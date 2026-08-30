@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "SwasthyaVaani"
+description = "A premium multilingual patient intake platform for hospitals, helping patients share their story simply and helping doctors review structured, physician-controlled summaries."
+version = "1.0.0"
+id = "artifacts/swasthyavaani"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23484
+
+[services.development]
+run = "pnpm --filter @workspace/swasthyavaani run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/swasthyavaani", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/swasthyavaani/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23484"
+BASE_PATH = "/"
