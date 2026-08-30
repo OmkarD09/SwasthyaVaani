@@ -288,11 +288,31 @@ function DoctorPortal() {
 function PatientKiosk() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(0);
+<<<<<<< HEAD
   const [language, setLanguage] = useState('');
   const [mode, setMode] = useState<'voice' | 'text'>('voice');
   const [searchQuery, setSearchQuery] = useState('');
+=======
+  const [language, setLanguage] = useState('English');
+  const [mode, setMode] = useState<'voice' | 'touch'>('voice');
+  const [workflow, setWorkflow] = useState<'GENERAL_CLINICAL' | 'AYUSH'>('GENERAL_CLINICAL');
+  const [patientName, setPatientName] = useState('Ananya Sharma');
+  const [patientAge, setPatientAge] = useState(34);
+  const [patientGender, setPatientGender] = useState('Female');
+  
+  // Live Intake Session State
+  const [intakeId, setIntakeId] = useState<string | null>(null);
+  const [token, setToken] = useState<string>('A-028');
+  const [activeQuestion, setActiveQuestion] = useState('What brings you in today?');
+  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [targetField, setTargetField] = useState<string>('chief_complaint');
+  const [patientAnswer, setPatientAnswer] = useState('');
+  const [extractedSummary, setExtractedSummary] = useState<Record<string, any>>({});
+>>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
   const [uploaded, setUploaded] = useState(false);
+  const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+<<<<<<< HEAD
 
   const t = getKioskTranslation(language || 'English');
 
@@ -331,10 +351,129 @@ function PatientKiosk() {
   const next = () => {
     if (!language && step === 0) return;
     setStep(Math.min(3, step + 1));
+=======
+  const [loading, setLoading] = useState(false);
+
+  const languages = ['English', 'हिन्दी', 'বাংলা', 'मराठी', 'తెలుగు', 'தமிழ்'];
+
+  // Start Session when leaving Step 0
+  const handleStartIntake = async () => {
+    setLoading(true);
+    const langCode = language === 'हिन्दी' ? 'hi' : 'en';
+    try {
+      const res = await fetch('/api/v1/intakes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_name: patientName,
+          patient_age: patientAge,
+          patient_gender: patientGender,
+          hospital_id: 'hosp_district_01',
+          doctor_id: 'doc_001',
+          workflow_type: workflow,
+          language_code: langCode,
+          interaction_mode: mode.toUpperCase(),
+          consent_given: true,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIntakeId(data.id);
+        setToken(data.token);
+      }
+    } catch (e) {
+      console.warn('Using offline intake session:', e);
+    } finally {
+      setLoading(false);
+      setStep(1);
+    }
+  };
+
+  // Submit answer and receive next adaptive question
+  const handleSubmitAnswer = async () => {
+    if (!patientAnswer.trim()) {
+      setStep(2);
+      return;
+    }
+    setLoading(true);
+    const langCode = language === 'हिन्दी' ? 'hi' : 'en';
+    try {
+      if (intakeId) {
+        const res = await fetch(`/api/v1/intakes/${intakeId}/answers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question_event_id: activeQuestionId,
+            raw_text: patientAnswer,
+            input_mode: mode.toUpperCase(),
+            language_code: langCode,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setExtractedSummary(prev => ({ ...prev, ...data.extracted_facts }));
+          if (data.decision && data.decision.action === 'ASK' && data.decision.question) {
+            setActiveQuestion(data.decision.question);
+            setTargetField(data.decision.target_field || '');
+            setPatientAnswer('');
+            setRecording(false);
+            setLoading(false);
+            return; // Ask next adaptive question
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Offline answer ingestion:', e);
+    } finally {
+      setLoading(false);
+      setStep(2);
+    }
+  };
+
+  // Document upload
+  const handleFileUpload = async (e?: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e?.target?.files?.[0];
+    const fileName = file ? file.name : 'Prescription_May2026.pdf';
+    setUploadedDocName(fileName);
+    setUploaded(true);
+    if (file && intakeId) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('patient_id', 'pat_demo');
+      formData.append('intake_session_id', intakeId);
+      formData.append('document_type', 'PRESCRIPTION');
+      try {
+        await fetch('/api/v1/documents/upload', {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (err) {
+        console.warn('Doc upload error:', err);
+      }
+    }
+  };
+
+  // Final submission into Doctor Queue
+  const handleFinalSubmit = async () => {
+    setLoading(true);
+    try {
+      if (intakeId) {
+        await fetch(`/api/v1/intakes/${intakeId}/submit`, {
+          method: 'POST',
+        });
+      }
+    } catch (e) {
+      console.warn('Submit offline:', e);
+    } finally {
+      setLoading(false);
+      setLocation('/clinician/queue');
+    }
+>>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
   };
 
   return (
     <main className="kiosk-page">
+<<<<<<< HEAD
       <div className="kiosk-layout">
         <aside className="kiosk-progress">
           <div className="kiosk-brand">
@@ -366,6 +505,38 @@ function PatientKiosk() {
                   <span className="step-icon">
                     {index < step ? <Check size={17} /> : <Icon size={17} />}
                   </span>
+=======
+      <header className="kiosk-topbar">
+        <button className="brand-button" onClick={() => setLocation('/')}>
+          <Brand />
+        </button>
+        <div className="kiosk-right">
+          <span className="kiosk-secure">
+            <ShieldCheck size={15} /> Private & Secure
+          </span>
+          <button className="language-mini">
+            <Languages size={16} /> {language} <ChevronDown size={13} />
+          </button>
+          <button className="kiosk-close" onClick={() => setLocation('/')}>
+            <X size={18} />
+          </button>
+        </div>
+      </header>
+
+      <div className="kiosk-layout">
+        <aside className="kiosk-progress">
+          <div className="kiosk-welcome">
+            <span className="eyebrow">PATIENT INTAKE</span>
+            <h1>Your care<br /><em>starts here.</em></h1>
+            <p>Take a few quiet minutes to share what brings you in today.</p>
+          </div>
+          <div className="step-list">
+            {patientSteps.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <div className={`kiosk-step ${index === step ? 'current' : ''} ${index < step ? 'done' : ''}`} key={item.title}>
+                  <span className="step-icon">{index < step ? <Check size={17} /> : <Icon size={17} />}</span>
+>>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
                   <span>
                     <b>{item.title}</b>
                     <small>{item.caption}</small>
@@ -376,6 +547,7 @@ function PatientKiosk() {
           </div>
           <div className="kiosk-help">
             <CircleHelp size={16} />
+<<<<<<< HEAD
             <span>{t.needHelp}</span>
           </div>
         </aside>
@@ -385,6 +557,16 @@ function PatientKiosk() {
               <span>
                 {t.stepPrefix} {String(step + 1).padStart(2, '0')} {t.stepOf} 04
               </span>
+=======
+            <span>Need help? Ask a staff member nearby.</span>
+          </div>
+        </aside>
+
+        <section className="kiosk-main">
+          <div className="kiosk-main-inner">
+            <div className="kiosk-progress-top">
+              <span>STEP {String(step + 1).padStart(2, '0')} OF 04</span>
+>>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
               <div>
                 <i className={step >= 0 ? 'filled' : ''} />
                 <i className={step >= 1 ? 'filled' : ''} />
@@ -392,6 +574,7 @@ function PatientKiosk() {
                 <i className={step >= 3 ? 'filled' : ''} />
               </div>
               <span className="time-note">
+<<<<<<< HEAD
                 <Clock3 size={14} /> {t.durationNote}
               </span>
             </div>
@@ -524,12 +707,148 @@ function PatientKiosk() {
                 </div>
               )
             )}
+=======
+                <Clock3 size={14} /> Token: <strong className="font-mono text-[#a06f42]">{token}</strong>
+              </span>
+            </div>
+
+            {/* STEP 0: LANGUAGE & WORKFLOW SELECTION */}
+            {step === 0 && (
+              <div className="kiosk-card language-card">
+                <div className="kiosk-card-icon">
+                  <Languages size={25} />
+                </div>
+                <div className="kiosk-card-heading">
+                  <span className="section-kicker">Welcome to SwasthyaVaani</span>
+                  <h2>Which language would<br />you like to speak?</h2>
+                  <p>Choose your preferred language for the voice interview.</p>
+                </div>
+                <div className="language-grid">
+                  {languages.map((item) => (
+                    <button
+                      key={item}
+                      className={language === item ? 'selected' : ''}
+                      onClick={() => setLanguage(item)}
+                    >
+                      <span className="language-radio">{language === item && <Check size={14} />}</span>
+                      <b>{item}</b>
+                      {item === 'English' && <small>English</small>}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-6">
+                  <span className="section-kicker">Clinical Stream</span>
+                  <div className="mode-toggle mt-2">
+                    <button
+                      className={workflow === 'GENERAL_CLINICAL' ? 'active' : ''}
+                      onClick={() => setWorkflow('GENERAL_CLINICAL')}
+                    >
+                      <Stethoscope size={18} /> General Medicine
+                    </button>
+                    <button
+                      className={workflow === 'AYUSH' ? 'active' : ''}
+                      onClick={() => setWorkflow('AYUSH')}
+                    >
+                      <HeartPulse size={18} /> AYUSH OPD
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mode-heading">
+                  <span className="section-kicker">How would you like to answer?</span>
+                  <div className="mode-toggle">
+                    <button className={mode === 'voice' ? 'active' : ''} onClick={() => setMode('voice')}>
+                      <Mic size={19} /> Voice
+                    </button>
+                    <button className={mode === 'touch' ? 'active' : ''} onClick={() => setMode('touch')}>
+                      <ScanLine size={19} /> Text / Touch
+                    </button>
+                  </div>
+                </div>
+                <AppButton onClick={handleStartIntake} className="kiosk-next" disabled={loading}>
+                  {loading ? 'Initializing…' : <>Start Intake <ArrowRight size={17} /></>}
+                </AppButton>
+              </div>
+            )}
+
+            {/* STEP 1: ADAPTIVE STORY & VOICE */}
+            {step === 1 && (
+              <div className="kiosk-card story-card">
+                <div className={`listen-orb ${recording ? 'recording' : ''}`}>
+                  <div className="listen-inner">
+                    {recording ? <Activity size={29} /> : <Mic size={29} />}
+                  </div>
+                </div>
+                <span className="section-kicker">Adaptive Question · {language}</span>
+                <h2 className="text-2xl font-serif">{activeQuestion}</h2>
+                <p className="story-instruction">
+                  {recording
+                    ? 'Listening… speak naturally about your symptoms.'
+                    : 'Tap to speak, or type your answer below.'}
+                </p>
+
+                <div className="my-4 w-full">
+                  <textarea
+                    rows={2}
+                    value={patientAnswer}
+                    onChange={(e) => setPatientAnswer(e.target.value)}
+                    placeholder={
+                      language === 'हिन्दी'
+                        ? 'उदा. मुझे 3 दिनों से तेज बुखार और सिरदर्द है...'
+                        : 'e.g. I have had fever and chest discomfort since 3 days...'
+                    }
+                    className="w-full rounded-xl border border-[#cbd6ca] bg-[#fbfaf4] p-3 text-sm text-[#173e35] outline-none focus:border-[#1f5b4e]"
+                  />
+                </div>
+
+                <div className="flex gap-2 w-full">
+                  <button
+                    className={`record-button flex-1 ${recording ? 'recording' : ''}`}
+                    onClick={() => {
+                      setRecording(!recording);
+                      if (!recording && !patientAnswer) {
+                        setPatientAnswer(
+                          language === 'हिन्दी'
+                            ? 'मुझे 3 दिनों से तेज बुखार और खांसी है, दर्द 6/10 है'
+                            : 'I have had persistent chest tightness and mild fever for 2 days, severity 6 out of 10'
+                        );
+                      }
+                    }}
+                  >
+                    {recording ? (
+                      <><span className="recording-bars"><i /><i /><i /></span> Listening…</>
+                    ) : (
+                      <><Mic size={19} /> {patientAnswer ? 'Audio recorded' : 'Tap to speak'}</>
+                    )}
+                  </button>
+                </div>
+
+                {Object.keys(extractedSummary).length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                    {Object.entries(extractedSummary).map(([k, v]) => (
+                      <span key={k} className="rounded-full bg-[#dbeade] px-3 py-1 font-mono text-[#245746]">
+                        ✓ {k}: {String(v)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <AppButton onClick={handleSubmitAnswer} className="kiosk-next mt-4" disabled={loading}>
+                  {loading ? 'Analyzing with AI…' : <>Next Question <ArrowRight size={17} /></>}
+                </AppButton>
+              </div>
+            )}
+
+            {/* STEP 2: DOCUMENTS UPLOAD */}
+>>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
             {step === 2 && (
               <div className="kiosk-card records-card">
                 <div className="kiosk-card-icon amber-icon">
                   <Paperclip size={25} />
                 </div>
                 <div className="kiosk-card-heading">
+<<<<<<< HEAD
                   <span className="section-kicker">{t.recordsKicker}</span>
                   <h2>{t.recordsHeading}</h2>
                   <p>{t.recordsSubtitle}</p>
@@ -573,11 +892,52 @@ function PatientKiosk() {
                 </AppButton>
               </div>
             )}
+=======
+                  <span className="section-kicker">Helpful context</span>
+                  <h2>Do you have an old<br />prescription or lab report?</h2>
+                  <p>Our secure OCR pipeline extracts relevant facts for your doctor.</p>
+                </div>
+                {uploaded ? (
+                  <div className="uploaded-file">
+                    <span className="file-check"><Check size={16} /></span>
+                    <span>
+                      <b>{uploadedDocName || 'Prescription_May2026.pdf'}</b>
+                      <small>Attached for doctor review · OCR Processed</small>
+                    </span>
+                    <button onClick={() => setUploaded(false)}><X size={15} /></button>
+                  </div>
+                ) : (
+                  <div className="upload-options">
+                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-[#b8cabe] bg-[#fbfaf4] p-5 text-center transition hover:border-[#1f5b4e]">
+                      <Upload size={24} className="text-[#1f5b4e]" />
+                      <b className="mt-2 text-sm text-[#173e35]">Upload from device</b>
+                      <small className="text-xs text-[#7b9086]">PDF, JPG or PNG</small>
+                      <input type="file" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                    <button onClick={() => handleFileUpload()}>
+                      <span><Camera size={21} /></span>
+                      <b>Use demo sample</b>
+                      <small>Sample prescription</small>
+                    </button>
+                  </div>
+                )}
+                <button className="skip-link" onClick={() => setStep(3)}>
+                  {uploaded ? 'Continue with attached file' : 'Skip for now'} <ArrowRight size={14} />
+                </button>
+                <AppButton onClick={() => setStep(3)} className="kiosk-next">
+                  Continue to Summary <ArrowRight size={17} />
+                </AppButton>
+              </div>
+            )}
+
+            {/* STEP 3: PATIENT REVIEW & SUBMIT TO QUEUE */}
+>>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
             {step === 3 && (
               <div className="kiosk-card ready-card">
                 <div className="ready-check">
                   <Check size={32} />
                 </div>
+<<<<<<< HEAD
                 <span className="section-kicker">{t.readyKicker}</span>
                 <h2>
                   {t.readyHeading}
@@ -614,6 +974,36 @@ function PatientKiosk() {
                 </div>
                 <AppButton onClick={() => setLocation('/doctor')} className="kiosk-next">
                   {t.btnFinishNotify} <ArrowRight size={17} />
+=======
+                <span className="section-kicker">You are all set</span>
+                <h2>Your intake summary<br />is ready for the doctor.</h2>
+                <p>We’ve organized your answers into a clear structured brief for the clinician.</p>
+                
+                <div className="ready-summary">
+                  <div>
+                    <span><UserRound size={15} /> Patient</span>
+                    <b>{patientName} ({patientAge} yrs)</b>
+                  </div>
+                  <div>
+                    <span><Languages size={15} /> Language</span>
+                    <b>{language}</b>
+                  </div>
+                  <div>
+                    <span><FileText size={15} /> Queue Token</span>
+                    <b className="font-mono text-[#a06f42]">#{token}</b>
+                  </div>
+                </div>
+
+                <div className="privacy-callout">
+                  <ShieldCheck size={17} />
+                  <span>
+                    <b>Physician-Controlled AI</b>
+                    <small>Your doctor remains the sole clinical decision maker.</small>
+                  </span>
+                </div>
+                <AppButton onClick={handleFinalSubmit} className="kiosk-next" disabled={loading}>
+                  {loading ? 'Submitting to Queue…' : <>Submit & Enter Doctor Queue <ArrowRight size={17} /></>}
+>>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
                 </AppButton>
               </div>
             )}
@@ -623,6 +1013,7 @@ function PatientKiosk() {
     </main>
   );
 }
+
 
 function AdminPortal() {
   const [, setLocation] = useLocation();
