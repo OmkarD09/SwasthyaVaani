@@ -18,6 +18,7 @@ import {
   FileText,
   HeartPulse,
   Hospital,
+  Keyboard,
   Languages,
   LayoutDashboard,
   LockKeyhole,
@@ -40,6 +41,9 @@ import {
   X,
 } from 'lucide-react';
 import './index.css';
+import CursorGrid from './components/CursorGrid';
+import { PatientTextChat } from './components/PatientTextChat';
+import { getKioskTranslation } from './lib/kioskTranslations';
 import { ClinicianLogin, Queue, RecordPage } from './pages/ClinicianDashboard';
 
 type IconType = typeof Activity;
@@ -121,14 +125,25 @@ function AppButton({
   variant = 'primary',
   className = '',
   type = 'button',
+  disabled = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
-  variant?: 'primary' | 'outline' | 'ghost' | 'dark' | 'soft';
+  variant?: 'primary' | 'outline' | 'ghost' | 'dark' | 'soft' | 'amber';
   className?: string;
   type?: 'button' | 'submit';
+  disabled?: boolean;
 }) {
-  return <button type={type} className={`app-button ${variant} ${className}`} onClick={onClick}>{children}</button>;
+  return (
+    <button
+      type={type}
+      className={`app-button ${variant} ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
 }
 
 function ShellNav() {
@@ -153,7 +168,22 @@ function Home() {
     <main className="home-page">
       <ShellNav />
       <section className="hero">
-        <div className="hero-grid" />
+        <div className="hero-grid" aria-hidden="true">
+          <CursorGrid
+            cellSize={70}
+            color="#EABA61"
+            radius={160}
+            falloff="smooth"
+            holdTime={300}
+            fadeDuration={900}
+            lineWidth={1}
+            maxOpacity={0.65}
+            fillOpacity={0.04}
+            gridOpacity={0.06}
+            cellRadius={0}
+            clickPulse={false}
+          />
+        </div>
         <div className="hero-copy">
           <div className="eyebrow light-eyebrow"><span className="live-dot" /> THE NEW PATIENT FIRST</div>
           <h1>Your story.<br /><em>Understood</em> before<br />you meet the doctor.</h1>
@@ -258,13 +288,340 @@ function DoctorPortal() {
 function PatientKiosk() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(0);
-  const [language, setLanguage] = useState('English');
-  const [mode, setMode] = useState<'voice' | 'touch'>('voice');
+  const [language, setLanguage] = useState('');
+  const [mode, setMode] = useState<'voice' | 'text'>('voice');
+  const [searchQuery, setSearchQuery] = useState('');
   const [uploaded, setUploaded] = useState(false);
   const [recording, setRecording] = useState(false);
-  const languages = ['English', 'हिन्दी', 'বাংলা', 'मराठी', 'తెలుగు', 'தமிழ்'];
-  const next = () => setStep(Math.min(3, step + 1));
-  return <main className="kiosk-page"><header className="kiosk-topbar"><button className="brand-button" onClick={() => setLocation('/')}><Brand /></button><div className="kiosk-right"><span className="kiosk-secure"><ShieldCheck size={15} /> Private & secure</span><button className="language-mini"><Languages size={16} /> {language} <ChevronDown size={13} /></button><button className="kiosk-close" onClick={() => setLocation('/')}><X size={18} /></button></div></header><div className="kiosk-layout"><aside className="kiosk-progress"><div className="kiosk-welcome"><span className="eyebrow">PATIENT INTAKE</span><h1>Your care<br /><em>starts here.</em></h1><p>Take a few quiet minutes to share what brings you in today.</p></div><div className="step-list">{patientSteps.map((item, index) => { const Icon = item.icon; return <div className={`kiosk-step ${index === step ? 'current' : ''} ${index < step ? 'done' : ''}`} key={item.title}><span className="step-icon">{index < step ? <Check size={17} /> : <Icon size={17} />}</span><span><b>{item.title}</b><small>{item.caption}</small></span></div>; })}</div><div className="kiosk-help"><CircleHelp size={16} /><span>Need help? Ask a staff member nearby.</span></div></aside><section className="kiosk-main"><div className="kiosk-main-inner"><div className="kiosk-progress-top"><span>STEP {String(step + 1).padStart(2, '0')} OF 04</span><div><i className={step >= 0 ? 'filled' : ''} /><i className={step >= 1 ? 'filled' : ''} /><i className={step >= 2 ? 'filled' : ''} /><i className={step >= 3 ? 'filled' : ''} /></div><span className="time-note"><Clock3 size={14} /> Takes about 3 min</span></div>{step === 0 && <div className="kiosk-card language-card"><div className="kiosk-card-icon"><Languages size={25} /></div><div className="kiosk-card-heading"><span className="section-kicker">First, let’s get comfortable</span><h2>Which language would<br />you like to use?</h2><p>You can change this at any time.</p></div><div className="language-grid">{languages.map((item) => <button key={item} className={language === item ? 'selected' : ''} onClick={() => setLanguage(item)}><span className="language-radio">{language === item && <Check size={14} />}</span><b>{item}</b>{item === 'English' && <small>English</small>}</button>)}</div><div className="mode-heading"><span className="section-kicker">How would you like to answer?</span><div className="mode-toggle"><button className={mode === 'voice' ? 'active' : ''} onClick={() => setMode('voice')}><Mic size={19} /> Voice</button><button className={mode === 'touch' ? 'active' : ''} onClick={() => setMode('touch')}><ScanLine size={19} /> Touch</button></div></div><AppButton onClick={next} className="kiosk-next">Continue <ArrowRight size={17} /></AppButton></div>}{step === 1 && <div className="kiosk-card story-card"><div className={`listen-orb ${recording ? 'recording' : ''}`}><div className="listen-inner">{recording ? <Activity size={29} /> : <Mic size={29} />}</div></div><span className="section-kicker">You’re speaking in {language}</span><h2>What brings you<br />in today?</h2><p className="story-instruction">{recording ? 'I’m listening. Take your time…' : 'Tap the microphone and tell us in your own words.'}</p><button className={`record-button ${recording ? 'recording' : ''}`} onClick={() => setRecording(!recording)}>{recording ? <><span className="recording-bars"><i /><i /><i /></span> Listening…</> : <><Mic size={19} /> Tap to speak</>}</button><div className="touch-fallback"><span>Prefer typing?</span><button onClick={() => setMode('touch')}>Use touch instead <ArrowRight size={14} /></button></div><AppButton onClick={next} className="kiosk-next">Continue <ArrowRight size={17} /></AppButton></div>}{step === 2 && <div className="kiosk-card records-card"><div className="kiosk-card-icon amber-icon"><Paperclip size={25} /></div><div className="kiosk-card-heading"><span className="section-kicker">Helpful, not required</span><h2>Do you have an old<br />prescription or report?</h2><p>It helps your doctor see the full picture.</p></div>{uploaded ? <div className="uploaded-file"><span className="file-check"><Check size={16} /></span><span><b>Prescription_May2026.pdf</b><small>Ready for your doctor · 1.2 MB</small></span><button onClick={() => setUploaded(false)}><X size={15} /></button></div> : <div className="upload-options"><button onClick={() => setUploaded(true)}><span><Upload size={21} /></span><b>Upload from device</b><small>PDF, JPG or PNG</small></button><button onClick={() => setUploaded(true)}><span><Camera size={21} /></span><b>Take a photo</b><small>Use the camera to scan</small></button></div>}<button className="skip-link" onClick={next}>{uploaded ? 'Continue without adding more' : 'Skip for now'} <ArrowRight size={14} /></button><AppButton onClick={next} className="kiosk-next">{uploaded ? 'Continue' : 'Continue without a report'} <ArrowRight size={17} /></AppButton></div>}{step === 3 && <div className="kiosk-card ready-card"><div className="ready-check"><Check size={32} /></div><span className="section-kicker">You’re all set</span><h2>Your story is ready<br />for <em>Dr. Rao.</em></h2><p>We’ve organized your answers and records into a clear summary for your doctor to review before you meet.</p><div className="ready-summary"><div><span><UserRound size={15} /> Patient</span><b>Meena Kumari</b></div><div><span><Languages size={15} /> Language</span><b>{language}</b></div><div><span><FileText size={15} /> Records</span><b>{uploaded ? '1 attached' : 'None added'}</b></div></div><div className="privacy-callout"><ShieldCheck size={17} /><span><b>Your information stays private</b><small>Only your care team can view this summary.</small></span></div><AppButton onClick={() => setLocation('/doctor')} className="kiosk-next">Finish and notify doctor <ArrowRight size={17} /></AppButton></div>}</div></section></div></main>;
+
+  const t = getKioskTranslation(language || 'English');
+
+  const languages = [
+    { name: 'English', sub: 'English' },
+    { name: 'हिन्दी', sub: 'Hindi' },
+    { name: 'বাংলা', sub: 'Bengali' },
+    { name: 'मराठी', sub: 'Marathi' },
+    { name: 'తెలుగు', sub: 'Telugu' },
+    { name: 'தமிழ்', sub: 'Tamil' },
+    { name: 'ગુજરાતી', sub: 'Gujarati' },
+    { name: 'ಕನ್ನಡ', sub: 'Kannada' },
+    { name: 'മലയാളം', sub: 'Malayalam' },
+    { name: 'ਪੰਜਾਬੀ', sub: 'Punjabi' },
+    { name: 'ଓଡ଼ିଆ', sub: 'Odia' },
+    { name: 'অসমীয়া', sub: 'Assamese' },
+    { name: 'اردو', sub: 'Urdu' },
+  ];
+
+  const filteredLanguages = languages.filter((item) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      item.name.toLowerCase().includes(q) ||
+      item.sub.toLowerCase().includes(q)
+    );
+  });
+
+  const dynamicSteps = [
+    { title: t.steps.language.title, caption: t.steps.language.caption, icon: Languages },
+    { title: t.steps.story.title, caption: t.steps.story.caption, icon: Mic },
+    { title: t.steps.records.title, caption: t.steps.records.caption, icon: FileText },
+    { title: t.steps.ready.title, caption: t.steps.ready.caption, icon: CheckCircle2 },
+  ];
+
+  const next = () => {
+    if (!language && step === 0) return;
+    setStep(Math.min(3, step + 1));
+  };
+
+  return (
+    <main className="kiosk-page">
+      <div className="kiosk-layout">
+        <aside className="kiosk-progress">
+          <div className="kiosk-brand">
+            <button
+              className="brand-button"
+              onClick={() => setLocation('/')}
+              aria-label="SwasthyaVaani home"
+            >
+              <Brand light />
+            </button>
+          </div>
+          <div className="kiosk-welcome">
+            <span className="eyebrow">{t.intakeEyebrow}</span>
+            <h1>
+              {t.careStartsHere}
+              <br />
+              <em>{t.careStartsHereEm}</em>
+            </h1>
+            <p>{t.careDescription}</p>
+          </div>
+          <div className="step-list">
+            {dynamicSteps.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  className={`kiosk-step ${index === step ? 'current' : ''} ${index < step ? 'done' : ''}`}
+                  key={item.title + index}
+                >
+                  <span className="step-icon">
+                    {index < step ? <Check size={17} /> : <Icon size={17} />}
+                  </span>
+                  <span>
+                    <b>{item.title}</b>
+                    <small>{item.caption}</small>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="kiosk-help">
+            <CircleHelp size={16} />
+            <span>{t.needHelp}</span>
+          </div>
+        </aside>
+        <section className="kiosk-main">
+          <div className="kiosk-main-inner">
+            <div className="kiosk-progress-top">
+              <span>
+                {t.stepPrefix} {String(step + 1).padStart(2, '0')} {t.stepOf} 04
+              </span>
+              <div>
+                <i className={step >= 0 ? 'filled' : ''} />
+                <i className={step >= 1 ? 'filled' : ''} />
+                <i className={step >= 2 ? 'filled' : ''} />
+                <i className={step >= 3 ? 'filled' : ''} />
+              </div>
+              <span className="time-note">
+                <Clock3 size={14} /> {t.durationNote}
+              </span>
+            </div>
+            {step === 0 && (
+              <div className="kiosk-card language-card">
+                <div className="kiosk-card-heading">
+                  <span className="section-kicker">{t.langKicker}</span>
+                  <h2>{t.langHeading}</h2>
+                  <p>{t.langSubtitle}</p>
+                </div>
+                <div className="language-search-wrap">
+                  <Search size={15} className="search-icon" />
+                  <input
+                    type="text"
+                    className="language-search-input"
+                    placeholder="Search your language..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      className="search-clear-btn"
+                      onClick={() => setSearchQuery('')}
+                      aria-label="Clear search"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                {filteredLanguages.length === 0 ? (
+                  <div className="language-no-results">
+                    No languages found matching &ldquo;{searchQuery}&rdquo;
+                  </div>
+                ) : (
+                  <div className="language-grid-wrap">
+                    <div className="language-grid">
+                      {filteredLanguages.map((item) => (
+                        <button
+                          key={item.sub}
+                          className={language === item.name || language === item.sub ? 'selected' : ''}
+                          onClick={() => setLanguage(item.name)}
+                        >
+                          <span className="language-radio">
+                            {(language === item.name || language === item.sub) && <Check size={14} />}
+                          </span>
+                          <b>{item.name}</b>
+                          <small>{item.sub}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="mode-heading">
+                  <span className="section-kicker">{t.modeKicker}</span>
+                  <div className="mode-toggle">
+                    <button
+                      className={mode === 'voice' ? 'active' : ''}
+                      onClick={() => setMode('voice')}
+                    >
+                      <Mic size={19} /> {t.modeVoice}
+                    </button>
+                    <button
+                      className={mode === 'text' ? 'active' : ''}
+                      onClick={() => setMode('text')}
+                    >
+                      <Keyboard size={19} /> {t.modeText}
+                    </button>
+                  </div>
+                </div>
+                <AppButton
+                  variant="amber"
+                  onClick={next}
+                  disabled={!language}
+                  className="kiosk-next"
+                >
+                  {t.btnContinue} <ArrowRight size={17} />
+                </AppButton>
+              </div>
+            )}
+            {step === 1 && (
+              mode === 'text' ? (
+                <PatientTextChat
+                  language={language}
+                  onComplete={() => setStep(2)}
+                  onSwitchToVoice={() => setMode('voice')}
+                />
+              ) : (
+                <div className="kiosk-card story-card">
+                  <div className={`listen-orb ${recording ? 'recording' : ''}`}>
+                    <div className="listen-inner">
+                      {recording ? <Activity size={29} /> : <Mic size={29} />}
+                    </div>
+                  </div>
+                  <span className="section-kicker">
+                    {t.speakingIn} {language}
+                  </span>
+                  <h2>{t.storyHeading}</h2>
+                  <p className="story-instruction">
+                    {recording ? t.storyInstructionActive : t.storyInstructionIdle}
+                  </p>
+                  <button
+                    className={`record-button ${recording ? 'recording' : ''}`}
+                    onClick={() => setRecording(!recording)}
+                  >
+                    {recording ? (
+                      <>
+                        <span className="recording-bars">
+                          <i />
+                          <i />
+                          <i />
+                        </span>{' '}
+                        {t.btnListening}
+                      </>
+                    ) : (
+                      <>
+                        <Mic size={19} /> {t.btnTapToSpeak}
+                      </>
+                    )}
+                  </button>
+                  <div className="touch-fallback">
+                    <span>{t.preferTyping}</span>
+                    <button onClick={() => setMode('text')}>
+                      {t.useTouchInstead} <ArrowRight size={14} />
+                    </button>
+                  </div>
+                  <AppButton onClick={next} className="kiosk-next">
+                    {t.btnContinue} <ArrowRight size={17} />
+                  </AppButton>
+                </div>
+              )
+            )}
+            {step === 2 && (
+              <div className="kiosk-card records-card">
+                <div className="kiosk-card-icon amber-icon">
+                  <Paperclip size={25} />
+                </div>
+                <div className="kiosk-card-heading">
+                  <span className="section-kicker">{t.recordsKicker}</span>
+                  <h2>{t.recordsHeading}</h2>
+                  <p>{t.recordsSubtitle}</p>
+                </div>
+                {uploaded ? (
+                  <div className="uploaded-file">
+                    <span className="file-check">
+                      <Check size={16} />
+                    </span>
+                    <span>
+                      <b>Prescription_May2026.pdf</b>
+                      <small>{t.recordReadySub}</small>
+                    </span>
+                    <button onClick={() => setUploaded(false)}>
+                      <X size={15} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="upload-options">
+                    <button onClick={() => setUploaded(true)}>
+                      <span>
+                        <Upload size={21} />
+                      </span>
+                      <b>{t.uploadDeviceTitle}</b>
+                      <small>{t.uploadDeviceSub}</small>
+                    </button>
+                    <button onClick={() => setUploaded(true)}>
+                      <span>
+                        <Camera size={21} />
+                      </span>
+                      <b>{t.takePhotoTitle}</b>
+                      <small>{t.takePhotoSub}</small>
+                    </button>
+                  </div>
+                )}
+                <button className="skip-link" onClick={next}>
+                  {uploaded ? t.btnContinueWithoutMore : t.btnSkip} <ArrowRight size={14} />
+                </button>
+                <AppButton onClick={next} className="kiosk-next">
+                  {uploaded ? t.btnContinue : t.btnContinueWithoutReport} <ArrowRight size={17} />
+                </AppButton>
+              </div>
+            )}
+            {step === 3 && (
+              <div className="kiosk-card ready-card">
+                <div className="ready-check">
+                  <Check size={32} />
+                </div>
+                <span className="section-kicker">{t.readyKicker}</span>
+                <h2>
+                  {t.readyHeading}
+                  <br />
+                  <em>{t.readyHeadingEm}</em>
+                </h2>
+                <p>{t.readySubtitle}</p>
+                <div className="ready-summary">
+                  <div>
+                    <span>
+                      <UserRound size={15} /> {t.summaryPatient}
+                    </span>
+                    <b>Meena Kumari</b>
+                  </div>
+                  <div>
+                    <span>
+                      <Languages size={15} /> {t.summaryLanguage}
+                    </span>
+                    <b>{language}</b>
+                  </div>
+                  <div>
+                    <span>
+                      <FileText size={15} /> {t.summaryRecords}
+                    </span>
+                    <b>{uploaded ? t.summaryOneAttached : t.summaryNoneAdded}</b>
+                  </div>
+                </div>
+                <div className="privacy-callout">
+                  <ShieldCheck size={17} />
+                  <span>
+                    <b>{t.privacyTitle}</b>
+                    <small>{t.privacySub}</small>
+                  </span>
+                </div>
+                <AppButton onClick={() => setLocation('/doctor')} className="kiosk-next">
+                  {t.btnFinishNotify} <ArrowRight size={17} />
+                </AppButton>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
 }
 
 function AdminPortal() {
