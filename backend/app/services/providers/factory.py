@@ -4,7 +4,7 @@ from app.services.providers.base import (
     AbstractLLMProvider, AbstractSpeechProvider, AbstractOCRProvider
 )
 from app.services.providers.llm_provider import MockLLMProvider, GeminiLLMProvider
-from app.services.providers.speech_provider import MockSpeechProvider, BhashiniSpeechProvider
+from app.services.providers.speech_provider import MockSpeechProvider, BhashiniSpeechProvider, SarvamSpeechProvider
 from app.services.providers.ocr_provider import MockOCRProvider, PaddleOCRProvider
 
 
@@ -28,7 +28,11 @@ class ProviderRegistry:
     def get_speech(self) -> AbstractSpeechProvider:
         if self._speech_provider is None:
             provider_type = os.getenv("PROVIDER_SPEECH", "mock").lower()
-            if provider_type == "bhashini":
+            if provider_type == "sarvam":
+                self._speech_provider = SarvamSpeechProvider(
+                    api_key=os.getenv("SARVAM_API_KEY")
+                )
+            elif provider_type == "bhashini":
                 self._speech_provider = BhashiniSpeechProvider(
                     api_key=os.getenv("BHASHINI_API_KEY"),
                     user_id=os.getenv("BHASHINI_USER_ID")
