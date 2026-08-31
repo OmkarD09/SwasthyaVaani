@@ -24,13 +24,10 @@ def extract_clinical_facts_from_answer(
         extracted["chief_complaint"] = raw_answer
         progress = True
 
-    # Check for duration signals (English, Hinglish, Devanagari)
-    duration_match = re.search(r'(\d+)\s*(days?|din(?:o[n]?)?|weeks?|haft[ae]|months?|mah[ie]ne|hours?|ghant[ae]|दिन(?:ों)?|हफ्ते|हफ़्ते|महीने|घंटे)', text)
+    # Check for duration signals
+    duration_match = re.search(r'(\d+)\s*(days?|din|weeks?|haft[ae]|months?|mah[ie]ne|hours?|ghant[ae])', text)
     if duration_match:
-        num = duration_match.group(1)
-        unit = duration_match.group(2)
-        norm_unit = "days" if ("day" in unit or "din" in unit or "दिन" in unit) else unit
-        dur_str = f"{num} {norm_unit}"
+        dur_str = f"{duration_match.group(1)} {duration_match.group(2)}"
         updated_state.duration = dur_str
         extracted["duration"] = dur_str
         progress = True

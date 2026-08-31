@@ -1,22 +1,7 @@
-import json
-from typing import Dict, Any, Optional, List
-from pydantic import BaseModel, Field
-
+from typing import Dict, Any, Optional
 from app.services.providers.base import AbstractLLMProvider, ExtractionResult
 from app.services.clinical_ai.mock_provider import extract_clinical_facts_from_answer
 from app.schemas.clinical_state import ClinicalState
-
-
-class GeminiClinicalExtraction(BaseModel):
-    """Structured extraction schema enforced on Gemini responses."""
-    chief_complaint: Optional[str] = Field(None, description="Primary symptom or presenting medical issue")
-    onset: Optional[str] = Field(None, description="Onset characteristic, e.g. sudden or gradual")
-    duration: Optional[str] = Field(None, description="Duration of symptoms, e.g. 3 days, since yesterday")
-    severity: Optional[int] = Field(None, ge=1, le=10, description="Pain or distress scale 1 to 10")
-    location: Optional[str] = Field(None, description="Anatomical site of symptom")
-    radiation: Optional[str] = Field(None, description="Radiation direction, e.g. left arm, neck, back")
-    associated_symptoms: List[str] = Field(default_factory=list, description="Other accompanying symptoms")
-    has_meaningful_progress: bool = Field(True, description="Whether new clinical information was provided")
 
 
 class MockLLMProvider(AbstractLLMProvider):
@@ -63,71 +48,24 @@ class MockLLMProvider(AbstractLLMProvider):
 
 
 class GeminiLLMProvider(AbstractLLMProvider):
-    """Google Gemini 2.5 Flash Provider with Pydantic Structured Output and safe fallback."""
+    """Google Gemini 1.5 Flash Provider adapter."""
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key
         self.fallback = MockLLMProvider()
-        self._client = None
-        if self.api_key:
-            try:
-                from google import genai
-                self._client = genai.Client(api_key=self.api_key)
-            except Exception as e:
-                print(f"[GeminiLLMProvider] Failed to initialize Google GenAI Client: {e}")
 
     async def extract_clinical_facts(
         self,
         raw_text: str,
-        current_state: Any,
-        language_code: str = "en",
-        target_field: str = "chief_complaint"
+        current_state: Dict[str, Any],
+        language_code: str = "en"
     ) -> ExtractionResult:
-        """
-        Extracts clinical entities using Gemini 2.5 Flash with structured JSON output.
-        Strict Clinical Safety: NEVER diagnose or prescribe.
-        """
-        if not self._client or not self.api_key:
-            return await self.fallback.extract_clinical_facts(raw_text, current_state, language_code, target_field)
-
-        prompt = f"""
-You are SwasthyaVaani's clinical pre-consultation intake extractor for SIH Problem Statement 26047.
-Extract structured clinical facts from the patient's statement into the requested JSON schema.
-
-RULES:
-1. NEVER output diagnoses or prescriptions.
-2. Extract only factual symptom characteristics (SOCRATES framework & AYUSH metrics).
-3. If a field is not mentioned, leave it null.
-4. Support both English and Indic language terms (e.g., 'chhati mein dard', 'sir dard', 'tez bukhar').
-
-Target Field Being Answered: {target_field}
-Current State Summary: {current_state}
-Patient Statement ({language_code}): "{raw_text}"
-"""
-        try:
-            from google.genai import types
-            response = self._client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=GeminiClinicalExtraction,
-                    temperature=0.1
-                )
-            )
-
-            parsed = json.loads(response.text)
-            clean_facts = {k: v for k, v in parsed.items() if v is not None}
-
-            return ExtractionResult(
-                extracted_facts=clean_facts,
-                confidence=0.92,
-                raw_response=response.text,
-                provider_name="Gemini 1.5 Flash"
-            )
-        except Exception as err:
-            print(f"[GeminiLLMProvider] Live API call failed, using deterministic fallback: {err}")
-            return await self.fallback.extract_clinical_facts(raw_text, current_state, language_code, target_field)
+        if not self.api_key:
+            # Safe degradation to deterministic fallback
+            return await self.fallback.extract_clinical_facts(raw_text, current_state, language_code)
+        
+        # Real Gemini structured JSON extraction can be plugged here
+        return await self.fallback.extract_clinical_facts(raw_text, current_state, language_code)
 
     async def generate_adaptive_question(
         self,
@@ -135,27 +73,4 @@ Patient Statement ({language_code}): "{raw_text}"
         chief_complaint: Optional[str],
         language_code: str = "en"
     ) -> str:
-        """Generates dynamic, empathetic clinical follow-up question via Gemini 2.5 Flash."""
-        if not self._client or not self.api_key:
-            return await self.fallback.generate_adaptive_question(target_field, chief_complaint, language_code)
-
-        prompt = f"""
-You are SwasthyaVaani, an empathetic clinical intake assistant for an Indian outpatient clinic.
-Formulate a SINGLE, polite follow-up question to clarify the missing field: '{target_field}'.
-Chief Complaint: {chief_complaint or 'Not yet specified'}
-Language Code: {language_code} (if 'hi', ask in natural Hindi; if 'en', ask in natural English).
-
-RULES:
-- Ask only ONE single question.
-- Keep it under 25 words.
-- Do NOT suggest any medical diagnoses or treatments.
-"""
-        try:
-            response = self._client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
-            return response.text.strip()
-        except Exception as err:
-            print(f"[GeminiLLMProvider] Question generation fallback: {err}")
-            return await self.fallback.generate_adaptive_question(target_field, chief_complaint, language_code)
+        return await self.fallback.generate_adaptive_question(target_field, chief_complaint, language_code)
