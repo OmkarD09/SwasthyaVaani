@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import {
   Activity,
@@ -45,6 +45,9 @@ import CursorGrid from './components/CursorGrid';
 import { PatientTextChat } from './components/PatientTextChat';
 import { getKioskTranslation } from './lib/kioskTranslations';
 import { ClinicianLogin, Queue, RecordPage } from './pages/ClinicianDashboard';
+import { PatientProfile } from './pages/PatientProfile';
+import { PatientDetails } from './pages/PatientDetails';
+import { patientApi } from './services/patientApi';
 
 type IconType = typeof Activity;
 
@@ -282,37 +285,231 @@ function DoctorPortal() {
   const [selected, setSelected] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const patient = queuePatients[selected];
-  return <main className="portal-page"><PortalSidebar active="Triage queue" onNavigate={setLocation} mobileOpen={mobileOpen} /><div className="portal-content"><PortalTopbar title="Good morning, Ananya" subtitle="Tuesday, 18 June 2026 · District Hospital" onMenu={() => setMobileOpen(!mobileOpen)} /><div className="portal-main"><div className="portal-heading-row"><div><div className="section-kicker">Tuesday OPD · 10:44 AM</div><h1>Your triage queue</h1><p>Review patient stories before they enter the consultation room.</p></div><AppButton variant="soft" onClick={() => setLocation('/patient')}><Plus size={16} /> New intake</AppButton></div><div className="doctor-stats"><div className="doctor-stat accent"><span className="stat-icon"><Users size={17} /></span><div><span>Waiting now</span><strong>08</strong></div><small>+2 this hour</small></div><div className="doctor-stat"><span className="stat-icon"><Clock3 size={17} /></span><div><span>Avg. wait time</span><strong>14 <small>min</small></strong></div><small className="good">↓ 18% today</small></div><div className="doctor-stat"><span className="stat-icon"><CheckCircle2 size={17} /></span><div><span>Reviewed today</span><strong>26</strong></div><small>of 34 patients</small></div><div className="doctor-stat"><span className="stat-icon"><Languages size={17} /></span><div><span>Languages today</span><strong>07</strong></div><small>across OPD</small></div></div><div className="doctor-workspace"><section className="queue-panel"><div className="panel-heading"><div><h2>Live patient queue <span className="live-pill"><span /> Live</span></h2><p>Prioritized by arrival and clinical flags</p></div><button className="filter-button"><span>All patients</span><ChevronDown size={14} /></button></div><div className="queue-list">{queuePatients.map((item, index) => <button className={`queue-row ${selected === index ? 'selected' : ''}`} key={item.id} onClick={() => setSelected(index)}><div className={`queue-avatar ${item.color}`}>{item.initials}</div><div className="queue-patient"><b>{item.name}</b><span>{item.id} · {item.age}</span></div><div className="queue-reason"><b>{item.reason}</b><span><Languages size={12} /> {item.lang}</span></div><div className={`priority ${item.priority === 'Priority' ? 'priority-high' : ''}`}><span />{item.priority}</div><div className="queue-wait"><span>Waiting</span><b>{item.wait}</b></div><ArrowRight size={17} className="row-arrow" /></button>)}</div><button className="view-all-button">View all 8 patients <ArrowRight size={15} /></button></section><aside className="summary-panel"><div className="summary-panel-top"><div><span className="section-kicker">Selected patient</span><h2>Patient summary</h2></div><button className="more-button"><MoreHorizontal size={18} /></button></div><div className="selected-profile"><div className={`queue-avatar ${patient.color}`}>{patient.initials}</div><div><h3>{patient.name}</h3><span>{patient.id} · {patient.age} · {patient.lang}</span></div><span className="profile-status">Waiting {patient.wait}</span></div><div className="ai-notice"><Sparkles size={16} /><span><b>AI-structured summary</b><small>For physician review only</small></span><CheckCircle2 size={15} /></div><div className="summary-block"><span className="summary-block-label">CHIEF CONCERN</span><h3>{patient.reason}</h3><p>Patient reports a persistent cough with intermittent throat irritation, more noticeable at night. No shortness of breath reported during intake.</p></div><div className="summary-block"><span className="summary-block-label">INTAKE SIGNALS</span><div className="signal-row"><span>Duration</span><b>About 2 weeks</b></div><div className="signal-row"><span>Severity</span><b className="amber-text">Moderate · 5/10</b></div><div className="signal-row"><span>Previous history</span><b>Seasonal allergies</b></div></div><div className="summary-block"><span className="summary-block-label">ATTACHMENTS <small>2</small></span><div className="attachment-row"><FileText size={16} /><span><b>Prescription_May2026.pdf</b><small>Uploaded 10:27 AM · 1.2 MB</small></span><button><ArrowRight size={14} /></button></div><div className="attachment-row"><FileText size={16} /><span><b>Chest_Xray_Report.jpg</b><small>Uploaded 10:27 AM · 840 KB</small></span><button><ArrowRight size={14} /></button></div></div><div className="summary-actions"><AppButton onClick={() => setSelected((selected + 1) % queuePatients.length)}><Check size={16} /> Mark reviewed</AppButton><button className="secondary-action"><MoreHorizontal size={17} /> More actions</button></div></aside></div></div></div></main>;
+  return (
+    <main className="portal-page">
+      <PortalSidebar active="Triage queue" onNavigate={setLocation} mobileOpen={mobileOpen} />
+      <div className="portal-content">
+        <PortalTopbar
+          title="Good morning, Ananya"
+          subtitle="Tuesday, 18 June 2026 · District Hospital"
+          onMenu={() => setMobileOpen(!mobileOpen)}
+        />
+        <div className="portal-main">
+          <div className="portal-heading-row">
+            <div>
+              <div className="section-kicker">Tuesday OPD · 10:44 AM</div>
+              <h1>Your triage queue</h1>
+              <p>Review patient stories before they enter the consultation room.</p>
+            </div>
+            <AppButton variant="soft" onClick={() => setLocation('/patient')}>
+              <Plus size={16} /> New intake
+            </AppButton>
+          </div>
+          <div className="doctor-stats">
+            <div className="doctor-stat accent">
+              <span className="stat-icon">
+                <Users size={17} />
+              </span>
+              <div>
+                <span>Waiting now</span>
+                <strong>08</strong>
+              </div>
+              <small>+2 this hour</small>
+            </div>
+            <div className="doctor-stat">
+              <span className="stat-icon">
+                <Clock3 size={17} />
+              </span>
+              <div>
+                <span>Avg. wait time</span>
+                <strong>
+                  14 <small>min</small>
+                </strong>
+              </div>
+              <small className="good">↓ 18% today</small>
+            </div>
+            <div className="doctor-stat">
+              <span className="stat-icon">
+                <CheckCircle2 size={17} />
+              </span>
+              <div>
+                <span>Reviewed today</span>
+                <strong>26</strong>
+              </div>
+              <small>of 34 patients</small>
+            </div>
+            <div className="doctor-stat">
+              <span className="stat-icon">
+                <Languages size={17} />
+              </span>
+              <div>
+                <span>Languages today</span>
+                <strong>07</strong>
+              </div>
+              <small>across OPD</small>
+            </div>
+          </div>
+          <div className="doctor-workspace">
+            <section className="queue-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>
+                    Live patient queue <span className="live-pill"><span /> Live</span>
+                  </h2>
+                  <p>Prioritized by arrival and clinical flags</p>
+                </div>
+                <button className="filter-button">
+                  <span>All patients</span>
+                  <ChevronDown size={14} />
+                </button>
+              </div>
+              <div className="queue-list">
+                {queuePatients.map((item, index) => (
+                  <button
+                    className={`queue-row ${selected === index ? 'selected' : ''}`}
+                    key={item.id}
+                    onClick={() => setSelected(index)}
+                  >
+                    <div className={`queue-avatar ${item.color}`}>{item.initials}</div>
+                    <div className="queue-patient">
+                      <b>{item.name}</b>
+                      <span>
+                        {item.id} · {item.age}
+                      </span>
+                    </div>
+                    <div className="queue-reason">
+                      <b>{item.reason}</b>
+                      <span>
+                        <Languages size={12} /> {item.lang}
+                      </span>
+                    </div>
+                    <div className={`priority ${item.priority === 'Priority' ? 'priority-high' : ''}`}>
+                      <span />
+                      {item.priority}
+                    </div>
+                    <div className="queue-wait">
+                      <span>Waiting</span>
+                      <b>{item.wait}</b>
+                    </div>
+                    <ArrowRight size={17} className="row-arrow" />
+                  </button>
+                ))}
+              </div>
+              <button className="view-all-button">
+                View all 8 patients <ArrowRight size={15} />
+              </button>
+            </section>
+            <aside className="summary-panel">
+              <div className="summary-panel-top">
+                <div>
+                  <span className="section-kicker">Selected patient</span>
+                  <h2>Patient summary</h2>
+                </div>
+                <button className="more-button">
+                  <MoreHorizontal size={18} />
+                </button>
+              </div>
+              <div className="selected-profile">
+                <div className={`queue-avatar ${patient.color}`}>{patient.initials}</div>
+                <div>
+                  <h3>{patient.name}</h3>
+                  <span>
+                    {patient.id} · {patient.age} · {patient.lang}
+                  </span>
+                </div>
+                <span className="profile-status">Waiting {patient.wait}</span>
+              </div>
+              <div className="ai-notice">
+                <Sparkles size={16} />
+                <span>
+                  <b>AI-structured summary</b>
+                  <small>For physician review only</small>
+                </span>
+                <CheckCircle2 size={15} />
+              </div>
+              <div className="summary-block">
+                <span className="summary-block-label">CHIEF CONCERN</span>
+                <h3>{patient.reason}</h3>
+                <p>
+                  Patient reports a persistent cough with intermittent throat irritation, more noticeable at
+                  night. No shortness of breath reported during intake.
+                </p>
+              </div>
+              <div className="summary-block">
+                <span className="summary-block-label">INTAKE SIGNALS</span>
+                <div className="signal-row">
+                  <span>Duration</span>
+                  <b>About 2 weeks</b>
+                </div>
+                <div className="signal-row">
+                  <span>Severity</span>
+                  <b className="amber-text">Moderate · 5/10</b>
+                </div>
+                <div className="signal-row">
+                  <span>Previous history</span>
+                  <b>Seasonal allergies</b>
+                </div>
+              </div>
+              <div className="summary-block">
+                <span className="summary-block-label">
+                  ATTACHMENTS <small>2</small>
+                </span>
+                <div className="attachment-row">
+                  <FileText size={16} />
+                  <span>
+                    <b>Prescription_May2026.pdf</b>
+                    <small>Uploaded 10:27 AM · 1.2 MB</small>
+                  </span>
+                  <button>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+                <div className="attachment-row">
+                  <FileText size={16} />
+                  <span>
+                    <b>Chest_Xray_Report.jpg</b>
+                    <small>Uploaded 10:27 AM · 840 KB</small>
+                  </span>
+                  <button>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+              <div className="summary-actions">
+                <AppButton onClick={() => setSelected((selected + 1) % queuePatients.length)}>
+                  <Check size={16} /> Mark reviewed
+                </AppButton>
+                <button className="secondary-action">
+                  <MoreHorizontal size={17} /> More actions
+                </button>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
 }
 
 function PatientKiosk() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(0);
-<<<<<<< HEAD
   const [language, setLanguage] = useState('');
   const [mode, setMode] = useState<'voice' | 'text'>('voice');
   const [searchQuery, setSearchQuery] = useState('');
-=======
-  const [language, setLanguage] = useState('English');
-  const [mode, setMode] = useState<'voice' | 'touch'>('voice');
-  const [workflow, setWorkflow] = useState<'GENERAL_CLINICAL' | 'AYUSH'>('GENERAL_CLINICAL');
-  const [patientName, setPatientName] = useState('Ananya Sharma');
-  const [patientAge, setPatientAge] = useState(34);
-  const [patientGender, setPatientGender] = useState('Female');
-  
-  // Live Intake Session State
-  const [intakeId, setIntakeId] = useState<string | null>(null);
-  const [token, setToken] = useState<string>('A-028');
-  const [activeQuestion, setActiveQuestion] = useState('What brings you in today?');
-  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
-  const [targetField, setTargetField] = useState<string>('chief_complaint');
-  const [patientAnswer, setPatientAnswer] = useState('');
-  const [extractedSummary, setExtractedSummary] = useState<Record<string, any>>({});
->>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
   const [uploaded, setUploaded] = useState(false);
   const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
-<<<<<<< HEAD
+  const [patientName, setPatientName] = useState('Ananya Sharma');
+  const [patientAge, setPatientAge] = useState('34');
+  const [token] = useState('A-028');
+
+  useEffect(() => {
+    patientApi.getProfile().then((p) => {
+      if (p.name) setPatientName(p.name);
+      if (p.age) setPatientAge(p.age);
+    });
+  }, []);
 
   const t = getKioskTranslation(language || 'English');
 
@@ -351,129 +548,17 @@ function PatientKiosk() {
   const next = () => {
     if (!language && step === 0) return;
     setStep(Math.min(3, step + 1));
-=======
-  const [loading, setLoading] = useState(false);
-
-  const languages = ['English', 'हिन्दी', 'বাংলা', 'मराठी', 'తెలుగు', 'தமிழ்'];
-
-  // Start Session when leaving Step 0
-  const handleStartIntake = async () => {
-    setLoading(true);
-    const langCode = language === 'हिन्दी' ? 'hi' : 'en';
-    try {
-      const res = await fetch('/api/v1/intakes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patient_name: patientName,
-          patient_age: patientAge,
-          patient_gender: patientGender,
-          hospital_id: 'hosp_district_01',
-          doctor_id: 'doc_001',
-          workflow_type: workflow,
-          language_code: langCode,
-          interaction_mode: mode.toUpperCase(),
-          consent_given: true,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setIntakeId(data.id);
-        setToken(data.token);
-      }
-    } catch (e) {
-      console.warn('Using offline intake session:', e);
-    } finally {
-      setLoading(false);
-      setStep(1);
-    }
   };
 
-  // Submit answer and receive next adaptive question
-  const handleSubmitAnswer = async () => {
-    if (!patientAnswer.trim()) {
-      setStep(2);
-      return;
-    }
-    setLoading(true);
-    const langCode = language === 'हिन्दी' ? 'hi' : 'en';
-    try {
-      if (intakeId) {
-        const res = await fetch(`/api/v1/intakes/${intakeId}/answers`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            question_event_id: activeQuestionId,
-            raw_text: patientAnswer,
-            input_mode: mode.toUpperCase(),
-            language_code: langCode,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setExtractedSummary(prev => ({ ...prev, ...data.extracted_facts }));
-          if (data.decision && data.decision.action === 'ASK' && data.decision.question) {
-            setActiveQuestion(data.decision.question);
-            setTargetField(data.decision.target_field || '');
-            setPatientAnswer('');
-            setRecording(false);
-            setLoading(false);
-            return; // Ask next adaptive question
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Offline answer ingestion:', e);
-    } finally {
-      setLoading(false);
-      setStep(2);
-    }
-  };
-
-  // Document upload
-  const handleFileUpload = async (e?: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
     const file = e?.target?.files?.[0];
     const fileName = file ? file.name : 'Prescription_May2026.pdf';
     setUploadedDocName(fileName);
     setUploaded(true);
-    if (file && intakeId) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('patient_id', 'pat_demo');
-      formData.append('intake_session_id', intakeId);
-      formData.append('document_type', 'PRESCRIPTION');
-      try {
-        await fetch('/api/v1/documents/upload', {
-          method: 'POST',
-          body: formData,
-        });
-      } catch (err) {
-        console.warn('Doc upload error:', err);
-      }
-    }
-  };
-
-  // Final submission into Doctor Queue
-  const handleFinalSubmit = async () => {
-    setLoading(true);
-    try {
-      if (intakeId) {
-        await fetch(`/api/v1/intakes/${intakeId}/submit`, {
-          method: 'POST',
-        });
-      }
-    } catch (e) {
-      console.warn('Submit offline:', e);
-    } finally {
-      setLoading(false);
-      setLocation('/clinician/queue');
-    }
->>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
   };
 
   return (
     <main className="kiosk-page">
-<<<<<<< HEAD
       <div className="kiosk-layout">
         <aside className="kiosk-progress">
           <div className="kiosk-brand">
@@ -505,38 +590,6 @@ function PatientKiosk() {
                   <span className="step-icon">
                     {index < step ? <Check size={17} /> : <Icon size={17} />}
                   </span>
-=======
-      <header className="kiosk-topbar">
-        <button className="brand-button" onClick={() => setLocation('/')}>
-          <Brand />
-        </button>
-        <div className="kiosk-right">
-          <span className="kiosk-secure">
-            <ShieldCheck size={15} /> Private & Secure
-          </span>
-          <button className="language-mini">
-            <Languages size={16} /> {language} <ChevronDown size={13} />
-          </button>
-          <button className="kiosk-close" onClick={() => setLocation('/')}>
-            <X size={18} />
-          </button>
-        </div>
-      </header>
-
-      <div className="kiosk-layout">
-        <aside className="kiosk-progress">
-          <div className="kiosk-welcome">
-            <span className="eyebrow">PATIENT INTAKE</span>
-            <h1>Your care<br /><em>starts here.</em></h1>
-            <p>Take a few quiet minutes to share what brings you in today.</p>
-          </div>
-          <div className="step-list">
-            {patientSteps.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <div className={`kiosk-step ${index === step ? 'current' : ''} ${index < step ? 'done' : ''}`} key={item.title}>
-                  <span className="step-icon">{index < step ? <Check size={17} /> : <Icon size={17} />}</span>
->>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
                   <span>
                     <b>{item.title}</b>
                     <small>{item.caption}</small>
@@ -547,7 +600,6 @@ function PatientKiosk() {
           </div>
           <div className="kiosk-help">
             <CircleHelp size={16} />
-<<<<<<< HEAD
             <span>{t.needHelp}</span>
           </div>
         </aside>
@@ -557,16 +609,6 @@ function PatientKiosk() {
               <span>
                 {t.stepPrefix} {String(step + 1).padStart(2, '0')} {t.stepOf} 04
               </span>
-=======
-            <span>Need help? Ask a staff member nearby.</span>
-          </div>
-        </aside>
-
-        <section className="kiosk-main">
-          <div className="kiosk-main-inner">
-            <div className="kiosk-progress-top">
-              <span>STEP {String(step + 1).padStart(2, '0')} OF 04</span>
->>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
               <div>
                 <i className={step >= 0 ? 'filled' : ''} />
                 <i className={step >= 1 ? 'filled' : ''} />
@@ -574,7 +616,6 @@ function PatientKiosk() {
                 <i className={step >= 3 ? 'filled' : ''} />
               </div>
               <span className="time-note">
-<<<<<<< HEAD
                 <Clock3 size={14} /> {t.durationNote}
               </span>
             </div>
@@ -707,148 +748,12 @@ function PatientKiosk() {
                 </div>
               )
             )}
-=======
-                <Clock3 size={14} /> Token: <strong className="font-mono text-[#a06f42]">{token}</strong>
-              </span>
-            </div>
-
-            {/* STEP 0: LANGUAGE & WORKFLOW SELECTION */}
-            {step === 0 && (
-              <div className="kiosk-card language-card">
-                <div className="kiosk-card-icon">
-                  <Languages size={25} />
-                </div>
-                <div className="kiosk-card-heading">
-                  <span className="section-kicker">Welcome to SwasthyaVaani</span>
-                  <h2>Which language would<br />you like to speak?</h2>
-                  <p>Choose your preferred language for the voice interview.</p>
-                </div>
-                <div className="language-grid">
-                  {languages.map((item) => (
-                    <button
-                      key={item}
-                      className={language === item ? 'selected' : ''}
-                      onClick={() => setLanguage(item)}
-                    >
-                      <span className="language-radio">{language === item && <Check size={14} />}</span>
-                      <b>{item}</b>
-                      {item === 'English' && <small>English</small>}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-6">
-                  <span className="section-kicker">Clinical Stream</span>
-                  <div className="mode-toggle mt-2">
-                    <button
-                      className={workflow === 'GENERAL_CLINICAL' ? 'active' : ''}
-                      onClick={() => setWorkflow('GENERAL_CLINICAL')}
-                    >
-                      <Stethoscope size={18} /> General Medicine
-                    </button>
-                    <button
-                      className={workflow === 'AYUSH' ? 'active' : ''}
-                      onClick={() => setWorkflow('AYUSH')}
-                    >
-                      <HeartPulse size={18} /> AYUSH OPD
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mode-heading">
-                  <span className="section-kicker">How would you like to answer?</span>
-                  <div className="mode-toggle">
-                    <button className={mode === 'voice' ? 'active' : ''} onClick={() => setMode('voice')}>
-                      <Mic size={19} /> Voice
-                    </button>
-                    <button className={mode === 'touch' ? 'active' : ''} onClick={() => setMode('touch')}>
-                      <ScanLine size={19} /> Text / Touch
-                    </button>
-                  </div>
-                </div>
-                <AppButton onClick={handleStartIntake} className="kiosk-next" disabled={loading}>
-                  {loading ? 'Initializing…' : <>Start Intake <ArrowRight size={17} /></>}
-                </AppButton>
-              </div>
-            )}
-
-            {/* STEP 1: ADAPTIVE STORY & VOICE */}
-            {step === 1 && (
-              <div className="kiosk-card story-card">
-                <div className={`listen-orb ${recording ? 'recording' : ''}`}>
-                  <div className="listen-inner">
-                    {recording ? <Activity size={29} /> : <Mic size={29} />}
-                  </div>
-                </div>
-                <span className="section-kicker">Adaptive Question · {language}</span>
-                <h2 className="text-2xl font-serif">{activeQuestion}</h2>
-                <p className="story-instruction">
-                  {recording
-                    ? 'Listening… speak naturally about your symptoms.'
-                    : 'Tap to speak, or type your answer below.'}
-                </p>
-
-                <div className="my-4 w-full">
-                  <textarea
-                    rows={2}
-                    value={patientAnswer}
-                    onChange={(e) => setPatientAnswer(e.target.value)}
-                    placeholder={
-                      language === 'हिन्दी'
-                        ? 'उदा. मुझे 3 दिनों से तेज बुखार और सिरदर्द है...'
-                        : 'e.g. I have had fever and chest discomfort since 3 days...'
-                    }
-                    className="w-full rounded-xl border border-[#cbd6ca] bg-[#fbfaf4] p-3 text-sm text-[#173e35] outline-none focus:border-[#1f5b4e]"
-                  />
-                </div>
-
-                <div className="flex gap-2 w-full">
-                  <button
-                    className={`record-button flex-1 ${recording ? 'recording' : ''}`}
-                    onClick={() => {
-                      setRecording(!recording);
-                      if (!recording && !patientAnswer) {
-                        setPatientAnswer(
-                          language === 'हिन्दी'
-                            ? 'मुझे 3 दिनों से तेज बुखार और खांसी है, दर्द 6/10 है'
-                            : 'I have had persistent chest tightness and mild fever for 2 days, severity 6 out of 10'
-                        );
-                      }
-                    }}
-                  >
-                    {recording ? (
-                      <><span className="recording-bars"><i /><i /><i /></span> Listening…</>
-                    ) : (
-                      <><Mic size={19} /> {patientAnswer ? 'Audio recorded' : 'Tap to speak'}</>
-                    )}
-                  </button>
-                </div>
-
-                {Object.keys(extractedSummary).length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                    {Object.entries(extractedSummary).map(([k, v]) => (
-                      <span key={k} className="rounded-full bg-[#dbeade] px-3 py-1 font-mono text-[#245746]">
-                        ✓ {k}: {String(v)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <AppButton onClick={handleSubmitAnswer} className="kiosk-next mt-4" disabled={loading}>
-                  {loading ? 'Analyzing with AI…' : <>Next Question <ArrowRight size={17} /></>}
-                </AppButton>
-              </div>
-            )}
-
-            {/* STEP 2: DOCUMENTS UPLOAD */}
->>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
             {step === 2 && (
               <div className="kiosk-card records-card">
                 <div className="kiosk-card-icon amber-icon">
                   <Paperclip size={25} />
                 </div>
                 <div className="kiosk-card-heading">
-<<<<<<< HEAD
                   <span className="section-kicker">{t.recordsKicker}</span>
                   <h2>{t.recordsHeading}</h2>
                   <p>{t.recordsSubtitle}</p>
@@ -859,7 +764,7 @@ function PatientKiosk() {
                       <Check size={16} />
                     </span>
                     <span>
-                      <b>Prescription_May2026.pdf</b>
+                      <b>{uploadedDocName || 'Prescription_May2026.pdf'}</b>
                       <small>{t.recordReadySub}</small>
                     </span>
                     <button onClick={() => setUploaded(false)}>
@@ -868,14 +773,13 @@ function PatientKiosk() {
                   </div>
                 ) : (
                   <div className="upload-options">
-                    <button onClick={() => setUploaded(true)}>
-                      <span>
-                        <Upload size={21} />
-                      </span>
-                      <b>{t.uploadDeviceTitle}</b>
-                      <small>{t.uploadDeviceSub}</small>
-                    </button>
-                    <button onClick={() => setUploaded(true)}>
+                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-[#b8cabe] bg-[#fbfaf4] p-5 text-center transition hover:border-[#1f5b4e]">
+                      <Upload size={21} className="text-[#1f5b4e]" />
+                      <b className="mt-2 text-sm text-[#173e35]">{t.uploadDeviceTitle}</b>
+                      <small className="text-xs text-[#7b9086]">{t.uploadDeviceSub}</small>
+                      <input type="file" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                    <button onClick={() => handleFileUpload()}>
                       <span>
                         <Camera size={21} />
                       </span>
@@ -892,52 +796,11 @@ function PatientKiosk() {
                 </AppButton>
               </div>
             )}
-=======
-                  <span className="section-kicker">Helpful context</span>
-                  <h2>Do you have an old<br />prescription or lab report?</h2>
-                  <p>Our secure OCR pipeline extracts relevant facts for your doctor.</p>
-                </div>
-                {uploaded ? (
-                  <div className="uploaded-file">
-                    <span className="file-check"><Check size={16} /></span>
-                    <span>
-                      <b>{uploadedDocName || 'Prescription_May2026.pdf'}</b>
-                      <small>Attached for doctor review · OCR Processed</small>
-                    </span>
-                    <button onClick={() => setUploaded(false)}><X size={15} /></button>
-                  </div>
-                ) : (
-                  <div className="upload-options">
-                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-[#b8cabe] bg-[#fbfaf4] p-5 text-center transition hover:border-[#1f5b4e]">
-                      <Upload size={24} className="text-[#1f5b4e]" />
-                      <b className="mt-2 text-sm text-[#173e35]">Upload from device</b>
-                      <small className="text-xs text-[#7b9086]">PDF, JPG or PNG</small>
-                      <input type="file" className="hidden" onChange={handleFileUpload} />
-                    </label>
-                    <button onClick={() => handleFileUpload()}>
-                      <span><Camera size={21} /></span>
-                      <b>Use demo sample</b>
-                      <small>Sample prescription</small>
-                    </button>
-                  </div>
-                )}
-                <button className="skip-link" onClick={() => setStep(3)}>
-                  {uploaded ? 'Continue with attached file' : 'Skip for now'} <ArrowRight size={14} />
-                </button>
-                <AppButton onClick={() => setStep(3)} className="kiosk-next">
-                  Continue to Summary <ArrowRight size={17} />
-                </AppButton>
-              </div>
-            )}
-
-            {/* STEP 3: PATIENT REVIEW & SUBMIT TO QUEUE */}
->>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
             {step === 3 && (
               <div className="kiosk-card ready-card">
                 <div className="ready-check">
                   <Check size={32} />
                 </div>
-<<<<<<< HEAD
                 <span className="section-kicker">{t.readyKicker}</span>
                 <h2>
                   {t.readyHeading}
@@ -950,7 +813,7 @@ function PatientKiosk() {
                     <span>
                       <UserRound size={15} /> {t.summaryPatient}
                     </span>
-                    <b>Meena Kumari</b>
+                    <b>{patientName} ({patientAge} yrs)</b>
                   </div>
                   <div>
                     <span>
@@ -962,7 +825,7 @@ function PatientKiosk() {
                     <span>
                       <FileText size={15} /> {t.summaryRecords}
                     </span>
-                    <b>{uploaded ? t.summaryOneAttached : t.summaryNoneAdded}</b>
+                    <b>{uploaded ? (uploadedDocName || t.summaryOneAttached) : t.summaryNoneAdded}</b>
                   </div>
                 </div>
                 <div className="privacy-callout">
@@ -972,38 +835,8 @@ function PatientKiosk() {
                     <small>{t.privacySub}</small>
                   </span>
                 </div>
-                <AppButton onClick={() => setLocation('/doctor')} className="kiosk-next">
+                <AppButton onClick={() => setLocation('/clinician/queue')} className="kiosk-next">
                   {t.btnFinishNotify} <ArrowRight size={17} />
-=======
-                <span className="section-kicker">You are all set</span>
-                <h2>Your intake summary<br />is ready for the doctor.</h2>
-                <p>We’ve organized your answers into a clear structured brief for the clinician.</p>
-                
-                <div className="ready-summary">
-                  <div>
-                    <span><UserRound size={15} /> Patient</span>
-                    <b>{patientName} ({patientAge} yrs)</b>
-                  </div>
-                  <div>
-                    <span><Languages size={15} /> Language</span>
-                    <b>{language}</b>
-                  </div>
-                  <div>
-                    <span><FileText size={15} /> Queue Token</span>
-                    <b className="font-mono text-[#a06f42]">#{token}</b>
-                  </div>
-                </div>
-
-                <div className="privacy-callout">
-                  <ShieldCheck size={17} />
-                  <span>
-                    <b>Physician-Controlled AI</b>
-                    <small>Your doctor remains the sole clinical decision maker.</small>
-                  </span>
-                </div>
-                <AppButton onClick={handleFinalSubmit} className="kiosk-next" disabled={loading}>
-                  {loading ? 'Submitting to Queue…' : <>Submit & Enter Doctor Queue <ArrowRight size={17} /></>}
->>>>>>> c0701e87aba21e9a22f978a12f3421a235608298
                 </AppButton>
               </div>
             )}
@@ -1023,7 +856,23 @@ function AdminPortal() {
 }
 
 function Router() {
-  return <Switch><Route path="/clinician/login" component={ClinicianLogin} /><Route path="/clinician/queue" component={Queue} /><Route path="/clinician/patient/:id" component={RecordPage} /><Route path="/" component={Home} /><Route path="/patient" component={PatientKiosk} /><Route path="/doctor" component={DoctorPortal} /><Route path="/admin" component={AdminPortal} /><Route component={Home} /></Switch>;
+  return (
+    <Switch>
+      <Route path="/clinician/login" component={ClinicianLogin} />
+      <Route path="/clinician/queue" component={Queue} />
+      <Route path="/clinician/patient/:id" component={RecordPage} />
+      <Route path="/" component={Home} />
+      <Route path="/patient" component={PatientKiosk} />
+      <Route path="/patient/profile" component={PatientProfile} />
+      <Route path="/patient/info" component={PatientProfile} />
+      <Route path="/patient/details" component={PatientDetails} />
+      <Route path="/patient/details-form" component={PatientDetails} />
+      <Route path="/patient/consultation" component={PatientDetails} />
+      <Route path="/doctor" component={DoctorPortal} />
+      <Route path="/admin" component={AdminPortal} />
+      <Route component={Home} />
+    </Switch>
+  );
 }
 
 export default function App() {
