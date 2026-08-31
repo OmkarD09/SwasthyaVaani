@@ -19,6 +19,11 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Private medical document storage and generated document test output
+private_uploads/
+backend/private_uploads/
+backend/tests/generated/
+
 # Build artifacts
 dist/
 build/

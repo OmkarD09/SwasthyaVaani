@@ -1,0 +1,3 @@
+[tool.ruff.lint]
+# FastAPI declares request parsing and dependency injection in function defaults.
+extend-ignore = ["B008"]

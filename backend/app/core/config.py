@@ -1,21 +1,17 @@
-import os
-from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
     PROJECT_NAME: str = "SwasthyaVaani API"
     ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api/v1"
-    
+
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
+    BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://localhost:8000",
@@ -36,6 +32,16 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "medical-documents"
+
+    # Private document processing
+    DOCUMENT_STORAGE_DIR: str = "./private_uploads"
+    DOCUMENT_MAX_FILE_SIZE_BYTES: int = 10 * 1024 * 1024
+    DOCUMENT_MAX_PAGE_COUNT: int = 20
+    DOCUMENT_ALLOWED_MIME_TYPES: list[str] = [
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+    ]
 
     # AI & Speech Providers
     LLM_PROVIDER: str = "mock"
