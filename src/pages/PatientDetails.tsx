@@ -14,6 +14,19 @@ import { getTranslation, type LanguageCode } from '../i18n';
 import { patientApi, type PatientProfileData } from '../services/patientApi';
 import { LanguageSelector } from '../components/patient/LanguageSelector';
 
+function mapToLanguageCode(lang: string): LanguageCode {
+  const l = (lang || '').toLowerCase();
+  if (l === 'hi' || l === 'hindi' || l === 'हिन्दी') return 'hi';
+  if (l === 'mr' || l === 'marathi' || l === 'मराठी') return 'mr';
+  return 'en';
+}
+
+function languageCodeToName(code: string): string {
+  if (code === 'hi' || code === 'हिन्दी' || code === 'Hindi') return 'हिन्दी';
+  if (code === 'mr' || code === 'मराठी' || code === 'Marathi') return 'मराठी';
+  return 'English';
+}
+
 export function PatientDetails() {
   const [, setLocation] = useLocation();
   const [language, setLanguage] = useState<LanguageCode>('en');
@@ -29,18 +42,22 @@ export function PatientDetails() {
   const [savedNotice, setSavedNotice] = useState(false);
 
   useEffect(() => {
+    const savedLang = localStorage.getItem('sv_selected_language') || localStorage.getItem('sv_selected_lang_code');
     patientApi.getProfile().then((profile) => {
       if (profile) {
         setPatientData(profile);
-        if (profile.preferredLanguage) {
-          setLanguage(profile.preferredLanguage);
-        }
+        const activeLang = savedLang || profile.preferredLanguage || 'en';
+        setLanguage(mapToLanguageCode(activeLang));
+      } else if (savedLang) {
+        setLanguage(mapToLanguageCode(savedLang));
       }
     });
   }, []);
 
   const handleLanguageSelect = (lang: LanguageCode) => {
     setLanguage(lang);
+    localStorage.setItem('sv_selected_language', languageCodeToName(lang));
+    localStorage.setItem('sv_selected_lang_code', lang);
     setPatientData((prev) => ({ ...prev, preferredLanguage: lang }));
     patientApi.updateProfile({ ...patientData, preferredLanguage: lang });
   };
@@ -62,9 +79,11 @@ export function PatientDetails() {
 
     setProfileErrors({});
     await patientApi.updateProfile({ ...patientData, preferredLanguage: language });
+    localStorage.setItem('sv_selected_language', languageCodeToName(language));
+    localStorage.setItem('sv_selected_lang_code', language);
     setSavedNotice(true);
     setTimeout(() => {
-      setLocation('/patient');
+      setLocation('/patient/mode');
     }, 400);
   };
 
@@ -99,7 +118,7 @@ export function PatientDetails() {
 
           <button
             className="kiosk-close p-1.5 rounded-lg hover:bg-stone-200/60 transition-colors"
-            onClick={() => setLocation('/patient')}
+            onClick={() => setLocation('/patient/language')}
             aria-label="Close"
           >
             <X size={18} />
@@ -283,8 +302,8 @@ export function PatientDetails() {
                 <div className="pt-4 border-t border-emerald-900/10 flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={() => setLocation('/patient')}
-                    className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900"
+                    onClick={() => setLocation('/patient/language')}
+                    className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer"
                   >
                     <ArrowLeft size={16} />
                     <span>{getTranslation(language, 'back')}</span>
