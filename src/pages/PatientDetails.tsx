@@ -1,35 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import {
+  Languages,
   UserRound,
-  ShieldCheck,
-  Languages as LanguagesIcon,
-  X,
+  Mic,
+  FileText,
+  Clock3,
+  Check,
   ArrowRight,
   ArrowLeft,
-  Sparkles,
-  Check,
+  CircleHelp,
 } from 'lucide-react';
-import { getTranslation, type LanguageCode } from '../i18n';
+import { Brand, AppButton } from '../components/Brand';
+import { getKioskTranslation } from '../lib/kioskTranslations';
+import {
+  getStoredLanguage,
+} from '../lib/kioskState';
 import { patientApi, type PatientProfileData } from '../services/patientApi';
-import { LanguageSelector } from '../components/patient/LanguageSelector';
-
-function mapToLanguageCode(lang: string): LanguageCode {
-  const l = (lang || '').toLowerCase();
-  if (l === 'hi' || l === 'hindi' || l === 'हिन्दी') return 'hi';
-  if (l === 'mr' || l === 'marathi' || l === 'मराठी') return 'mr';
-  return 'en';
-}
-
-function languageCodeToName(code: string): string {
-  if (code === 'hi' || code === 'हिन्दी' || code === 'Hindi') return 'हिन्दी';
-  if (code === 'mr' || code === 'मराठी' || code === 'Marathi') return 'मराठी';
-  return 'English';
-}
 
 export function PatientDetails() {
   const [, setLocation] = useLocation();
-  const [language, setLanguage] = useState<LanguageCode>('en');
+  const [language, setLanguage] = useState(getStoredLanguage);
   const [patientData, setPatientData] = useState<PatientProfileData>({
     name: 'Ananya Sharma',
     age: '34',
@@ -42,34 +33,27 @@ export function PatientDetails() {
   const [savedNotice, setSavedNotice] = useState(false);
 
   useEffect(() => {
-    const savedLang = localStorage.getItem('sv_selected_language') || localStorage.getItem('sv_selected_lang_code');
+    const l = getStoredLanguage() || localStorage.getItem('sv_selected_language');
+    if (l) setLanguage(l);
+
     patientApi.getProfile().then((profile) => {
       if (profile) {
         setPatientData(profile);
-        const activeLang = savedLang || profile.preferredLanguage || 'en';
-        setLanguage(mapToLanguageCode(activeLang));
-      } else if (savedLang) {
-        setLanguage(mapToLanguageCode(savedLang));
       }
     });
   }, []);
 
-  const handleLanguageSelect = (lang: LanguageCode) => {
-    setLanguage(lang);
-    localStorage.setItem('sv_selected_language', languageCodeToName(lang));
-    localStorage.setItem('sv_selected_lang_code', lang);
-    setPatientData((prev) => ({ ...prev, preferredLanguage: lang }));
-    patientApi.updateProfile({ ...patientData, preferredLanguage: lang });
-  };
+  const t = getKioskTranslation(language || 'English');
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: { name?: string; age?: string } = {};
+
     if (!patientData.name.trim()) {
-      errors.name = getTranslation(language, 'requiredField');
+      errors.name = 'Full name is required';
     }
     if (!patientData.age.trim()) {
-      errors.age = getTranslation(language, 'requiredField');
+      errors.age = 'Age is required';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -78,191 +62,175 @@ export function PatientDetails() {
     }
 
     setProfileErrors({});
-    await patientApi.updateProfile({ ...patientData, preferredLanguage: language });
-    localStorage.setItem('sv_selected_language', languageCodeToName(language));
-    localStorage.setItem('sv_selected_lang_code', language);
+    await patientApi.updateProfile({ ...patientData });
     setSavedNotice(true);
+
     setTimeout(() => {
       setLocation('/patient/mode');
-    }, 400);
+    }, 300);
   };
 
   return (
-    <main className="kiosk-page min-h-screen flex flex-col justify-between bg-[var(--sv-paper,#f6f9f8)] text-[var(--sv-ink,#18332c)]">
-      {/* Top Bar */}
-      <header className="kiosk-topbar flex items-center justify-between p-4 md:px-8 border-b border-emerald-900/10 bg-white">
-        <button
-          className="brand-button flex items-center gap-2"
-          onClick={() => setLocation('/')}
-          aria-label="SwasthyaVaani Home"
-        >
-          <span className="brand-mark w-8 h-8 rounded-lg bg-emerald-900 text-amber-400 flex items-center justify-center">
-            <Sparkles size={18} strokeWidth={2.5} />
-          </span>
-          <span className="font-serif font-bold text-lg text-emerald-950">
-            Swasthya<span className="text-amber-600">Vaani</span>
-          </span>
-        </button>
-
-        <div className="kiosk-right flex items-center gap-3">
-          <span className="kiosk-secure flex items-center gap-1 text-xs font-mono text-stone-600">
-            <ShieldCheck size={15} /> {getTranslation(language, 'privateAndSecure')}
-          </span>
-
-          {/* Quick Language Dropdown Switcher */}
-          <LanguageSelector
-            currentLanguage={language}
-            onSelectLanguage={handleLanguageSelect}
-            variant="compact"
-          />
-
-          <button
-            className="kiosk-close p-1.5 rounded-lg hover:bg-stone-200/60 transition-colors"
-            onClick={() => setLocation('/patient/language')}
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Kiosk Layout */}
-      <div className="kiosk-layout flex-1 flex flex-col md:flex-row max-w-6xl mx-auto w-full p-4 md:p-8 gap-8">
+    <main className="kiosk-page">
+      <div className="kiosk-layout">
         {/* Left Side Progress Sidebar */}
-        <aside className="kiosk-progress md:w-80 flex flex-col justify-between bg-emerald-950 text-emerald-50 p-6 md:p-8 rounded-2xl">
-          <div>
-            <div className="kiosk-welcome mb-8">
-              <span className="eyebrow uppercase text-xs font-mono tracking-wider text-amber-400">
-                PATIENT INTAKE
+        <aside className="kiosk-progress">
+          <div className="kiosk-brand">
+            <button
+              className="brand-button"
+              onClick={() => setLocation('/')}
+              aria-label="SwasthyaVaani home"
+            >
+              <Brand light />
+            </button>
+          </div>
+
+          <div className="kiosk-welcome">
+            <span className="eyebrow">{t.intakeEyebrow}</span>
+            <h1>
+              {t.careStartsHere}
+              <br />
+              <em>{t.careStartsHereEm}</em>
+            </h1>
+            <p>{t.careDescription}</p>
+          </div>
+
+          <div className="step-list">
+            {/* Step 1: Language (Completed) */}
+            <div className="kiosk-step done">
+              <span className="step-icon">
+                <Check size={17} />
               </span>
-              <h1 className="text-2xl md:text-3xl font-serif text-emerald-50 mt-2">
-                Your care<br />
-                <em>starts here.</em>
-              </h1>
-              <p className="text-xs md:text-sm text-emerald-100/70 mt-2">
-                {getTranslation(language, 'patientRegistrationSubtitle')}
-              </p>
+              <span>
+                <b>{t.steps.language.title}</b>
+                <small>{t.steps.language.caption}</small>
+              </span>
             </div>
 
-            <div className="step-list space-y-3">
-              <div className="kiosk-step done flex items-center gap-3 text-xs text-emerald-200/80">
-                <span className="step-icon w-6 h-6 rounded-full bg-emerald-800 flex items-center justify-center text-white">
-                  <Check size={14} />
-                </span>
-                <span>
-                  <b>{getTranslation(language, 'stepLanguage')}</b>
-                </span>
-              </div>
-              <div className="kiosk-step current flex items-center gap-3 text-xs font-semibold text-amber-400">
-                <span className="step-icon w-6 h-6 rounded-full bg-amber-500 text-emerald-950 flex items-center justify-center">
-                  <UserRound size={14} />
-                </span>
-                <span>
-                  <b>{getTranslation(language, 'stepDetails')}</b>
-                </span>
-              </div>
-              <div className="kiosk-step flex items-center gap-3 text-xs text-emerald-100/50">
-                <span className="step-icon w-6 h-6 rounded-full bg-emerald-900/60 flex items-center justify-center">
-                  3
-                </span>
-                <span>
-                  <b>{getTranslation(language, 'stepStory')}</b>
-                </span>
-              </div>
-              <div className="kiosk-step flex items-center gap-3 text-xs text-emerald-100/50">
-                <span className="step-icon w-6 h-6 rounded-full bg-emerald-900/60 flex items-center justify-center">
-                  4
-                </span>
-                <span>
-                  <b>{getTranslation(language, 'stepRecords')}</b>
-                </span>
-              </div>
+            {/* Step 2: Patient Details (Current Step) */}
+            <div className="kiosk-step current">
+              <span className="step-icon">
+                <UserRound size={17} />
+              </span>
+              <span>
+                <b>Patient Details</b>
+                <small>Personal info</small>
+              </span>
+            </div>
+
+            {/* Step 3: Interaction Mode (Upcoming) */}
+            <div className="kiosk-step">
+              <span className="step-icon">
+                <Mic size={17} />
+              </span>
+              <span>
+                <b>Interaction Mode</b>
+                <small>Voice or Text</small>
+              </span>
+            </div>
+
+            {/* Step 4: Records (Upcoming) */}
+            <div className="kiosk-step">
+              <span className="step-icon">
+                <FileText size={17} />
+              </span>
+              <span>
+                <b>{t.steps.records.title}</b>
+                <small>{t.steps.records.caption}</small>
+              </span>
             </div>
           </div>
 
-          <div className="kiosk-help text-xs text-emerald-100/60 pt-6 border-t border-emerald-900/60 flex items-center gap-2">
-            <span>{getTranslation(language, 'needHelp')}</span>
+          <div className="kiosk-help">
+            <CircleHelp size={16} />
+            <span>{t.needHelp}</span>
           </div>
         </aside>
 
-        {/* Right Main Panel: Patient Details Form */}
-        <section className="kiosk-main flex-1 flex items-center justify-center">
-          <div className="w-full max-w-xl">
-            <div className="kiosk-card profile-card p-6 md:p-8 rounded-2xl shadow-xl border border-emerald-900/10 bg-white space-y-6 animate-fadeIn">
-              <div className="kiosk-card-icon w-12 h-12 rounded-xl bg-amber-400/20 text-emerald-900 flex items-center justify-center">
-                <UserRound size={24} />
+        {/* Right Main Panel */}
+        <section className="kiosk-main">
+          <div className="kiosk-main-inner">
+            {/* Top Progress Indicator */}
+            <div className="kiosk-progress-top">
+              <span>
+                {t.stepPrefix} 02 {t.stepOf} 04
+              </span>
+              <div>
+                <i className="filled" />
+                <i className="filled" />
+                <i />
+                <i />
               </div>
+              <span className="time-note">
+                <Clock3 size={14} /> {t.durationNote}
+              </span>
+            </div>
+
+            {/* Patient Details Form Card */}
+            <div className="kiosk-card profile-details-card">
               <div className="kiosk-card-heading">
-                <span className="section-kicker text-xs font-mono uppercase text-emerald-800">
-                  Step 2 · Patient Information
-                </span>
-                <h2 className="text-2xl md:text-3xl font-semibold text-emerald-950 mt-1">
-                  {getTranslation(language, 'patientRegistrationTitle')}
-                </h2>
-                <p className="text-sm text-stone-600 mt-1">
-                  {getTranslation(language, 'patientRegistrationSubtitle')}
-                </p>
+                <span className="section-kicker">STEP 02 · PATIENT INFORMATION</span>
+                <h2>Patient Details</h2>
+                <p>Please enter or verify your details to prepare your pre-consultation record.</p>
               </div>
 
               {savedNotice && (
-                <div className="flex items-center gap-2 p-3 bg-emerald-100 text-emerald-900 text-sm rounded-lg border border-emerald-300">
+                <div className="kiosk-alert-success">
                   <Check size={16} />
-                  <span>Details saved! Opening interview…</span>
+                  <span>Details saved! Opening next step…</span>
                 </div>
               )}
 
-              <form onSubmit={handleProfileSubmit} className="space-y-4 pt-2">
-                <div>
-                  <label className="block text-xs font-mono font-semibold uppercase text-stone-700 mb-1.5">
-                    {getTranslation(language, 'nameLabel')} *
+              <form onSubmit={handleProfileSubmit} className="kiosk-form">
+                {/* Full Name */}
+                <div className="kiosk-form-group">
+                  <label className="kiosk-form-label">
+                    Full Name <span style={{ color: '#d33c3c' }}>*</span>
                   </label>
                   <input
                     type="text"
+                    className={`kiosk-form-input ${profileErrors.name ? 'has-error' : ''}`}
                     value={patientData.name}
-                    onChange={(e) => setPatientData({ ...patientData, name: e.target.value })}
-                    placeholder="e.g. Meena Kumari"
-                    className={`w-full p-3.5 rounded-xl border ${
-                      profileErrors.name ? 'border-red-500 ring-1 ring-red-500' : 'border-emerald-900/20'
-                    } bg-white text-emerald-950 text-base focus:outline-none focus:ring-2 focus:border-amber-500`}
+                    onChange={(e) =>
+                      setPatientData({ ...patientData, name: e.target.value })
+                    }
+                    placeholder="e.g. Ananya Sharma"
                   />
                   {profileErrors.name && (
-                    <span className="text-xs text-red-600 font-mono mt-1 block">
-                      {profileErrors.name}
-                    </span>
+                    <span className="kiosk-form-error">{profileErrors.name}</span>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-mono font-semibold uppercase text-stone-700 mb-1.5">
-                      {getTranslation(language, 'ageLabel')} *
+                {/* Age & Gender in same row */}
+                <div className="kiosk-form-row">
+                  <div className="kiosk-form-group">
+                    <label className="kiosk-form-label">
+                      Age <span style={{ color: '#d33c3c' }}>*</span>
                     </label>
                     <input
                       type="number"
                       min="1"
                       max="120"
+                      className={`kiosk-form-input ${profileErrors.age ? 'has-error' : ''}`}
                       value={patientData.age}
-                      onChange={(e) => setPatientData({ ...patientData, age: e.target.value })}
-                      placeholder="e.g. 42"
-                      className={`w-full p-3.5 rounded-xl border ${
-                        profileErrors.age ? 'border-red-500 ring-1 ring-red-500' : 'border-emerald-900/20'
-                      } bg-white text-emerald-950 text-base focus:outline-none focus:ring-2 focus:border-amber-500`}
+                      onChange={(e) =>
+                        setPatientData({ ...patientData, age: e.target.value })
+                      }
+                      placeholder="e.g. 34"
                     />
                     {profileErrors.age && (
-                      <span className="text-xs text-red-600 font-mono mt-1 block">
-                        {profileErrors.age}
-                      </span>
+                      <span className="kiosk-form-error">{profileErrors.age}</span>
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-mono font-semibold uppercase text-stone-700 mb-1.5">
-                      {getTranslation(language, 'genderLabel')}
-                    </label>
+                  <div className="kiosk-form-group">
+                    <label className="kiosk-form-label">Gender</label>
                     <select
+                      className="kiosk-form-select"
                       value={patientData.gender}
-                      onChange={(e) => setPatientData({ ...patientData, gender: e.target.value })}
-                      className="w-full p-3.5 rounded-xl border border-emerald-900/20 bg-white text-emerald-950 text-base focus:outline-none focus:ring-2 focus:border-amber-500"
+                      onChange={(e) =>
+                        setPatientData({ ...patientData, gender: e.target.value })
+                      }
                     >
                       <option value="Not specified">Not specified</option>
                       <option value="Female">Female</option>
@@ -272,50 +240,53 @@ export function PatientDetails() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono font-semibold uppercase text-stone-700 mb-1.5">
-                    {getTranslation(language, 'phoneLabel')}
-                  </label>
-                  <input
-                    type="tel"
-                    value={patientData.phone || ''}
-                    onChange={(e) => setPatientData({ ...patientData, phone: e.target.value })}
-                    placeholder="e.g. 9876543210"
-                    className="w-full p-3.5 rounded-xl border border-emerald-900/20 bg-white text-emerald-950 text-base focus:outline-none focus:ring-2 focus:border-amber-500 font-mono"
-                  />
+                {/* Phone & ABHA Number */}
+                <div className="kiosk-form-row">
+                  <div className="kiosk-form-group">
+                    <label className="kiosk-form-label">Phone Number</label>
+                    <input
+                      type="tel"
+                      className="kiosk-form-input font-mono"
+                      value={patientData.phone || ''}
+                      onChange={(e) =>
+                        setPatientData({ ...patientData, phone: e.target.value })
+                      }
+                      placeholder="e.g. 9876543210"
+                    />
+                  </div>
+
+                  <div className="kiosk-form-group">
+                    <label className="kiosk-form-label">ABHA Card / Number</label>
+                    <input
+                      type="text"
+                      className="kiosk-form-input font-mono"
+                      value={patientData.abhaNumber || ''}
+                      onChange={(e) =>
+                        setPatientData({ ...patientData, abhaNumber: e.target.value })
+                      }
+                      placeholder="e.g. 91-4521-8890-1234"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono font-semibold uppercase text-stone-700 mb-1.5">
-                    {getTranslation(language, 'abhaNumberLabel')}
-                  </label>
-                  <input
-                    type="text"
-                    value={patientData.abhaNumber || ''}
-                    onChange={(e) => setPatientData({ ...patientData, abhaNumber: e.target.value })}
-                    placeholder="e.g. 91-4521-8890-1234 (ABDM)"
-                    className="w-full p-3.5 rounded-xl border border-emerald-900/20 bg-white text-emerald-950 text-base focus:outline-none focus:ring-2 focus:border-amber-500 font-mono"
-                  />
-                </div>
-
-                {/* Action Bar */}
-                <div className="pt-4 border-t border-emerald-900/10 flex items-center justify-between">
+                {/* Form Actions */}
+                <div className="kiosk-form-actions">
                   <button
                     type="button"
                     onClick={() => setLocation('/patient/language')}
-                    className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer"
+                    className="kiosk-back-btn"
                   >
                     <ArrowLeft size={16} />
-                    <span>{getTranslation(language, 'back')}</span>
+                    <span>Back</span>
                   </button>
 
-                  <button
+                  <AppButton
+                    variant="amber"
                     type="submit"
-                    className="app-button primary px-6 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-md hover:shadow-lg bg-[#eaba61] text-[#1a332c] hover:bg-[#f1c771] transition-all"
+                    className="kiosk-submit-btn"
                   >
-                    <span>{getTranslation(language, 'createProfileAndContinue')}</span>
-                    <ArrowRight size={17} />
-                  </button>
+                    {t.btnContinue} <ArrowRight size={17} />
+                  </AppButton>
                 </div>
               </form>
             </div>

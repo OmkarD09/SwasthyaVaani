@@ -3254,6 +3254,128 @@ h2 em,
   padding: 14px;
 }
 
+/* Patient Kiosk Form & Inputs */
+.kiosk-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.kiosk-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 600px) {
+  .kiosk-form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kiosk-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kiosk-form-label {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #557774;
+}
+
+.kiosk-form-input,
+.kiosk-form-select {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid #dbe7e5;
+  border-radius: 9px;
+  background: #fbfdfd;
+  color: #1d363d;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  box-sizing: border-box;
+}
+
+.kiosk-form-input::placeholder {
+  color: #94a7a5;
+}
+
+.kiosk-form-input:focus,
+.kiosk-form-select:focus {
+  border-color: #eaba61;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(234, 186, 97, .2);
+}
+
+.kiosk-form-input.has-error,
+.kiosk-form-select.has-error {
+  border-color: #e05252;
+  box-shadow: 0 0 0 3px rgba(224, 82, 82, .15);
+}
+
+.kiosk-form-error {
+  font-size: 10px;
+  color: #d33c3c;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.kiosk-alert-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #eafaf6;
+  border: 1px solid #c2ece2;
+  border-radius: 9px;
+  color: #166e5f;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 14px;
+}
+
+.kiosk-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 18px;
+  border-top: 1px solid #e6efed;
+}
+
+.kiosk-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #728c89;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 7px;
+  transition: color .2s ease, background .2s ease;
+}
+
+.kiosk-back-btn:hover {
+  color: #1b364c;
+  background: #edf5f4;
+}
+
+.kiosk-submit-btn {
+  min-width: 140px;
+}
+
+
 /* Patient Text AI Chat */
 .patient-chat-container {
   display: flex;
