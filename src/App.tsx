@@ -491,45 +491,66 @@ function DoctorPortal() {
   );
 }
 
-function PatientKiosk() {
+const PATIENT_LANG_KEY = 'sv_selected_language';
+const PATIENT_LANG_CODE_KEY = 'sv_selected_lang_code';
+const PATIENT_MODE_KEY = 'sv_selected_mode';
+
+function getStoredLanguage(): string {
+  return localStorage.getItem(PATIENT_LANG_KEY) || '';
+}
+
+function setStoredLanguage(lang: string) {
+  localStorage.setItem(PATIENT_LANG_KEY, lang);
+  const code =
+    lang === 'हिन्दी' || lang.toLowerCase() === 'hindi' || lang === 'hi'
+      ? 'hi'
+      : lang === 'मराठी' || lang.toLowerCase() === 'marathi' || lang === 'mr'
+      ? 'mr'
+      : 'en';
+  localStorage.setItem(PATIENT_LANG_CODE_KEY, code);
+  patientApi.getProfile().then((p) => {
+    patientApi.updateProfile({ ...p, preferredLanguage: code as any });
+  });
+}
+
+function getStoredMode(): 'voice' | 'text' {
+  const m = localStorage.getItem(PATIENT_MODE_KEY);
+  return m === 'text' ? 'text' : 'voice';
+}
+
+function setStoredMode(mode: 'voice' | 'text') {
+  localStorage.setItem(PATIENT_MODE_KEY, mode);
+}
+
+const INTAKE_LANGUAGES = [
+  { name: 'English', sub: 'English' },
+  { name: 'हिन्दी', sub: 'Hindi' },
+  { name: 'বাংলা', sub: 'Bengali' },
+  { name: 'मराठी', sub: 'Marathi' },
+  { name: 'తెలుగు', sub: 'Telugu' },
+  { name: 'தமிழ்', sub: 'Tamil' },
+  { name: 'ગુજરાતી', sub: 'Gujarati' },
+  { name: 'ಕನ್ನಡ', sub: 'Kannada' },
+  { name: 'മലയാളം', sub: 'Malayalam' },
+  { name: 'ਪੰਜਾਬੀ', sub: 'Punjabi' },
+  { name: 'ଓଡ଼ିଆ', sub: 'Odia' },
+  { name: 'অসমীয়া', sub: 'Assamese' },
+  { name: 'اردو', sub: 'Urdu' },
+];
+
+function PatientLanguageSelection() {
   const [, setLocation] = useLocation();
-  const [step, setStep] = useState(0);
-  const [language, setLanguage] = useState('');
-  const [mode, setMode] = useState<'voice' | 'text'>('voice');
+  const [language, setLanguage] = useState(getStoredLanguage);
   const [searchQuery, setSearchQuery] = useState('');
-  const [uploaded, setUploaded] = useState(false);
-  const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
-  const [recording, setRecording] = useState(false);
-  const [patientName, setPatientName] = useState('Ananya Sharma');
-  const [patientAge, setPatientAge] = useState('34');
-  const [token] = useState('A-028');
 
   useEffect(() => {
-    patientApi.getProfile().then((p) => {
-      if (p.name) setPatientName(p.name);
-      if (p.age) setPatientAge(p.age);
-    });
+    const l = getStoredLanguage();
+    if (l) setLanguage(l);
   }, []);
 
   const t = getKioskTranslation(language || 'English');
 
-  const languages = [
-    { name: 'English', sub: 'English' },
-    { name: 'हिन्दी', sub: 'Hindi' },
-    { name: 'বাংলা', sub: 'Bengali' },
-    { name: 'मराठी', sub: 'Marathi' },
-    { name: 'తెలుగు', sub: 'Telugu' },
-    { name: 'தமிழ்', sub: 'Tamil' },
-    { name: 'ગુજરાતી', sub: 'Gujarati' },
-    { name: 'ಕನ್ನಡ', sub: 'Kannada' },
-    { name: 'മലയാളം', sub: 'Malayalam' },
-    { name: 'ਪੰਜਾਬੀ', sub: 'Punjabi' },
-    { name: 'ଓଡ଼ିଆ', sub: 'Odia' },
-    { name: 'অসমীয়া', sub: 'Assamese' },
-    { name: 'اردو', sub: 'Urdu' },
-  ];
-
-  const filteredLanguages = languages.filter((item) => {
+  const filteredLanguages = INTAKE_LANGUAGES.filter((item) => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -538,23 +559,16 @@ function PatientKiosk() {
     );
   });
 
-  const dynamicSteps = [
-    { title: t.steps.language.title, caption: t.steps.language.caption, icon: Languages },
-    { title: t.steps.story.title, caption: t.steps.story.caption, icon: Mic },
-    { title: t.steps.records.title, caption: t.steps.records.caption, icon: FileText },
-    { title: t.steps.ready.title, caption: t.steps.ready.caption, icon: CheckCircle2 },
-  ];
-
-  const next = () => {
-    if (!language && step === 0) return;
-    setStep(Math.min(3, step + 1));
+  const handleSelect = (langName: string) => {
+    setLanguage(langName);
+    setStoredLanguage(langName);
   };
 
-  const handleFileUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e?.target?.files?.[0];
-    const fileName = file ? file.name : 'Prescription_May2026.pdf';
-    setUploadedDocName(fileName);
-    setUploaded(true);
+  const handleContinue = () => {
+    if (language) {
+      setStoredLanguage(language);
+      setLocation('/patient/details');
+    }
   };
 
   return (
@@ -580,23 +594,361 @@ function PatientKiosk() {
             <p>{t.careDescription}</p>
           </div>
           <div className="step-list">
-            {dynamicSteps.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  className={`kiosk-step ${index === step ? 'current' : ''} ${index < step ? 'done' : ''}`}
-                  key={item.title + index}
-                >
-                  <span className="step-icon">
-                    {index < step ? <Check size={17} /> : <Icon size={17} />}
-                  </span>
-                  <span>
-                    <b>{item.title}</b>
-                    <small>{item.caption}</small>
-                  </span>
+            <div className="kiosk-step current">
+              <span className="step-icon"><Languages size={17} /></span>
+              <span><b>{t.steps.language.title}</b><small>{t.steps.language.caption}</small></span>
+            </div>
+            <div className="kiosk-step">
+              <span className="step-icon"><UserRound size={17} /></span>
+              <span><b>Patient Details</b><small>Personal info</small></span>
+            </div>
+            <div className="kiosk-step">
+              <span className="step-icon"><Mic size={17} /></span>
+              <span><b>Interaction Mode</b><small>Voice or Text</small></span>
+            </div>
+            <div className="kiosk-step">
+              <span className="step-icon"><FileText size={17} /></span>
+              <span><b>{t.steps.records.title}</b><small>{t.steps.records.caption}</small></span>
+            </div>
+          </div>
+          <div className="kiosk-help">
+            <CircleHelp size={16} />
+            <span>{t.needHelp}</span>
+          </div>
+        </aside>
+        <section className="kiosk-main">
+          <div className="kiosk-main-inner">
+            <div className="kiosk-progress-top">
+              <span>{t.stepPrefix} 01 {t.stepOf} 04</span>
+              <div>
+                <i className="filled" />
+                <i />
+                <i />
+                <i />
+              </div>
+              <span className="time-note">
+                <Clock3 size={14} /> {t.durationNote}
+              </span>
+            </div>
+            <div className="kiosk-card language-card">
+              <div className="kiosk-card-heading">
+                <span className="section-kicker">{t.langKicker}</span>
+                <h2>{t.langHeading}</h2>
+                <p>{t.langSubtitle}</p>
+              </div>
+              <div className="language-search-wrap">
+                <Search size={15} className="search-icon" />
+                <input
+                  type="text"
+                  className="language-search-input"
+                  placeholder="Search your language..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    className="search-clear-btn"
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              {filteredLanguages.length === 0 ? (
+                <div className="language-no-results">
+                  No languages found matching &ldquo;{searchQuery}&rdquo;
                 </div>
-              );
-            })}
+              ) : (
+                <div className="language-grid-wrap">
+                  <div className="language-grid">
+                    {filteredLanguages.map((item) => (
+                      <button
+                        key={item.sub}
+                        className={language === item.name || language === item.sub ? 'selected' : ''}
+                        onClick={() => handleSelect(item.name)}
+                      >
+                        <span className="language-radio">
+                          {(language === item.name || language === item.sub) && <Check size={14} />}
+                        </span>
+                        <b>{item.name}</b>
+                        <small>{item.sub}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <AppButton
+                variant="amber"
+                onClick={handleContinue}
+                disabled={!language}
+                className="kiosk-next"
+              >
+                {t.btnContinue} <ArrowRight size={17} />
+              </AppButton>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function PatientModeSelection() {
+  const [, setLocation] = useLocation();
+  const [language, setLanguage] = useState(getStoredLanguage);
+  const [mode, setMode] = useState<'voice' | 'text'>(getStoredMode);
+
+  useEffect(() => {
+    setLanguage(getStoredLanguage());
+    setMode(getStoredMode());
+  }, []);
+
+  const t = getKioskTranslation(language || 'English');
+
+  const handleContinue = () => {
+    setStoredMode(mode);
+    setLocation('/patient/intake');
+  };
+
+  return (
+    <main className="kiosk-page">
+      <div className="kiosk-layout">
+        <aside className="kiosk-progress">
+          <div className="kiosk-brand">
+            <button
+              className="brand-button"
+              onClick={() => setLocation('/')}
+              aria-label="SwasthyaVaani home"
+            >
+              <Brand light />
+            </button>
+          </div>
+          <div className="kiosk-welcome">
+            <span className="eyebrow">{t.intakeEyebrow}</span>
+            <h1>
+              {t.careStartsHere}
+              <br />
+              <em>{t.careStartsHereEm}</em>
+            </h1>
+            <p>{t.careDescription}</p>
+          </div>
+          <div className="step-list">
+            <div className="kiosk-step done">
+              <span className="step-icon"><Check size={17} /></span>
+              <span><b>{t.steps.language.title}</b><small>{t.steps.language.caption}</small></span>
+            </div>
+            <div className="kiosk-step done">
+              <span className="step-icon"><Check size={17} /></span>
+              <span><b>Patient Details</b><small>Personal info</small></span>
+            </div>
+            <div className="kiosk-step current">
+              <span className="step-icon"><Mic size={17} /></span>
+              <span><b>Interaction Mode</b><small>Voice or Text</small></span>
+            </div>
+            <div className="kiosk-step">
+              <span className="step-icon"><FileText size={17} /></span>
+              <span><b>{t.steps.records.title}</b><small>{t.steps.records.caption}</small></span>
+            </div>
+          </div>
+          <div className="kiosk-help">
+            <CircleHelp size={16} />
+            <span>{t.needHelp}</span>
+          </div>
+        </aside>
+        <section className="kiosk-main">
+          <div className="kiosk-main-inner">
+            <div className="kiosk-progress-top">
+              <span>{t.stepPrefix} 03 {t.stepOf} 04</span>
+              <div>
+                <i className="filled" />
+                <i className="filled" />
+                <i className="filled" />
+                <i />
+              </div>
+              <span className="time-note">
+                <Clock3 size={14} /> {t.durationNote}
+              </span>
+            </div>
+            <div className="kiosk-card mode-selection-card">
+              <div className="kiosk-card-heading">
+                <span className="section-kicker">
+                  <Languages size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                  {t.speakingIn} {language}
+                </span>
+                <h2>{t.modeKicker}</h2>
+                <p>Choose how you would like to share your health concern with our AI assistant.</p>
+              </div>
+
+              <div className="mode-options-grid grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
+                <button
+                  type="button"
+                  className={`p-6 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-4 cursor-pointer ${
+                    mode === 'voice'
+                      ? 'border-[#eaba61] bg-[#fffdfa] shadow-md ring-2 ring-[#eaba61]/30'
+                      : 'border-[#e0ebe8] bg-white hover:border-[#173e35]/30'
+                  }`}
+                  onClick={() => {
+                    setMode('voice');
+                    setStoredMode('voice');
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-[#eaba61]/20 text-[#173e35] flex items-center justify-center">
+                      <Mic size={24} />
+                    </div>
+                    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      mode === 'voice' ? 'border-[#c98e20] bg-[#eaba61]' : 'border-stone-300'
+                    }`}>
+                      {mode === 'voice' && <Check size={12} className="text-white stroke-[3]" />}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[#173e35] mb-1">{t.modeVoice}</h3>
+                    <p className="text-xs text-[#5c726a] leading-relaxed">
+                      Speak freely and naturally in your chosen language. AI listens and transcribes.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className={`p-6 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-4 cursor-pointer ${
+                    mode === 'text'
+                      ? 'border-[#eaba61] bg-[#fffdfa] shadow-md ring-2 ring-[#eaba61]/30'
+                      : 'border-[#e0ebe8] bg-white hover:border-[#173e35]/30'
+                  }`}
+                  onClick={() => {
+                    setMode('text');
+                    setStoredMode('text');
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-[#eaba61]/20 text-[#173e35] flex items-center justify-center">
+                      <Keyboard size={24} />
+                    </div>
+                    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      mode === 'text' ? 'border-[#c98e20] bg-[#eaba61]' : 'border-stone-300'
+                    }`}>
+                      {mode === 'text' && <Check size={12} className="text-white stroke-[3]" />}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[#173e35] mb-1">{t.modeText}</h3>
+                    <p className="text-xs text-[#5c726a] leading-relaxed">
+                      Type your symptoms and answer guided questions on screen.
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              <div className="pt-4 border-t border-[#e6efed] flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setLocation('/patient/details')}
+                  className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back</span>
+                </button>
+
+                <AppButton
+                  variant="amber"
+                  onClick={handleContinue}
+                  className="kiosk-next"
+                >
+                  {t.btnContinue} <ArrowRight size={17} />
+                </AppButton>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function PatientIntake() {
+  const [, setLocation] = useLocation();
+  const [subStep, setSubStep] = useState<number>(0); // 0: Story (Voice/Text), 1: Records, 2: Ready
+  const [language, setLanguage] = useState(getStoredLanguage);
+  const [mode, setMode] = useState<'voice' | 'text'>(getStoredMode);
+  const [uploaded, setUploaded] = useState(false);
+  const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [patientName, setPatientName] = useState('Ananya Sharma');
+  const [patientAge, setPatientAge] = useState('34');
+
+  useEffect(() => {
+    setLanguage(getStoredLanguage());
+    setMode(getStoredMode());
+    patientApi.getProfile().then((p) => {
+      if (p.name) setPatientName(p.name);
+      if (p.age) setPatientAge(p.age);
+    });
+  }, []);
+
+  const t = getKioskTranslation(language || 'English');
+
+  const handleFileUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e?.target?.files?.[0];
+    const fileName = file ? file.name : 'Prescription_May2026.pdf';
+    setUploadedDocName(fileName);
+    setUploaded(true);
+  };
+
+  const handleBack = () => {
+    if (subStep === 0) {
+      setLocation('/patient/mode');
+    } else {
+      setSubStep((prev) => prev - 1);
+    }
+  };
+
+  return (
+    <main className="kiosk-page">
+      <div className="kiosk-layout">
+        <aside className="kiosk-progress">
+          <div className="kiosk-brand">
+            <button
+              className="brand-button"
+              onClick={() => setLocation('/')}
+              aria-label="SwasthyaVaani home"
+            >
+              <Brand light />
+            </button>
+          </div>
+          <div className="kiosk-welcome">
+            <span className="eyebrow">{t.intakeEyebrow}</span>
+            <h1>
+              {t.careStartsHere}
+              <br />
+              <em>{t.careStartsHereEm}</em>
+            </h1>
+            <p>{t.careDescription}</p>
+          </div>
+          <div className="step-list">
+            <div className="kiosk-step done">
+              <span className="step-icon"><Check size={17} /></span>
+              <span><b>{t.steps.language.title}</b><small>{t.steps.language.caption}</small></span>
+            </div>
+            <div className="kiosk-step done">
+              <span className="step-icon"><Check size={17} /></span>
+              <span><b>Patient Details</b><small>Personal info</small></span>
+            </div>
+            <div className={`kiosk-step ${subStep === 0 ? 'current' : 'done'}`}>
+              <span className="step-icon">{subStep > 0 ? <Check size={17} /> : <Mic size={17} />}</span>
+              <span><b>{t.steps.story.title}</b><small>{t.steps.story.caption}</small></span>
+            </div>
+            <div className={`kiosk-step ${subStep === 1 ? 'current' : subStep > 1 ? 'done' : ''}`}>
+              <span className="step-icon">{subStep > 1 ? <Check size={17} /> : <FileText size={17} />}</span>
+              <span><b>{t.steps.records.title}</b><small>{t.steps.records.caption}</small></span>
+            </div>
+            <div className={`kiosk-step ${subStep === 2 ? 'current' : ''}`}>
+              <span className="step-icon"><CheckCircle2 size={17} /></span>
+              <span><b>{t.steps.ready.title}</b><small>{t.steps.ready.caption}</small></span>
+            </div>
           </div>
           <div className="kiosk-help">
             <CircleHelp size={16} />
@@ -607,101 +959,28 @@ function PatientKiosk() {
           <div className="kiosk-main-inner">
             <div className="kiosk-progress-top">
               <span>
-                {t.stepPrefix} {String(step + 1).padStart(2, '0')} {t.stepOf} 04
+                {t.stepPrefix} {String(subStep + 3).padStart(2, '0')} {t.stepOf} 04
               </span>
               <div>
-                <i className={step >= 0 ? 'filled' : ''} />
-                <i className={step >= 1 ? 'filled' : ''} />
-                <i className={step >= 2 ? 'filled' : ''} />
-                <i className={step >= 3 ? 'filled' : ''} />
+                <i className="filled" />
+                <i className="filled" />
+                <i className={subStep >= 0 ? 'filled' : ''} />
+                <i className={subStep >= 1 ? 'filled' : ''} />
               </div>
               <span className="time-note">
                 <Clock3 size={14} /> {t.durationNote}
               </span>
             </div>
-            {step === 0 && (
-              <div className="kiosk-card language-card">
-                <div className="kiosk-card-heading">
-                  <span className="section-kicker">{t.langKicker}</span>
-                  <h2>{t.langHeading}</h2>
-                  <p>{t.langSubtitle}</p>
-                </div>
-                <div className="language-search-wrap">
-                  <Search size={15} className="search-icon" />
-                  <input
-                    type="text"
-                    className="language-search-input"
-                    placeholder="Search your language..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      className="search-clear-btn"
-                      onClick={() => setSearchQuery('')}
-                      aria-label="Clear search"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-                {filteredLanguages.length === 0 ? (
-                  <div className="language-no-results">
-                    No languages found matching &ldquo;{searchQuery}&rdquo;
-                  </div>
-                ) : (
-                  <div className="language-grid-wrap">
-                    <div className="language-grid">
-                      {filteredLanguages.map((item) => (
-                        <button
-                          key={item.sub}
-                          className={language === item.name || language === item.sub ? 'selected' : ''}
-                          onClick={() => setLanguage(item.name)}
-                        >
-                          <span className="language-radio">
-                            {(language === item.name || language === item.sub) && <Check size={14} />}
-                          </span>
-                          <b>{item.name}</b>
-                          <small>{item.sub}</small>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="mode-heading">
-                  <span className="section-kicker">{t.modeKicker}</span>
-                  <div className="mode-toggle">
-                    <button
-                      className={mode === 'voice' ? 'active' : ''}
-                      onClick={() => setMode('voice')}
-                    >
-                      <Mic size={19} /> {t.modeVoice}
-                    </button>
-                    <button
-                      className={mode === 'text' ? 'active' : ''}
-                      onClick={() => setMode('text')}
-                    >
-                      <Keyboard size={19} /> {t.modeText}
-                    </button>
-                  </div>
-                </div>
-                <AppButton
-                  variant="amber"
-                  onClick={next}
-                  disabled={!language}
-                  className="kiosk-next"
-                >
-                  {t.btnContinue} <ArrowRight size={17} />
-                </AppButton>
-              </div>
-            )}
-            {step === 1 && (
+
+            {subStep === 0 && (
               mode === 'text' ? (
                 <PatientTextChat
                   language={language}
-                  onComplete={() => setStep(2)}
-                  onSwitchToVoice={() => setMode('voice')}
+                  onComplete={() => setSubStep(1)}
+                  onSwitchToVoice={() => {
+                    setMode('voice');
+                    setStoredMode('voice');
+                  }}
                 />
               ) : (
                 <div className="kiosk-card story-card">
@@ -738,17 +1017,31 @@ function PatientKiosk() {
                   </button>
                   <div className="touch-fallback">
                     <span>{t.preferTyping}</span>
-                    <button onClick={() => setMode('text')}>
+                    <button onClick={() => {
+                      setMode('text');
+                      setStoredMode('text');
+                    }}>
                       {t.useTouchInstead} <ArrowRight size={14} />
                     </button>
                   </div>
-                  <AppButton onClick={next} className="kiosk-next">
-                    {t.btnContinue} <ArrowRight size={17} />
-                  </AppButton>
+                  <div className="pt-4 border-t border-[#e6efed] flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={handleBack}
+                      className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer"
+                    >
+                      <ArrowLeft size={16} />
+                      <span>Back</span>
+                    </button>
+                    <AppButton onClick={() => setSubStep(1)} className="kiosk-next">
+                      {t.btnContinue} <ArrowRight size={17} />
+                    </AppButton>
+                  </div>
                 </div>
               )
             )}
-            {step === 2 && (
+
+            {subStep === 1 && (
               <div className="kiosk-card records-card">
                 <div className="kiosk-card-icon amber-icon">
                   <Paperclip size={25} />
@@ -788,15 +1081,26 @@ function PatientKiosk() {
                     </button>
                   </div>
                 )}
-                <button className="skip-link" onClick={next}>
-                  {uploaded ? t.btnContinueWithoutMore : t.btnSkip} <ArrowRight size={14} />
-                </button>
-                <AppButton onClick={next} className="kiosk-next">
+                <div className="flex items-center justify-between mt-4">
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer"
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Back</span>
+                  </button>
+                  <button className="skip-link" onClick={() => setSubStep(2)}>
+                    {uploaded ? t.btnContinueWithoutMore : t.btnSkip} <ArrowRight size={14} />
+                  </button>
+                </div>
+                <AppButton onClick={() => setSubStep(2)} className="kiosk-next">
                   {uploaded ? t.btnContinue : t.btnContinueWithoutReport} <ArrowRight size={17} />
                 </AppButton>
               </div>
             )}
-            {step === 3 && (
+
+            {subStep === 2 && (
               <div className="kiosk-card ready-card">
                 <div className="ready-check">
                   <Check size={32} />
@@ -835,9 +1139,19 @@ function PatientKiosk() {
                     <small>{t.privacySub}</small>
                   </span>
                 </div>
-                <AppButton onClick={() => setLocation('/clinician/queue')} className="kiosk-next">
-                  {t.btnFinishNotify} <ArrowRight size={17} />
-                </AppButton>
+                <div className="pt-4 border-t border-[#e6efed] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer"
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Back</span>
+                  </button>
+                  <AppButton onClick={() => setLocation('/clinician/queue')} className="kiosk-next">
+                    {t.btnFinishNotify} <ArrowRight size={17} />
+                  </AppButton>
+                </div>
               </div>
             )}
           </div>
@@ -862,10 +1176,13 @@ function Router() {
       <Route path="/clinician/queue" component={Queue} />
       <Route path="/clinician/patient/:id" component={RecordPage} />
       <Route path="/" component={Home} />
-      <Route path="/patient" component={PatientKiosk} />
+      <Route path="/patient" component={PatientLanguageSelection} />
+      <Route path="/patient/language" component={PatientLanguageSelection} />
+      <Route path="/patient/details" component={PatientDetails} />
+      <Route path="/patient/mode" component={PatientModeSelection} />
+      <Route path="/patient/intake" component={PatientIntake} />
       <Route path="/patient/profile" component={PatientProfile} />
       <Route path="/patient/info" component={PatientProfile} />
-      <Route path="/patient/details" component={PatientDetails} />
       <Route path="/patient/details-form" component={PatientDetails} />
       <Route path="/patient/consultation" component={PatientDetails} />
       <Route path="/doctor" component={DoctorPortal} />
