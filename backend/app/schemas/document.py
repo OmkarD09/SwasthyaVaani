@@ -9,8 +9,9 @@ class DocumentUploadResponse(BaseModel):
     file_name: str
     file_size: int
     mime_type: str
+    file_hash: Optional[str] = None
     storage_url: Optional[str] = None
-    status: Literal["UPLOADED", "OCR_PROCESSING", "EXTRACTED", "FAILED"] = "UPLOADED"
+    status: Literal["PENDING", "UPLOADED", "OCR_PROCESSING", "EXTRACTED", "FAILED"] = "PENDING"
     uploaded_at: datetime
 
 
@@ -21,12 +22,12 @@ class ExtractedFact(BaseModel):
     confidence: float = Field(default=0.9, ge=0.0, le=1.0)
     source_page: int = 1
     source_region: Optional[Dict[str, Any]] = None
-    status: Literal["EXTRACTED", "NEEDS_REVIEW", "CONFIRMED"] = "EXTRACTED"
+    status: Literal["NEEDS_REVIEW", "CONFIRMED", "REJECTED"] = "NEEDS_REVIEW"
 
 
 class DocumentExtractionResult(BaseModel):
     document_id: str
-    status: Literal["EXTRACTED", "NEEDS_REVIEW", "FAILED"]
+    status: Literal["PENDING", "PROCESSING", "EXTRACTED", "NEEDS_REVIEW", "FAILED"] = "NEEDS_REVIEW"
     extracted_facts: List[ExtractedFact] = Field(default_factory=list)
     raw_ocr_text: Optional[str] = None
     processed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

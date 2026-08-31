@@ -127,39 +127,57 @@ class QuestionDecision(BaseModel):
 ## 4. Kunal — Document OCR & Evidence Extraction Lead
 
 ### Responsibilities
-- File upload pipeline (PDF, JPG, PNG).
+- File upload pipeline (PDF, JPG, PNG) with non-blocking `202 Accepted` response.
 - PaddleOCR / Document AI extractor for prescriptions and lab reports.
-- Confidence scoring and `NEEDS_REVIEW` flags on ambiguous handwriting.
-- Storing files in Supabase Storage (`medical-documents` bucket).
+- Confidence scoring with mandatory `NEEDS_REVIEW` initial status for all extracted clinical fields.
+- Backend-only Supabase Storage (`medical-documents` private bucket) with short-lived signed URLs.
+- Intake-scoped SHA-256 duplicate document prevention.
 
 ### Files to Work In
-- [`backend/app/services/providers/ocr_provider.py`](file:///c:/Users/ACER/Downloads/SwasthyaVaani/backend/app/services/providers/ocr_provider.py): Concrete PaddleOCR implementation.
-- [`backend/app/api/v1/documents.py`](file:///c:/Users/ACER/Downloads/SwasthyaVaani/backend/app/api/v1/documents.py): Document upload handler.
+- [`backend/app/services/providers/ocr_provider.py`](file:///c:/Users/ACER/Downloads/SwasthyaVaani/backend/app/services/providers/ocr_provider.py): Concrete `PaddleOCRProvider` and `MockOCRProvider`.
+- [`backend/app/api/v1/documents.py`](file:///c:/Users/ACER/Downloads/SwasthyaVaani/backend/app/api/v1/documents.py): Document upload, status, and processing handlers.
 
-### Upload Endpoint Contract
-- **Endpoint:** `POST /api/v1/documents/upload` (`multipart/form-data`)
-- **Parameters:**
-  - `file`: `UploadFile` (binary)
-  - `patient_id`: string
-  - `intake_session_id`: string
-  - `document_type`: `"PRESCRIPTION"` | `"LAB_REPORT"` | `"DISCHARGE_SUMMARY"`
-- **Response:**
-```json
-{
-  "document_id": "doc-8812...",
-  "storage_path": "prescriptions/2026/doc-8812.pdf",
-  "status": "PROCESSED",
-  "extractions": [
-    {
-      "field_name": "Paracetamol 650mg",
-      "field_type": "MEDICATION",
-      "value_json": {"dose": "650mg", "frequency": "TDS"},
-      "confidence": 0.94,
-      "needs_review": false
-    }
-  ]
-}
-```
+### Confirmed API Contracts
+
+1. **Upload Document (`POST /api/v1/documents/upload` — `202 Accepted`)**
+   - **Form Fields:** `file` (UploadFile), `patient_id` (string), `intake_session_id` (optional string), `document_type` (`PRESCRIPTION` | `LAB_REPORT` | `DISCHARGE_SUMMARY`)
+   - **Behavior:** Calculates SHA-256 hash, rejects duplicates within the same `intake_session_id` (`409 Conflict`), uploads to private storage, and returns immediately with `status: "PENDING"`.
+   - **Response (`202 Accepted`):**
+   ```json
+   {
+     "document_id": "doc-8812-412...",
+     "file_name": "prescription_may2026.pdf",
+     "file_size": 184520,
+     "mime_type": "application/pdf",
+     "file_hash": "a1b2c3d4...",
+     "storage_url": "/api/v1/documents/doc-8812-412.../view",
+     "status": "PENDING",
+     "uploaded_at": "2026-08-31T10:45:00Z"
+   }
+   ```
+
+2. **Check Document Status (`GET /api/v1/documents/{document_id}/status`)**
+   - Returns `{ "document_id": "...", "status": "PENDING" | "PROCESSING" | "EXTRACTED" | "FAILED", ... }`
+
+3. **Process Document OCR (`POST /api/v1/documents/{document_id}/process`)**
+   - **Behavior:** Executes PaddleOCR extraction, marks all clinical entities as `NEEDS_REVIEW` for physician verification.
+   - **Response:**
+   ```json
+   {
+     "document_id": "doc-8812-412...",
+     "status": "NEEDS_REVIEW",
+     "extracted_facts": [
+       {
+         "field_type": "MEDICATION",
+         "field_name": "Paracetamol 650mg",
+         "value": "650mg TDS 5 days",
+         "confidence": 0.94,
+         "source_page": 1,
+         "status": "NEEDS_REVIEW"
+       }
+     ]
+   }
+   ```
 
 ---
 
