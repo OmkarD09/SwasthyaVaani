@@ -434,6 +434,8 @@ export function PatientVoiceChat({
         if (res.ok) {
           const data = await res.json();
           setIntakeSessionId(data.id);
+          localStorage.setItem('swasthya_active_intake_id', data.id);
+          localStorage.setItem('swasthya_active_token', data.token || '');
         }
       } catch (err) {
         console.warn('[SwasthyaVaani Voice] Backend session init note:', err);

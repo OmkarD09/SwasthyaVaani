@@ -285,20 +285,75 @@ function DoctorPortal() {
   const [, setLocation] = useLocation();
   const [selected, setSelected] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const patient = queuePatients[selected];
+  const [queue, setQueue] = useState(queuePatients);
+  const [loading, setLoading] = useState(false);
+
+  const fetchLiveQueue = async () => {
+    try {
+      const res = await fetch('/api/v1/doctor/queue');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const colors = ['coral', 'amber', 'mint', 'blue', 'lavender'];
+          const langNames: Record<string, string> = {
+            hi: 'हिन्दी',
+            mr: 'मराठी',
+            bn: 'বাংলা',
+            ta: 'தமிழ்',
+            te: 'తెలుగు',
+            en: 'English',
+          };
+          const formatted = data.map((item: any, idx: number) => {
+            const initials = (item.patient_name || 'Patient')
+              .split(' ')
+              .map((n: string) => n[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase();
+            return {
+              id: item.token || `SV-${item.intake_session_id?.slice(0, 4)}`,
+              intake_session_id: item.intake_session_id,
+              name: item.patient_name || 'Patient',
+              age: item.patient_age ? `${item.patient_age} yrs` : '34 yrs',
+              gender: item.patient_gender || 'Female',
+              lang: langNames[item.language_code] || item.language_code || 'हिन्दी',
+              reason: item.chief_complaint || 'General consultation',
+              wait: `${String(item.wait_time_minutes || 2).padStart(2, '0')} min`,
+              priority: item.priority || 'Routine',
+              initials: initials || 'PT',
+              color: colors[idx % colors.length],
+              has_red_flags: item.has_red_flags,
+              status: item.status,
+            };
+          });
+          setQueue(formatted);
+        }
+      }
+    } catch (err) {
+      console.warn('DoctorPortal queue fetch notice:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveQueue();
+    const interval = setInterval(fetchLiveQueue, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const patient = queue[selected] || queue[0] || queuePatients[0];
   return (
     <main className="portal-page">
       <PortalSidebar active="Triage queue" onNavigate={setLocation} mobileOpen={mobileOpen} />
       <div className="portal-content">
         <PortalTopbar
-          title="Good morning, Ananya"
+          title="Good morning, Doctor"
           subtitle="Tuesday, 18 June 2026 · District Hospital"
           onMenu={() => setMobileOpen(!mobileOpen)}
         />
         <div className="portal-main">
           <div className="portal-heading-row">
             <div>
-              <div className="section-kicker">Tuesday OPD · 10:44 AM</div>
+              <div className="section-kicker">OPD TRIAGE · LIVE CONNECTED</div>
               <h1>Your triage queue</h1>
               <p>Review patient stories before they enter the consultation room.</p>
             </div>
@@ -313,7 +368,7 @@ function DoctorPortal() {
               </span>
               <div>
                 <span>Waiting now</span>
-                <strong>08</strong>
+                <strong>{String(queue.length).padStart(2, '0')}</strong>
               </div>
               <small>+2 this hour</small>
             </div>
@@ -359,16 +414,16 @@ function DoctorPortal() {
                   </h2>
                   <p>Prioritized by arrival and clinical flags</p>
                 </div>
-                <button className="filter-button">
-                  <span>All patients</span>
-                  <ChevronDown size={14} />
+                <button className="filter-button" onClick={fetchLiveQueue}>
+                  <RefreshCw size={13} className="inline mr-1" />
+                  <span>Refresh queue</span>
                 </button>
               </div>
               <div className="queue-list">
-                {queuePatients.map((item, index) => (
+                {queue.map((item, index) => (
                   <button
                     className={`queue-row ${selected === index ? 'selected' : ''}`}
-                    key={item.id}
+                    key={item.id || index}
                     onClick={() => setSelected(index)}
                   >
                     <div className={`queue-avatar ${item.color}`}>{item.initials}</div>
@@ -384,7 +439,7 @@ function DoctorPortal() {
                         <Languages size={12} /> {item.lang}
                       </span>
                     </div>
-                    <div className={`priority ${item.priority === 'Priority' ? 'priority-high' : ''}`}>
+                    <div className={`priority ${item.priority === 'Priority' || item.has_red_flags ? 'priority-high' : ''}`}>
                       <span />
                       {item.priority}
                     </div>
@@ -396,8 +451,8 @@ function DoctorPortal() {
                   </button>
                 ))}
               </div>
-              <button className="view-all-button">
-                View all 8 patients <ArrowRight size={15} />
+              <button className="view-all-button" onClick={() => setLocation('/clinician/queue')}>
+                Open full clinician workstation <ArrowRight size={15} />
               </button>
             </section>
             <aside className="summary-panel">
@@ -432,44 +487,33 @@ function DoctorPortal() {
                 <span className="summary-block-label">CHIEF CONCERN</span>
                 <h3>{patient.reason}</h3>
                 <p>
-                  Patient reports a persistent cough with intermittent throat irritation, more noticeable at
-                  night. No shortness of breath reported during intake.
+                  Patient shared symptoms in {patient.lang} during adaptive intake. Structured clinical facts and red flag checks are ready for clinician review.
                 </p>
               </div>
               <div className="summary-block">
                 <span className="summary-block-label">INTAKE SIGNALS</span>
                 <div className="signal-row">
-                  <span>Duration</span>
-                  <b>About 2 weeks</b>
+                  <span>Language</span>
+                  <b>{patient.lang}</b>
                 </div>
                 <div className="signal-row">
-                  <span>Severity</span>
-                  <b className="amber-text">Moderate · 5/10</b>
+                  <span>Status</span>
+                  <b className="amber-text">{patient.priority} · {patient.status || 'READY'}</b>
                 </div>
                 <div className="signal-row">
-                  <span>Previous history</span>
-                  <b>Seasonal allergies</b>
+                  <span>Token</span>
+                  <b>{patient.id}</b>
                 </div>
               </div>
               <div className="summary-block">
                 <span className="summary-block-label">
-                  ATTACHMENTS <small>2</small>
+                  ATTACHMENTS <small>1</small>
                 </span>
                 <div className="attachment-row">
                   <FileText size={16} />
                   <span>
                     <b>Prescription_May2026.pdf</b>
-                    <small>Uploaded 10:27 AM · 1.2 MB</small>
-                  </span>
-                  <button>
-                    <ArrowRight size={14} />
-                  </button>
-                </div>
-                <div className="attachment-row">
-                  <FileText size={16} />
-                  <span>
-                    <b>Chest_Xray_Report.jpg</b>
-                    <small>Uploaded 10:27 AM · 840 KB</small>
+                    <small>Uploaded today · 1.2 MB</small>
                   </span>
                   <button>
                     <ArrowRight size={14} />
@@ -477,11 +521,17 @@ function DoctorPortal() {
                 </div>
               </div>
               <div className="summary-actions">
-                <AppButton onClick={() => setSelected((selected + 1) % queuePatients.length)}>
-                  <Check size={16} /> Mark reviewed
+                <AppButton onClick={() => {
+                  if (patient.intake_session_id) {
+                    setLocation(`/clinician/patient/${patient.intake_session_id}`);
+                  } else {
+                    setLocation('/clinician/queue');
+                  }
+                }}>
+                  <Check size={16} /> Open Clinical Record
                 </AppButton>
-                <button className="secondary-action">
-                  <MoreHorizontal size={17} /> More actions
+                <button className="secondary-action" onClick={() => setSelected((selected + 1) % queue.length)}>
+                  Next patient <ArrowRight size={14} />
                 </button>
               </div>
             </aside>
@@ -1106,7 +1156,20 @@ function PatientIntake() {
                     <ArrowLeft size={16} />
                     <span>Back</span>
                   </button>
-                  <AppButton onClick={() => setLocation('/clinician/queue')} className="kiosk-next">
+                  <AppButton
+                    onClick={async () => {
+                      const activeId = localStorage.getItem('swasthya_active_intake_id');
+                      if (activeId) {
+                        try {
+                          await fetch(`/api/v1/intakes/${activeId}/submit`, { method: 'POST' });
+                        } catch (err) {
+                          console.warn('Submit intake note:', err);
+                        }
+                      }
+                      setLocation('/clinician/queue');
+                    }}
+                    className="kiosk-next"
+                  >
                     {t.btnFinishNotify} <ArrowRight size={17} />
                   </AppButton>
                 </div>

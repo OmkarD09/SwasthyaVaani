@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import require_doctor, get_current_user
 from app.core.events import ws_manager
-from app.models.intake import IntakeSession, ClinicalStateModel
+from app.models.intake import IntakeSession, ClinicalStateModel, Answer
 from app.models.user import Patient, Hospital, Doctor
 from app.models.review import PhysicianReviewModel, PhysicianEditModel, AuditEventModel
 from app.schemas.doctor import (
@@ -40,12 +40,12 @@ async def doctor_queue_websocket(websocket: WebSocket):
 def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_db)):
     """Retrieve prioritized patient queue for doctor workstation."""
     query = db.query(IntakeSession).filter(
-        IntakeSession.status.in_(["SUBMITTED", "IN_REVIEW", "READY_TO_SUBMIT"])
+        IntakeSession.status.in_(["SUBMITTED", "IN_REVIEW", "READY_TO_SUBMIT", "ACTIVE"])
     )
     if doctor_id:
         query = query.filter(IntakeSession.doctor_id == doctor_id)
         
-    sessions = query.order_by(IntakeSession.submitted_at.desc()).all()
+    sessions = query.order_by(IntakeSession.started_at.desc()).all()
     queue_items: List[DoctorQueueItem] = []
 
     for s in sessions:
@@ -55,21 +55,31 @@ def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_
         ).order_by(ClinicalStateModel.version.desc()).first()
         
         state_dict = latest_state_model.state_json if latest_state_model else {}
-        chief_complaint = state_dict.get("chief_complaint", "General consultation")
+        chief_complaint = state_dict.get("chief_complaint")
+        
+        # Fallback to first recorded patient answer if clinical state not finalized
+        if not chief_complaint or chief_complaint == "General consultation":
+            first_ans = db.query(Answer).filter(Answer.intake_session_id == s.id).order_by(Answer.created_at.asc()).first()
+            if first_ans and first_ans.raw_text:
+                chief_complaint = first_ans.raw_text
+            else:
+                chief_complaint = "General consultation"
+
         red_flags = state_dict.get("red_flags", [])
         has_red_flags = len(red_flags) > 0
 
         # Calculate wait time
         wait_mins = 0
-        if s.submitted_at:
-            submitted_aware = s.submitted_at
+        timestamp_to_use = s.submitted_at or s.started_at
+        if timestamp_to_use:
+            submitted_aware = timestamp_to_use
             if submitted_aware.tzinfo is None:
                 submitted_aware = submitted_aware.replace(tzinfo=timezone.utc)
             wait_mins = max(0, int((datetime.now(timezone.utc) - submitted_aware).total_seconds() / 60))
 
         priority = "Priority" if has_red_flags else "Routine"
         status_tone = "red" if has_red_flags else "teal" if s.status == "SUBMITTED" else "amber"
-        queue_status = "PRIORITY_REVIEW" if has_red_flags else "HISTORY_READY"
+        queue_status = "PRIORITY_REVIEW" if has_red_flags else "HISTORY_READY" if s.status in ["SUBMITTED", "READY_TO_SUBMIT"] else "WAITING"
 
         queue_items.append(
             DoctorQueueItem(
@@ -86,7 +96,7 @@ def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_
                 status_tone=status_tone,
                 priority=priority,
                 has_red_flags=has_red_flags,
-                submitted_at=s.submitted_at or s.started_at,
+                submitted_at=timestamp_to_use or datetime.now(timezone.utc),
                 wait_time_minutes=wait_mins
             )
         )

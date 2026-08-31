@@ -370,8 +370,8 @@ function Queue() {
       console.warn('WebSocket connection error, falling back to polling:', err);
     }
 
-    // Secondary fallback polling every 15s
-    const interval = setInterval(fetchQueue, 15000);
+    // Secondary fallback polling every 4s
+    const interval = setInterval(fetchQueue, 4000);
 
     return () => {
       if (ws) ws.close();
