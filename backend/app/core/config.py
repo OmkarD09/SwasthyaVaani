@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=["backend/.env", ".env"],
         env_file_encoding="utf-8",
         extra="ignore"
     )
@@ -38,11 +38,15 @@ class Settings(BaseSettings):
     SUPABASE_STORAGE_BUCKET: str = "medical-documents"
 
     # AI & Speech Providers
+    PROVIDER_LLM: str = "mock"
     LLM_PROVIDER: str = "mock"
+    PROVIDER_SPEECH: str = "mock"
+    PROVIDER_OCR: str = "mock"
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     SARVAM_API_KEY: str = ""
     BHASHINI_API_KEY: str = ""
+    BHASHINI_USER_ID: str = ""
 
     # Interview Safety Guardrail Defaults
     MAX_QUESTIONS_DEFAULT: int = 15

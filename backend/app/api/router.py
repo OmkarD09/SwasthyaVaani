@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, intakes, doctor, documents, admin, fhir, abdm
+from app.api.v1 import auth, intakes, doctor, documents, admin, fhir, abdm, speech
 
 api_router = APIRouter()
 
@@ -10,3 +10,4 @@ api_router.include_router(documents.router)
 api_router.include_router(admin.router)
 api_router.include_router(fhir.router)
 api_router.include_router(abdm.router)
+api_router.include_router(speech.router)

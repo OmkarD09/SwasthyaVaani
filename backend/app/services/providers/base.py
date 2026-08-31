@@ -66,6 +66,15 @@ class AbstractSpeechProvider(ABC):
         """Transcribe incoming patient audio into normalized text."""
         pass
 
+    @abstractmethod
+    async def text_to_speech(
+        self,
+        text: str,
+        language_code: Optional[str] = None
+    ) -> Optional[str]:
+        """Synthesize spoken audio from clinical text."""
+        pass
+
 
 # 3. Document OCR Service Interface
 class AbstractOCRProvider(ABC):

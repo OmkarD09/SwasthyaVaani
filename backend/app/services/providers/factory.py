@@ -1,10 +1,11 @@
 import os
 from typing import Optional
+from app.core.config import settings
 from app.services.providers.base import (
     AbstractLLMProvider, AbstractSpeechProvider, AbstractOCRProvider
 )
 from app.services.providers.llm_provider import MockLLMProvider, GeminiLLMProvider
-from app.services.providers.speech_provider import MockSpeechProvider, BhashiniSpeechProvider
+from app.services.providers.speech_provider import MockSpeechProvider, BhashiniSpeechProvider, SarvamSpeechProvider
 from app.services.providers.ocr_provider import MockOCRProvider, PaddleOCRProvider
 
 
@@ -18,20 +19,25 @@ class ProviderRegistry:
 
     def get_llm(self) -> AbstractLLMProvider:
         if self._llm_provider is None:
-            provider_type = os.getenv("PROVIDER_LLM", "mock").lower()
+            provider_type = (settings.PROVIDER_LLM or settings.LLM_PROVIDER or os.getenv("PROVIDER_LLM", "mock")).lower()
             if provider_type == "gemini":
-                self._llm_provider = GeminiLLMProvider(api_key=os.getenv("GEMINI_API_KEY"))
+                api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
+                self._llm_provider = GeminiLLMProvider(api_key=api_key)
             else:
                 self._llm_provider = MockLLMProvider()
         return self._llm_provider
 
     def get_speech(self) -> AbstractSpeechProvider:
         if self._speech_provider is None:
-            provider_type = os.getenv("PROVIDER_SPEECH", "mock").lower()
-            if provider_type == "bhashini":
+            provider_type = (settings.PROVIDER_SPEECH or os.getenv("PROVIDER_SPEECH", "mock")).lower()
+            sarvam_key = settings.SARVAM_API_KEY or os.getenv("SARVAM_API_KEY")
+            
+            if provider_type == "sarvam" or sarvam_key:
+                self._speech_provider = SarvamSpeechProvider(api_key=sarvam_key)
+            elif provider_type == "bhashini":
                 self._speech_provider = BhashiniSpeechProvider(
-                    api_key=os.getenv("BHASHINI_API_KEY"),
-                    user_id=os.getenv("BHASHINI_USER_ID")
+                    api_key=settings.BHASHINI_API_KEY or os.getenv("BHASHINI_API_KEY"),
+                    user_id=settings.BHASHINI_USER_ID or os.getenv("BHASHINI_USER_ID")
                 )
             else:
                 self._speech_provider = MockSpeechProvider()
@@ -39,7 +45,7 @@ class ProviderRegistry:
 
     def get_ocr(self) -> AbstractOCRProvider:
         if self._ocr_provider is None:
-            provider_type = os.getenv("PROVIDER_OCR", "mock").lower()
+            provider_type = (settings.PROVIDER_OCR or os.getenv("PROVIDER_OCR", "mock")).lower()
             if provider_type == "paddle":
                 self._ocr_provider = PaddleOCRProvider()
             else:
