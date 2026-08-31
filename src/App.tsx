@@ -43,6 +43,7 @@ import {
 import './index.css';
 import CursorGrid from './components/CursorGrid';
 import { PatientTextChat } from './components/PatientTextChat';
+import { PatientVoiceChat } from './components/PatientVoiceChat';
 import { getKioskTranslation } from './lib/kioskTranslations';
 import { ClinicianLogin, Queue, RecordPage } from './pages/ClinicianDashboard';
 import { PatientProfile } from './pages/PatientProfile';
@@ -976,6 +977,8 @@ function PatientIntake() {
               mode === 'text' ? (
                 <PatientTextChat
                   language={language}
+                  patientName={patientName}
+                  patientAge={patientAge}
                   onComplete={() => setSubStep(1)}
                   onSwitchToVoice={() => {
                     setMode('voice');
@@ -983,61 +986,16 @@ function PatientIntake() {
                   }}
                 />
               ) : (
-                <div className="kiosk-card story-card">
-                  <div className={`listen-orb ${recording ? 'recording' : ''}`}>
-                    <div className="listen-inner">
-                      {recording ? <Activity size={29} /> : <Mic size={29} />}
-                    </div>
-                  </div>
-                  <span className="section-kicker">
-                    {t.speakingIn} {language}
-                  </span>
-                  <h2>{t.storyHeading}</h2>
-                  <p className="story-instruction">
-                    {recording ? t.storyInstructionActive : t.storyInstructionIdle}
-                  </p>
-                  <button
-                    className={`record-button ${recording ? 'recording' : ''}`}
-                    onClick={() => setRecording(!recording)}
-                  >
-                    {recording ? (
-                      <>
-                        <span className="recording-bars">
-                          <i />
-                          <i />
-                          <i />
-                        </span>{' '}
-                        {t.btnListening}
-                      </>
-                    ) : (
-                      <>
-                        <Mic size={19} /> {t.btnTapToSpeak}
-                      </>
-                    )}
-                  </button>
-                  <div className="touch-fallback">
-                    <span>{t.preferTyping}</span>
-                    <button onClick={() => {
-                      setMode('text');
-                      setStoredMode('text');
-                    }}>
-                      {t.useTouchInstead} <ArrowRight size={14} />
-                    </button>
-                  </div>
-                  <div className="pt-4 border-t border-[#e6efed] flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={handleBack}
-                      className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer"
-                    >
-                      <ArrowLeft size={16} />
-                      <span>Back</span>
-                    </button>
-                    <AppButton onClick={() => setSubStep(1)} className="kiosk-next">
-                      {t.btnContinue} <ArrowRight size={17} />
-                    </AppButton>
-                  </div>
-                </div>
+                <PatientVoiceChat
+                  language={language}
+                  patientName={patientName}
+                  patientAge={patientAge}
+                  onComplete={() => setSubStep(1)}
+                  onSwitchToText={() => {
+                    setMode('text');
+                    setStoredMode('text');
+                  }}
+                />
               )
             )}
 
