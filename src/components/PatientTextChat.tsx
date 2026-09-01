@@ -196,7 +196,6 @@ export function PatientTextChat({
   const [inputText, setInputText] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [intakeSessionId, setIntakeSessionId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -359,7 +358,6 @@ export function PatientTextChat({
     setInputText('');
     setIsThinking(false);
     setIsFinished(false);
-    setAnswers({});
   };
 
   const latestAiMessage = [...messages].reverse().find((m) => m.sender === 'ai');

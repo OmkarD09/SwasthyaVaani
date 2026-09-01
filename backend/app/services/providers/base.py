@@ -18,6 +18,24 @@ class TranscriptionResult(BaseModel):
     provider_name: str
 
 
+class OCRBlock(BaseModel):
+    """Normalized atomic block of recognized text with confidence and bounding box."""
+    text: str
+    confidence: float = Field(default=0.9, ge=0.0, le=1.0)
+    bounding_box: list[list[float]] | None = None  # [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+    page_number: int = 1
+
+
+class NormalizedOCRResult(BaseModel):
+    """Normalized intermediate OCR payload consumed by Document Intelligence services."""
+    raw_text: str
+    blocks: list[OCRBlock] = Field(default_factory=list)
+    average_confidence: float = Field(default=0.9, ge=0.0, le=1.0)
+    pages_processed: int = 1
+    provider_name: str = "PaddleOCR"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class OCRExtractionResult(BaseModel):
     document_type: str
     extracted_fields: dict[str, Any]
@@ -27,6 +45,9 @@ class OCRExtractionResult(BaseModel):
     provider_version: str = "unknown"
     raw_text: str = ""
     text_blocks: list[dict[str, Any]] = Field(default_factory=list)
+    blocks: list[OCRBlock] | None = None
+    normalized_ocr: NormalizedOCRResult | None = None
+    review_status: str = "NEEDS_REVIEW"  # PROCESSED, NEEDS_REVIEW, FAILED
 
 
 class TranslationResult(BaseModel):
