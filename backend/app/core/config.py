@@ -1,4 +1,3 @@
-import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,7 +12,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "SwasthyaVaani API"
     ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api/v1"
-    
+
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
@@ -37,6 +36,16 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "medical-documents"
 
+    # Private document processing
+    DOCUMENT_STORAGE_DIR: str = "./private_uploads"
+    DOCUMENT_MAX_FILE_SIZE_BYTES: int = 10 * 1024 * 1024
+    DOCUMENT_MAX_PAGE_COUNT: int = 20
+    DOCUMENT_ALLOWED_MIME_TYPES: List[str] = [
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+    ]
+
     # AI & Speech Providers
     PROVIDER_LLM: str = "mock"
     LLM_PROVIDER: str = "mock"
@@ -44,7 +53,10 @@ class Settings(BaseSettings):
     PROVIDER_OCR: str = "mock"
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    GEMINI_DOCUMENT_MODEL: str = "gemini-3.5-flash-lite"
+    DOCUMENT_EXTRACTOR_PROVIDER: str = "groq"
     GROQ_API_KEY: str = ""
+    GROQ_DOCUMENT_MODEL: str = "qwen/qwen3.8-27b"
     SARVAM_API_KEY: str = ""
     BHASHINI_API_KEY: str = ""
     BHASHINI_USER_ID: str = ""

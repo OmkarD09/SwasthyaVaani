@@ -51,8 +51,10 @@ class OCRExtractionResult(BaseModel):
     confidence_score: float = Field(default=0.9, ge=0.0, le=1.0)
     pages_processed: int = 1
     provider_name: str
-    raw_text: Optional[str] = None
+    provider_version: str = "unknown"
+    raw_text: Optional[str] = ""
     blocks: Optional[List[OCRBlock]] = None
+    text_blocks: List[Dict[str, Any]] = Field(default_factory=list)
     normalized_ocr: Optional[NormalizedOCRResult] = None
     review_status: str = "NEEDS_REVIEW"  # PROCESSED, NEEDS_REVIEW, FAILED
 
