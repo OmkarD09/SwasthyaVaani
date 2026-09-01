@@ -12,12 +12,13 @@ import {
   Waves
 } from 'lucide-react';
 import { getKioskTranslation } from '../lib/kioskTranslations';
+import { recordIntakeAnswer } from '../lib/conversationStore';
 
 const INITIAL_INTAKE_GREETING: Record<string, string> = {
   English: 'Hello! I am SwasthyaVaani, your AI health assistant. What main symptom or health concern brings you in today?',
   'हिन्दी': 'नमस्ते! मैं स्वास्थ्यवाणी हूँ, आपका AI स्वास्थ्य सहायक। आज आपको क्या मुख्य तकलीफ या लक्षण महसूस हो रहे हैं?',
   'मराठी': 'नमस्कार! मी स्वास्थ्यवाणी आहे, तुमचा AI आरोग्य सहाय्यक. आज तुम्हाला कोणता मुख्य त्रास किंवा लक्षण जाणवत आहे?',
-  'বাংলা': 'নমস্কার! আমি স্বাস্থ্যবাণী, আপনার এআই স্বাস্থ্য সহকারী। আজকে আপনার প্রধান সমস্যা বা উপসর্গ কী?',
+  'বাংলা': 'নমস্কার! আমি স্বাস্থ্যবাণী, আপনার এআই স্বাস্থ্য সহকারী। আজকে আপনার প্রধান समस्या বা উপসর্গ কী?',
   'తెలుగు': 'నమస్కారం! నేను స్వాస్థ్యవాణి, మీ AI ఆరోగ్య సహాయకుడిని. ఈ రోజు మీకు ఉన్న ప్రధాన సమస్య లేదా లక్షణం ఏమిటి?',
   'தமிழ்': 'வணக்கம்! நான் ஸ்வாஸ்த்யவாணி, உங்கள் AI சுகாதார உதவியாளர். இன்று உங்களுக்கு என்ன முக்கிய அறிகுறி அல்லது பிரச்சனை உள்ளது?',
   'ગુજરાતી': 'નમસ્તે! હું સ્વાસ્થ્યવાણી છું, તમારો AI હેલ્થ આસિસ્ટન્ટ. આજે તમને મુખ્ય કઈ તકલીફ કે લક્ષણ છે?',
@@ -501,6 +502,15 @@ export function PatientVoiceChat({
       },
     ]);
 
+    // Record into unified conversation store (for Doctor Review & Patient Summary pages)
+    recordIntakeAnswer(
+      `q_${questionCount}`,
+      answerToSubmit,
+      'voice',
+      activeCategory,
+      activeQuestionText
+    );
+
     setLiveTranscript('');
     liveTranscriptRef.current = '';
 
@@ -565,7 +575,7 @@ export function PatientVoiceChat({
       console.warn('Backend adaptive answer processing note:', err);
     }
 
-    // Fallback: If offline, advance question count
+    // Fallback: If offline or rate-limited, advance question count
     const nextQCount = questionCount + 1;
     setQuestionCount(nextQCount);
 
