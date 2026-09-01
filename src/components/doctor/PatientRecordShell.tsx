@@ -217,32 +217,32 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
       </aside>
 
       {/* Main Content Area */}
-      <div className="portal-content">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#d8ddd3] bg-[#f8f7ef]/95 px-5 backdrop-blur md:px-8">
-          <button
-            onClick={() => setMobile(true)}
-            data-testid="button-open-menu"
-            className="text-[#476b5e] lg:hidden cursor-pointer"
-          >
-            <Menu size={22} />
-          </button>
-          <div className="hidden text-xs text-[#71877c] sm:flex items-center gap-2">
-            <Link href="/doctor" className="hover:text-[#1f5b4e] flex items-center gap-1 font-medium">
-              <ArrowLeft size={13} /> Doctor Dashboard
+      <div className="portal-content bg-[#f5f8f5]">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-[#e2e8e0] bg-[#f5f8f5]/95 px-5 backdrop-blur md:px-7">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobile(true)}
+              data-testid="button-open-menu"
+              className="text-[#476b5e] lg:hidden cursor-pointer"
+            >
+              <Menu size={20} />
+            </button>
+            <Link
+              href="/doctor"
+              className="hover:text-[#143d34] flex items-center gap-1.5 text-xs font-bold text-[#44685c] transition"
+            >
+              <ArrowLeft size={14} /> Back to Dashboard
             </Link>
-            <span className="text-[#bdc8bb]">/</span>
-            <span className="font-mono font-semibold text-[#173e35]">Patient #{patientId}</span>
           </div>
-          <div className="ml-auto flex items-center gap-4">
-            <span className="flex items-center gap-2 font-mono text-[10px] text-[#668075]">
-              <span className="h-2 w-2 rounded-full bg-[#6e9b76] animate-pulse" /> FASTAPI &
-              SUPABASE LIVE
+          <div className="ml-auto flex items-center gap-3.5">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] font-bold text-[#467364] tracking-wide">
+              <span className="h-2 w-2 rounded-full bg-[#27ae60] animate-pulse" /> FASTAPI & SUPABASE LIVE
             </span>
-            <BellRing size={18} className="text-[#668075]" />
+            <BellRing size={17} className="text-[#597e71]" />
           </div>
         </header>
 
-        <main className="p-5 md:p-8">{children}</main>
+        <main className="p-4 sm:p-6 lg:p-7">{children}</main>
       </div>
     </div>
   );

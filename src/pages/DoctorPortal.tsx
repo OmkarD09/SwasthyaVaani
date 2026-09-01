@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  Bell,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -12,68 +11,18 @@ import {
   Clock3,
   FileText,
   Hospital,
-  Languages,
   LayoutDashboard,
   LockKeyhole,
   Menu,
   MoreHorizontal,
-  Plus,
   RefreshCw,
   Search,
-  Settings2,
   Sparkles,
   Users,
   UsersRound,
   X,
 } from 'lucide-react';
 import { Brand, AppButton } from '../components/Brand';
-
-const queuePatients = [
-  {
-    name: 'Meena Kumari',
-    id: 'SV-2048',
-    age: '54 yrs',
-    lang: 'हिन्दी',
-    reason: 'Persistent cough',
-    wait: '04 min',
-    priority: 'Priority',
-    initials: 'MK',
-    color: 'coral',
-  },
-  {
-    name: 'Rakesh Sharma',
-    id: 'SV-2047',
-    age: '31 yrs',
-    lang: 'English',
-    reason: 'Lower back pain',
-    wait: '11 min',
-    priority: 'Routine',
-    initials: 'RS',
-    color: 'blue',
-  },
-  {
-    name: 'Lakshmi Devi',
-    id: 'SV-2046',
-    age: '67 yrs',
-    lang: 'తెలుగు',
-    reason: 'Medication follow-up',
-    wait: '18 min',
-    priority: 'Routine',
-    initials: 'LD',
-    color: 'purple',
-  },
-  {
-    name: 'Aarav Menon',
-    id: 'SV-2045',
-    age: '8 yrs',
-    lang: 'English',
-    reason: 'Fever since yesterday',
-    wait: '24 min',
-    priority: 'Priority',
-    initials: 'AM',
-    color: 'green',
-  },
-];
 
 function DoctorPortalSidebar({
   active,
@@ -150,7 +99,6 @@ function DoctorPortalSidebar({
       </nav>
 
       <div className="sidebar-bottom">
-        {/* Doctor Profile Section at bottom of left sidebar */}
         <div className="relative mb-2.5" ref={menuRef}>
           {profileOpen && (
             <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-[#264552] bg-[#0d222b] p-2.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-white">
@@ -238,7 +186,7 @@ function getPriorityWeight(priorityStr?: string, hasRedFlags?: boolean): number 
   const p = (priorityStr || '').toUpperCase();
   if (p === 'HIGH' || p === 'PRIORITY' || p === 'EMERGENCY' || p === 'RED' || p === 'CRITICAL') return 3;
   if (p === 'MEDIUM' || p === 'URGENT' || p === 'AMBER' || p === 'YELLOW') return 2;
-  return 1; // LOW / ROUTINE / NORMAL
+  return 1;
 }
 
 function parseWaitTimeMinutes(waitStr?: string | number): number {
@@ -253,9 +201,8 @@ function sortPatientQueue(patients: any[]): any[] {
     const weightA = getPriorityWeight(a.priority, a.has_red_flags);
     const weightB = getPriorityWeight(b.priority, b.has_red_flags);
     if (weightA !== weightB) {
-      return weightB - weightA; // High priority (3) first, then Medium (2), then Low (1)
+      return weightB - weightA;
     }
-    // Tie-breaker: earliest arrival / longest waiting time first
     const waitA = parseWaitTimeMinutes(a.wait_time_minutes ?? a.wait);
     const waitB = parseWaitTimeMinutes(b.wait_time_minutes ?? b.wait);
     return waitB - waitA;
@@ -266,7 +213,8 @@ export function DoctorPortal() {
   const [, setLocation] = useLocation();
   const [selected, setSelected] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [queue, setQueue] = useState<any[]>(sortPatientQueue(queuePatients));
+  const [queue, setQueue] = useState<any[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -292,49 +240,62 @@ export function DoctorPortal() {
       const res = await fetch('/api/v1/doctor/queue');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const colors = ['coral', 'amber', 'mint', 'blue', 'lavender'];
-          const langNames: Record<string, string> = {
-            hi: 'हिन्दी',
-            mr: 'मराठी',
-            bn: 'বাংলা',
-            ta: 'தமிழ்',
-            te: 'తెలుగు',
-            en: 'English',
-          };
-          const formatted = data.map((item: any, idx: number) => {
-            const initials = (item.patient_name || 'Patient')
-              .split(' ')
-              .map((n: string) => n[0])
-              .join('')
-              .slice(0, 2)
-              .toUpperCase();
-            return {
-              id: item.token || `SV-${item.intake_session_id?.slice(0, 4)}`,
-              intake_session_id: item.intake_session_id,
-              name: item.patient_name || 'Patient',
-              age: item.patient_age ? `${item.patient_age} yrs` : '34 yrs',
-              gender: item.patient_gender || 'Female',
-              lang: langNames[item.language_code] || item.language_code || 'हिन्दी',
-              reason: item.chief_complaint || 'General consultation',
-              wait: `${String(item.wait_time_minutes || 2).padStart(2, '0')} min`,
-              wait_time_minutes: item.wait_time_minutes || 2,
-              priority: item.priority || 'Routine',
-              initials: initials || 'PT',
-              color: colors[idx % colors.length],
-              has_red_flags: item.has_red_flags,
-              status: item.status,
+        if (Array.isArray(data)) {
+          if (data.length > 0) {
+            const colors = ['coral', 'amber', 'mint', 'blue', 'lavender'];
+            const langNames: Record<string, string> = {
+              hi: 'हिन्दी',
+              mr: 'मराठी',
+              bn: 'বাংলা',
+              ta: 'தமிழ்',
+              te: 'తెలుగు',
+              en: 'English',
             };
-          });
-          setQueue(sortPatientQueue(formatted));
+            const formatted = data.map((item: any, idx: number) => {
+              const patientName = item.patient_name || 'Patient';
+              const initials = patientName
+                .split(' ')
+                .filter(Boolean)
+                .map((n: string) => n[0])
+                .join('')
+                .slice(0, 2)
+                .toUpperCase() || 'PT';
+
+              return {
+                id: item.token || `SV-${item.intake_session_id?.slice(0, 4)}`,
+                intake_session_id: item.intake_session_id,
+                name: patientName,
+                age: item.patient_age ? `${item.patient_age} yrs` : '34 yrs',
+                gender: item.patient_gender || 'Female',
+                lang: langNames[item.language_code] || item.language_code || 'हिन्दी',
+                reason: item.chief_complaint || 'General consultation',
+                wait: `${String(item.wait_time_minutes || 0).padStart(2, '0')} min`,
+                wait_time_minutes: item.wait_time_minutes || 0,
+                priority: item.priority || 'Routine',
+                initials: initials,
+                color: colors[idx % colors.length],
+                has_red_flags: Boolean(item.has_red_flags),
+                status: item.status,
+              };
+            });
+            setQueue(sortPatientQueue(formatted));
+          } else {
+            setQueue([]);
+          }
+          setError(null);
           setLastUpdated(new Date());
         }
+      } else {
+        setError(`Failed to retrieve live queue (status ${res.status}).`);
+        if (queue === null) setQueue([]);
       }
-    } catch (err) {
-      console.warn('DoctorPortal queue fetch notice:', err);
+    } catch (err: any) {
+      console.error('DoctorPortal queue fetch error:', err);
+      setError('Unable to connect to backend clinical database.');
+      if (queue === null) setQueue([]);
     } finally {
       if (manual) {
-        setTimeout(() => setIsRefreshing(false), 650);
+        setTimeout(() => setIsRefreshing(false), 300);
       }
     }
   };
@@ -345,7 +306,8 @@ export function DoctorPortal() {
     return () => clearInterval(interval);
   }, []);
 
-  const sortedQueue = sortPatientQueue(queue);
+  const activeQueue = queue ?? [];
+  const sortedQueue = sortPatientQueue(activeQueue);
   const filteredQueue = sortedQueue.filter((item) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
@@ -356,7 +318,9 @@ export function DoctorPortal() {
     return nameMatch || idMatch || sessionMatch || reasonMatch;
   });
 
-  const patient = filteredQueue[selected] || filteredQueue[0] || queue[0] || queuePatients[0];
+  const patient = filteredQueue.length > 0
+    ? filteredQueue[Math.min(selected, filteredQueue.length - 1)]
+    : null;
 
   return (
     <main className="portal-page">
@@ -389,9 +353,9 @@ export function DoctorPortal() {
               </span>
               <div>
                 <span>Waiting now</span>
-                <strong>{String(queue.length).padStart(2, '0')}</strong>
+                <strong>{String(activeQueue.length).padStart(2, '0')}</strong>
               </div>
-              <small>+2 this hour</small>
+              <small>Live connected</small>
             </div>
             <div className="doctor-stat priority-alert-stat">
               <span className="stat-icon priority-icon">
@@ -401,7 +365,7 @@ export function DoctorPortal() {
                 <span>High priority</span>
                 <strong className="priority-number">
                   {String(
-                    queue.filter(
+                    activeQueue.filter(
                       (item) => getPriorityWeight(item.priority, item.has_red_flags) === 3
                     ).length
                   ).padStart(2, '0')}
@@ -416,10 +380,16 @@ export function DoctorPortal() {
               <div>
                 <span>Avg. wait time</span>
                 <strong>
-                  14 <small>min</small>
+                  {activeQueue.length > 0
+                    ? Math.round(
+                        activeQueue.reduce((acc, curr) => acc + (curr.wait_time_minutes || 0), 0) /
+                          activeQueue.length
+                      )
+                    : 0}{' '}
+                  <small>min</small>
                 </strong>
               </div>
-              <small className="good">↓ 18% today</small>
+              <small className="good">Real-time calculate</small>
             </div>
             <div className="doctor-stat">
               <span className="stat-icon stat-icon-reviewed">
@@ -427,11 +397,14 @@ export function DoctorPortal() {
               </span>
               <div>
                 <span>Reviewed today</span>
-                <strong>26</strong>
+                <strong>
+                  {activeQueue.filter((item) => item.status === 'CONFIRMED').length}
+                </strong>
               </div>
-              <small>of 34 patients</small>
+              <small>of {activeQueue.length} total</small>
             </div>
           </div>
+
           <div className="doctor-workspace">
             <section className="queue-panel">
               <div className="panel-heading">
@@ -484,15 +457,23 @@ export function DoctorPortal() {
                   >
                     <RefreshCw
                       size={14}
-                      className={`inline mr-1 transition-transform ${isRefreshing ? 'animate-spin text-[#1f5b4e]' : ''
-                        }`}
+                      className={`inline mr-1 transition-transform ${
+                        isRefreshing ? 'animate-spin text-[#1f5b4e]' : ''
+                      }`}
                     />
                     <span>{isRefreshing ? 'Syncing...' : 'Refresh queue'}</span>
                   </button>
                 </div>
               </div>
+
               <div className="queue-list">
-                {filteredQueue.length > 0 ? (
+                {queue === null ? (
+                  /* Initial loading state */
+                  <div className="py-12 px-4 text-center rounded-xl border border-dashed border-[#dce6e9] bg-[#fbfdfd] my-3">
+                    <RefreshCw size={24} className="mx-auto mb-2 text-[#1f5b4e] animate-spin" />
+                    <p className="font-semibold text-xs text-[#274457]">Connecting to live triage database...</p>
+                  </div>
+                ) : filteredQueue.length > 0 ? (
                   filteredQueue.map((item, index) => {
                     const patientId = item.intake_session_id || item.id || 'intake_001';
                     const weight = getPriorityWeight(item.priority, item.has_red_flags);
@@ -512,7 +493,7 @@ export function DoctorPortal() {
                         title={`Open clinical record for ${item.name}`}
                         aria-label={`Open clinical record for ${item.name} (${item.id})`}
                       >
-                        <div className={`queue-avatar ${item.color}`}>{item.initials}</div>
+                        <div className={`queue-avatar ${item.color || 'coral'}`}>{item.initials}</div>
                         <div className="queue-patient">
                           <b>{item.name}</b>
                           <span>
@@ -562,7 +543,7 @@ export function DoctorPortal() {
                     <Users size={26} className="mx-auto mb-2 text-[#9bb0ba]" />
                     <p className="font-semibold text-sm text-[#274457]">No patients waiting</p>
                     <p className="text-xs text-[#758a96] mt-1 max-w-sm mx-auto">
-                      The live queue is currently clear. New patients will appear here automatically.
+                      The live queue is currently clear. New patients from intake will appear here automatically.
                     </p>
                     <button
                       type="button"
@@ -577,6 +558,7 @@ export function DoctorPortal() {
                 )}
               </div>
             </section>
+
             <aside className="summary-panel">
               <div className="summary-panel-top">
                 <div>
@@ -587,63 +569,82 @@ export function DoctorPortal() {
                   <MoreHorizontal size={18} />
                 </button>
               </div>
-              <div className="selected-profile">
-                <div className={`queue-avatar ${patient.color}`}>{patient.initials}</div>
-                <div>
-                  <h3>{patient.name}</h3>
-                  <span>
-                    {patient.id} · {patient.age} · {patient.lang}
-                  </span>
+
+              {queue === null ? (
+                <div className="py-16 text-center">
+                  <RefreshCw size={22} className="mx-auto mb-2 text-[#1f5b4e] animate-spin" />
+                  <p className="text-xs font-semibold text-[#274457]">Loading patient data...</p>
                 </div>
-                <span className="profile-status">Waiting {patient.wait}</span>
-              </div>
-              <div className="ai-notice">
-                <Sparkles size={16} />
-                <span>
-                  <b>AI-structured summary</b>
-                  <small>For physician review only</small>
-                </span>
-                <CheckCircle2 size={16} />
-              </div>
-              <div className="summary-block">
-                <span className="summary-block-label">CHIEF CONCERN</span>
-                <h3>{patient.reason}</h3>
-                <p>
-                  Patient shared symptoms in {patient.lang} during adaptive intake. Structured
-                  clinical facts and red flag checks are ready for clinician review.
-                </p>
-              </div>
-              <div className="summary-block">
-                <span className="summary-block-label">
-                  ATTACHMENTS <small>1</small>
-                </span>
-                <div className="attachment-row">
-                  <FileText size={16} />
-                  <span>
-                    <b>Prescription_May2026.pdf</b>
-                    <small>Uploaded today · 1.2 MB</small>
-                  </span>
-                  <button aria-label="View attachment">
-                    <ArrowRight size={15} />
-                  </button>
+              ) : patient ? (
+                <>
+                  <div className="selected-profile">
+                    <div className={`queue-avatar ${patient.color || 'coral'}`}>{patient.initials}</div>
+                    <div>
+                      <h3>{patient.name}</h3>
+                      <span>
+                        {patient.id} · {patient.age} · {patient.lang}
+                      </span>
+                    </div>
+                    <span className="profile-status">Waiting {patient.wait}</span>
+                  </div>
+                  <div className="ai-notice">
+                    <Sparkles size={16} />
+                    <span>
+                      <b>AI-structured summary</b>
+                      <small>For physician review only</small>
+                    </span>
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div className="summary-block">
+                    <span className="summary-block-label">CHIEF CONCERN</span>
+                    <h3>{patient.reason}</h3>
+                    <p>
+                      Patient shared symptoms in {patient.lang} during adaptive intake. Structured
+                      clinical facts and red flag checks are ready for clinician review.
+                    </p>
+                  </div>
+                  <div className="summary-block">
+                    <span className="summary-block-label">
+                      ATTACHMENTS <small>1</small>
+                    </span>
+                    <div className="attachment-row">
+                      <FileText size={16} />
+                      <span>
+                        <b>Prescription_Uploaded.pdf</b>
+                        <small>Uploaded at intake</small>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="summary-actions">
+                    <AppButton
+                      onClick={() => {
+                        const id = patient.intake_session_id || patient.id;
+                        setLocation(`/doctor/patient/${id}`);
+                      }}
+                    >
+                      <Check size={16} /> Open Clinical Record
+                    </AppButton>
+                    <button
+                      className="secondary-action"
+                      onClick={() => {
+                        if (filteredQueue.length > 0) {
+                          setSelected((selected + 1) % filteredQueue.length);
+                        }
+                      }}
+                    >
+                      Next patient <ArrowRight size={15} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="py-16 px-4 text-center">
+                  <Users size={30} className="mx-auto mb-2 text-[#9bb0ba]" />
+                  <p className="font-semibold text-sm text-[#274457]">No patient selected</p>
+                  <p className="text-xs text-[#758a96] mt-1 max-w-xs mx-auto">
+                    Select a patient from the live queue to inspect their clinical summary.
+                  </p>
                 </div>
-              </div>
-              <div className="summary-actions">
-                <AppButton
-                  onClick={() => {
-                    const id = patient.intake_session_id || patient.id || 'intake_001';
-                    setLocation(`/doctor/patient/${id}`);
-                  }}
-                >
-                  <Check size={16} /> Open Clinical Record
-                </AppButton>
-                <button
-                  className="secondary-action"
-                  onClick={() => setSelected((selected + 1) % queue.length)}
-                >
-                  Next patient <ArrowRight size={15} />
-                </button>
-              </div>
+              )}
             </aside>
           </div>
         </div>
