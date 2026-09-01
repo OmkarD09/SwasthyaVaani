@@ -9,7 +9,7 @@ from app.core.events import ws_manager
 from app.models.intake import IntakeSession, QuestionEvent, Answer, ClinicalStateModel
 from app.models.user import Patient, Hospital, Doctor
 from app.schemas.intake import (
-    IntakeCreateRequest, AnswerSubmitRequest, AnswerSubmitResponse,
+    IntakeCreateRequest, AnswerSubmitRequest, AnswerSubmitResponse, VoiceAnswerSubmitResponse,
     IntakeReviewUpdateRequest, IntakeSubmissionResponse, IntakeSessionDetail
 )
 from app.schemas.clinical_state import ClinicalState
@@ -17,7 +17,8 @@ from app.schemas.question import QuestionDecision
 from app.services.clinical_ai.adaptive_engine import evaluate_next_question
 from app.services.safety.red_flags import evaluate_red_flags
 from app.models.safety import RedFlagModel
-from app.services.providers.factory import get_llm_service
+from app.services.providers.factory import get_llm_service, get_speech_service
+from fastapi import Form, UploadFile, File
 
 router = APIRouter(prefix="/intakes", tags=["Patient Intake"])
 
@@ -121,16 +122,20 @@ def get_intake_session(intake_id: str, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/{intake_id}/answers", response_model=AnswerSubmitResponse)
-async def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = Depends(get_db)):
+async def process_intake_answer_core(
+    session: IntakeSession,
+    raw_text: str,
+    input_mode: str,
+    language_code: str,
+    audio_duration_seconds: Optional[float],
+    question_event_id: Optional[str],
+    db: Session
+) -> AnswerSubmitResponse:
     """
-    Ingest patient answer, extract structured facts dynamically using LLM (Gemini 2.5 Flash),
-    evaluate safety rules, and compute next QuestionDecision.
+    ONE SHARED CLINICAL THINKING ENGINE for both Voice and Text modalities.
+    Processes patient natural language input, performs entity extraction, updates versioned ClinicalState,
+    and runs the Domain-Aware Adaptive Question Engine and Safety Guardrails.
     """
-    session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
-    if not session:
-        raise HTTPException(status_code=404, detail="Intake session not found")
-
     # Load current ClinicalState
     latest_state_model = db.query(ClinicalStateModel).filter(
         ClinicalStateModel.intake_session_id == session.id
@@ -138,31 +143,31 @@ async def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = 
     
     current_state = ClinicalState(**(latest_state_model.state_json if latest_state_model else {}))
     
-    # Save the answer record
+    # Save the answer record with modality provenance
     answer = Answer(
-        question_event_id=req.question_event_id,
+        question_event_id=question_event_id,
         intake_session_id=session.id,
-        raw_text=req.raw_text,
-        input_mode=req.input_mode,
-        language_code=req.language_code,
-        audio_duration_seconds=req.audio_duration_seconds
+        raw_text=raw_text,
+        input_mode=input_mode,
+        language_code=language_code,
+        audio_duration_seconds=audio_duration_seconds
     )
     db.add(answer)
     db.flush()
 
     # Determine target field from previous question event if available
     target_field = ""
-    if req.question_event_id:
-        q_event = db.query(QuestionEvent).filter(QuestionEvent.id == req.question_event_id).first()
+    if question_event_id:
+        q_event = db.query(QuestionEvent).filter(QuestionEvent.id == question_event_id).first()
         if q_event:
             target_field = q_event.target_field
 
-    # Extract structured clinical updates dynamically via LLM (Gemini 2.5 Flash / Mock)
+    # Extract structured clinical updates dynamically via LLM (Groq / Gemini / Mock)
     llm = get_llm_service()
     extraction_res = await llm.extract_clinical_facts(
-        raw_text=req.raw_text,
+        raw_text=raw_text,
         current_state=current_state,
-        language_code=req.language_code or "en",
+        language_code=language_code or "en",
         target_field=target_field or "chief_complaint"
     )
 
@@ -173,8 +178,22 @@ async def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = 
     updated_dict = current_state.model_dump()
     for k, v in extracted_facts.items():
         if v is not None:
-            updated_dict[k] = v
+            if k == "chief_complaint" and current_state.chief_complaint:
+                continue
+            if isinstance(v, list) and k in updated_dict and isinstance(updated_dict[k], list):
+                existing = updated_dict[k]
+                for item in v:
+                    if item not in existing:
+                        existing.append(item)
+            elif isinstance(v, dict) and k in updated_dict and isinstance(updated_dict[k], dict):
+                updated_dict[k].update(v)
+            else:
+                updated_dict[k] = v
     updated_state = ClinicalState(**updated_dict)
+    if raw_text and raw_text not in updated_state.raw_transcript_snippets:
+        updated_state.raw_transcript_snippets.append(raw_text)
+    if not updated_state.chief_complaint and raw_text:
+        updated_state.chief_complaint = raw_text.strip()
 
     # Save new ClinicalState version
     new_version = (latest_state_model.version + 1) if latest_state_model else 1
@@ -202,7 +221,7 @@ async def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = 
         asked_questions=past_questions,
         consecutive_low_progress=0 if has_progress else 1,
         total_questions_asked=session.question_count,
-        language_code=req.language_code or "en",
+        language_code=language_code or "en",
         db=db
     )
 
@@ -231,6 +250,84 @@ async def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = 
     )
 
 
+@router.post("/{intake_id}/answers", response_model=AnswerSubmitResponse)
+async def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = Depends(get_db)):
+    """
+    Ingest patient answer (Text or Voice modality) through the ONE SHARED clinical thinking engine.
+    """
+    session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Intake session not found")
+
+    return await process_intake_answer_core(
+        session=session,
+        raw_text=req.raw_text,
+        input_mode=req.input_mode or "TEXT",
+        language_code=req.language_code or "en",
+        audio_duration_seconds=req.audio_duration_seconds,
+        question_event_id=req.question_event_id,
+        db=db
+    )
+
+
+@router.post("/{intake_id}/voice-answer", response_model=VoiceAnswerSubmitResponse)
+async def submit_voice_answer(
+    intake_id: str,
+    file: UploadFile = File(...),
+    language_code: Optional[str] = Form("hi"),
+    question_event_id: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Voice Intake Ingestion:
+    Transcribes audio via Sarvam Saaras ASR, passes normalized text into the EXACT SAME
+    clinical thinking engine, and synthesizes next question audio via Sarvam Bulbul TTS.
+    """
+    session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Intake session not found")
+
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio file provided")
+
+    # 1. Transcribe audio via Speech Service (Sarvam / Mock)
+    speech_service = get_speech_service()
+    asr_res = await speech_service.transcribe_audio(audio_bytes, language_code)
+    transcript = asr_res.transcript_text.strip()
+    detected_lang = asr_res.detected_language or language_code or "hi"
+
+    # 2. Pass normalized transcript through the ONE SHARED clinical conversation engine
+    core_res = await process_intake_answer_core(
+        session=session,
+        raw_text=transcript,
+        input_mode="VOICE",
+        language_code=detected_lang,
+        audio_duration_seconds=None,
+        question_event_id=question_event_id,
+        db=db
+    )
+
+    # 3. If next action is ASK, synthesize spoken audio via Sarvam Bulbul TTS
+    audio_base64 = None
+    if core_res.decision.action == "ASK" and core_res.decision.question:
+        try:
+            audio_base64 = await speech_service.text_to_speech(core_res.decision.question, detected_lang)
+        except Exception:
+            audio_base64 = None
+
+    return VoiceAnswerSubmitResponse(
+        answer_id=core_res.answer_id,
+        intake_session_id=core_res.intake_session_id,
+        transcript_text=transcript,
+        detected_language=detected_lang,
+        audio_base64=audio_base64,
+        extracted_facts=core_res.extracted_facts,
+        clinical_state=core_res.clinical_state,
+        decision=core_res.decision
+    )
+
+
 @router.post("/{intake_id}/submit", response_model=IntakeSubmissionResponse)
 async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)):
     """
@@ -256,11 +353,17 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
     if current_state.red_flags:
         priority = "URGENT"
         for rf in current_state.red_flags:
+            rule_id = rf.get("rule_id", "RF-001") if isinstance(rf, dict) else "RF-001"
+            title = rf.get("title", str(rf)) if isinstance(rf, dict) else str(rf)
+            reason = rf.get("reason", f"Automated Clinical Red Flag: {title}") if isinstance(rf, dict) else f"Automated Clinical Red Flag: {rf}"
+            severity = rf.get("severity", "PRIORITY") if isinstance(rf, dict) else "PRIORITY"
             red_flag_entry = RedFlagModel(
                 intake_session_id=session.id,
-                flag_type=rf,
-                description=f"Automated Clinical Red Flag: {rf}",
-                acknowledged_by_doctor=False
+                rule_id=rule_id,
+                title=title,
+                reason=reason,
+                severity=severity,
+                status="OPEN"
             )
             db.add(red_flag_entry)
 

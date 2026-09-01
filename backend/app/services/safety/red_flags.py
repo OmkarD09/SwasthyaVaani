@@ -55,4 +55,19 @@ def evaluate_red_flags(state: ClinicalState) -> List[RedFlag]:
             )
         )
 
+    # Rule 4: RF-GI-001 - Gastrointestinal Bleeding / Melena Warning
+    has_gi_bleed = bool(state.dark_stool) or any(w in all_text for w in ["black stool", "dark stool", "blood in stool", "vomiting blood", "khoon"])
+    has_hypoperfusion = bool(state.dizziness) or bool(state.weakness) or any(w in all_text for w in ["dizzy", "dizziness", "weak", "weakness", "fainting", "chakkar"])
+    if has_gi_bleed:
+        reason_text = "Patient reported dark/black stool or GI bleeding." + (" Accompanied by dizziness/weakness indicating potential hypoperfusion." if has_hypoperfusion else "")
+        detected_flags.append(
+            RedFlag(
+                rule_id="RF-GI-001",
+                title="Gastrointestinal Bleeding / Melena Warning",
+                reason=reason_text,
+                severity="PRIORITY",
+                evidence_ids=["associated_symptoms"],
+            )
+        )
+
     return detected_flags
