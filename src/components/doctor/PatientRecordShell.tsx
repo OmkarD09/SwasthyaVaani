@@ -1,17 +1,20 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   LayoutDashboard,
   MessageSquare,
   FileText,
   Leaf,
-  LogOut,
   Menu,
-  X,
   BellRing,
   ArrowLeft,
+  Hospital,
+  ChevronDown,
+  CircleHelp,
+  LockKeyhole,
+  UsersRound,
 } from 'lucide-react';
-import { Logo } from '../clinician/ClinicianShared';
+import { Brand } from '../Brand';
 
 export interface PatientRecordShellProps {
   patientId: string;
@@ -21,142 +24,224 @@ export interface PatientRecordShellProps {
 export function PatientRecordShell({ patientId, children }: PatientRecordShellProps) {
   const [location, setLocation] = useLocation();
   const [mobile, setMobile] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setProfileOpen(false);
+    };
+    if (profileOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [profileOpen]);
 
   const isConversation = location.includes('/conversation');
   const isAyush = location.includes('/ayush');
   const isSummary = location.includes('/summary') || (!isConversation && !isAyush);
 
   return (
-    <div className="min-h-[100dvh] bg-[#eef0e8] text-[#173e35]">
-      {/* Patient Specific Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 border-r border-[#31594e] bg-[#173e35] px-4 py-5 transition-transform lg:translate-x-0 ${
-          mobile ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="flex items-center justify-between px-3">
-          <Logo dark />
-          <button
-            onClick={() => setMobile(false)}
-            data-testid="button-close-menu"
-            className="text-[#a9c5b5] lg:hidden cursor-pointer"
-          >
-            <X size={20} />
-          </button>
+    <div className="portal-page">
+      {/* Patient Specific Sidebar matching /doctor sidebar orientation and color */}
+      <aside className={`portal-sidebar ${mobile ? 'mobile-open' : ''}`}>
+        <div className="portal-brand" onClick={() => setLocation('/')}>
+          <Brand />
+        </div>
+
+        <div className="portal-context">
+          <span className="context-icon">
+            <Hospital size={16} />
+          </span>
+          <div>
+            <b>District Hospital</b>
+            <span>North wing · OPD 2</span>
+          </div>
+          <ChevronDown size={14} />
         </div>
 
         {/* Section 1: Doctor Workspace */}
-        <div className="mt-9 px-3 font-mono text-[10px] uppercase tracking-[.2em] text-[#86a899]">
-          Doctor Workspace
-        </div>
-        <nav className="mt-2 space-y-1">
-          <Link
-            href="/doctor"
-            onClick={() => setMobile(false)}
-            data-testid="link-doctor-dashboard"
-            className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm text-[#b6cdbf] hover:bg-[#234d43] hover:text-[#f7f0df] transition cursor-pointer"
+        <div className="side-label">DOCTOR WORKSPACE</div>
+        <nav className="portal-nav">
+          <button
+            type="button"
+            onClick={() => {
+              setMobile(false);
+              setLocation('/doctor');
+            }}
           >
-            <LayoutDashboard size={17} />
+            <LayoutDashboard size={18} />
             <span>Doctor Dashboard</span>
-          </Link>
+          </button>
         </nav>
 
         {/* Section 2: Patient Record Navigation */}
-        <div className="mt-7 px-3 font-mono text-[10px] uppercase tracking-[.2em] text-[#86a899]">
-          Patient Record
-        </div>
-        <nav className="mt-2 space-y-1.5">
-          <Link
-            href={`/doctor/patient/${patientId}/summary`}
-            onClick={() => setMobile(false)}
-            data-testid="link-patient-summary"
-            className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm transition cursor-pointer ${
-              isSummary
-                ? 'bg-[#2b6154] font-semibold text-[#f7f0df] shadow-sm'
-                : 'text-[#b6cdbf] hover:bg-[#234d43] hover:text-[#f7f0df]'
-            }`}
+        <div className="side-label side-label-spaced">PATIENT RECORD</div>
+        <nav className="portal-nav">
+          <button
+            type="button"
+            className={isSummary ? 'active' : ''}
+            onClick={() => {
+              setMobile(false);
+              setLocation(`/doctor/patient/${patientId}/summary`);
+            }}
           >
-            <FileText size={17} />
+            <FileText size={18} />
             <span>Clinical Summary</span>
-          </Link>
+          </button>
 
-          <Link
-            href={`/doctor/patient/${patientId}/conversation`}
-            onClick={() => setMobile(false)}
-            data-testid="link-patient-conversation"
-            className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm transition cursor-pointer ${
-              isConversation
-                ? 'bg-[#2b6154] font-semibold text-[#f7f0df] shadow-sm'
-                : 'text-[#b6cdbf] hover:bg-[#234d43] hover:text-[#f7f0df]'
-            }`}
+          <button
+            type="button"
+            className={isConversation ? 'active' : ''}
+            onClick={() => {
+              setMobile(false);
+              setLocation(`/doctor/patient/${patientId}/conversation`);
+            }}
           >
-            <MessageSquare size={17} />
+            <MessageSquare size={18} />
             <span>Patient Conversation</span>
-          </Link>
+          </button>
 
-          <Link
-            href={`/doctor/patient/${patientId}/ayush`}
-            onClick={() => setMobile(false)}
-            data-testid="link-patient-ayush"
-            className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm transition cursor-pointer ${
-              isAyush
-                ? 'bg-[#2b6154] font-semibold text-[#f7f0df] shadow-sm'
-                : 'text-[#b6cdbf] hover:bg-[#234d43] hover:text-[#f7f0df]'
-            }`}
+          <button
+            type="button"
+            className={isAyush ? 'active' : ''}
+            onClick={() => {
+              setMobile(false);
+              setLocation(`/doctor/patient/${patientId}/ayush`);
+            }}
           >
-            <Leaf size={17} />
+            <Leaf size={18} />
             <span>AYUSH Assessment</span>
-          </Link>
+          </button>
         </nav>
 
-        {/* Bottom Profile Info */}
-        <div className="absolute bottom-6 left-7 right-7 border-t border-[#31594e] pt-5">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-[#e1b968] font-semibold text-[#173e35]">
-              DR
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#f7f0df]">Dr. Ananya Rao</p>
-              <p className="font-mono text-[10px] text-[#86a899]">OPD 02 · DISTRICT HOSP</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setLocation('/')}
-            data-testid="button-clinician-logout"
-            className="mt-5 flex items-center gap-2 text-xs text-[#9ebcaf] hover:text-[#f7f0df] cursor-pointer"
-          >
-            <LogOut size={14} /> Exit demo
+        {/* Section 3: System */}
+        <div className="side-label side-label-spaced">SYSTEM</div>
+        <nav className="portal-nav">
+          <button type="button" onClick={() => alert('Support line: OPD Helpdesk Ext 402')}>
+            <CircleHelp size={18} />
+            <span>Help & support</span>
           </button>
+        </nav>
+
+        {/* Bottom Profile Info and Secure Badge */}
+        <div className="sidebar-bottom">
+          <div className="relative mb-2.5" ref={menuRef}>
+            {profileOpen && (
+              <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-[#264552] bg-[#0d222b] p-2.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-white">
+                <div className="px-3 py-2.5 border-b border-[#1b3945] mb-1.5 bg-[#122e3a] rounded-xl">
+                  <p className="font-bold text-xs text-[#6bdbca]">Dr. Ananya Rao</p>
+                  <p className="font-mono text-[10px] text-[#91b3bf] mt-0.5">OPD 02 · General Medicine</p>
+                  <p className="text-[10px] text-[#6d8d99] mt-0.5">District Hospital, North Wing</p>
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      alert('Physician ID: DOC-001\nLicense: MCI-2018-8472\nSpecialty: General Medicine');
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#a8cbdb] hover:bg-[#193845] hover:text-[#76ddcd] transition cursor-pointer font-medium"
+                  >
+                    <UsersRound size={14} className="text-[#76ddcd]" /> Profile details
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      alert('OPD Station: 02 (Active)\nConnected to live triage queue');
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#a8cbdb] hover:bg-[#193845] hover:text-[#76ddcd] transition cursor-pointer font-medium"
+                  >
+                    <Hospital size={14} className="text-[#76ddcd]" /> OPD Station 02
+                  </button>
+                </div>
+
+                <div className="border-t border-[#1b3945] mt-1.5 pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setLocation('/');
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#f59e97] hover:bg-[#331c1e] transition cursor-pointer font-medium text-xs"
+                  >
+                    <ArrowLeft size={14} /> Exit portal
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setProfileOpen(!profileOpen)}
+              aria-expanded={profileOpen}
+              aria-haspopup="true"
+              className="flex items-center gap-2.5 w-full p-2 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.09)] transition cursor-pointer text-left"
+              title="Dr. Ananya Rao · Click for profile options"
+            >
+              <div className="grid place-items-center w-8 h-8 rounded-full bg-[#1e4e46] text-[#78decb] font-bold text-xs shrink-0 border border-[#2b6d61]">
+                AR
+              </div>
+              <div className="min-w-0 flex-1">
+                <b className="block text-xs font-bold text-white truncate">Dr. Ananya Rao</b>
+                <span className="block text-[10px] text-[#86a2ab] truncate">General Medicine · OPD 2</span>
+              </div>
+              <ChevronDown
+                size={14}
+                className={`text-[#7f98a2] transition-transform duration-200 shrink-0 ${profileOpen ? 'rotate-180 text-[#76ddcd]' : ''}`}
+              />
+            </button>
+          </div>
+
+          <div className="secure-badge">
+            <LockKeyhole size={16} />
+            <span>
+              <b>Secure clinician workspace</b>
+              <small>Last synced just now</small>
+            </span>
+          </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#d8ddd3] bg-[#f5f4ec]/95 px-5 backdrop-blur md:px-8">
-          <button
-            onClick={() => setMobile(true)}
-            data-testid="button-open-menu"
-            className="text-[#476b5e] lg:hidden cursor-pointer"
-          >
-            <Menu size={22} />
-          </button>
-          <div className="hidden text-xs text-[#71877c] sm:flex items-center gap-2">
-            <Link href="/doctor" className="hover:text-[#1f5b4e] flex items-center gap-1 font-medium">
-              <ArrowLeft size={13} /> Doctor Dashboard
+      <div className="portal-content bg-[#f5f8f5]">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-[#e2e8e0] bg-[#f5f8f5]/95 px-5 backdrop-blur md:px-7">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobile(true)}
+              data-testid="button-open-menu"
+              className="text-[#476b5e] lg:hidden cursor-pointer"
+            >
+              <Menu size={20} />
+            </button>
+            <Link
+              href="/doctor"
+              className="hover:text-[#143d34] flex items-center gap-1.5 text-xs font-bold text-[#44685c] transition"
+            >
+              <ArrowLeft size={14} /> Back to Dashboard
             </Link>
-            <span className="text-[#bdc8bb]">/</span>
-            <span className="font-mono font-semibold text-[#173e35]">Patient #{patientId}</span>
           </div>
-          <div className="ml-auto flex items-center gap-4">
-            <span className="flex items-center gap-2 font-mono text-[10px] text-[#668075]">
-              <span className="h-2 w-2 rounded-full bg-[#6e9b76] animate-pulse" /> FASTAPI &
-              SUPABASE LIVE
+          <div className="ml-auto flex items-center gap-3.5">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] font-bold text-[#467364] tracking-wide">
+              <span className="h-2 w-2 rounded-full bg-[#27ae60] animate-pulse" /> FASTAPI & SUPABASE LIVE
             </span>
-            <BellRing size={18} className="text-[#668075]" />
+            <BellRing size={17} className="text-[#597e71]" />
           </div>
         </header>
 
-        <main className="p-5 md:p-8">{children}</main>
+        <main className="p-4 sm:p-6 lg:p-7">{children}</main>
       </div>
     </div>
   );

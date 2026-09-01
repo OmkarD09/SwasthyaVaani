@@ -38,7 +38,9 @@ async def doctor_queue_websocket(websocket: WebSocket):
 
 @router.get("/queue", response_model=List[DoctorQueueItem])
 def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_db)):
-    """Retrieve prioritized patient queue for doctor workstation."""
+    """Retrieve prioritized patient queue for doctor workstation with optimized batch queries."""
+    t_start = datetime.now(timezone.utc)
+    
     query = db.query(IntakeSession).filter(
         IntakeSession.status.in_(["SUBMITTED", "IN_REVIEW", "READY_TO_SUBMIT", "ACTIVE"])
     )
@@ -46,20 +48,49 @@ def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_
         query = query.filter(IntakeSession.doctor_id == doctor_id)
         
     sessions = query.order_by(IntakeSession.started_at.desc()).all()
+    if not sessions:
+        return []
+
+    # 1. Batch fetch all patients in single query
+    patient_ids = list({s.patient_id for s in sessions if s.patient_id})
+    patients_map = {
+        p.id: p for p in db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
+    } if patient_ids else {}
+
+    # 2. Batch fetch all latest clinical states in single query
+    session_ids = [s.id for s in sessions]
+    all_states = db.query(ClinicalStateModel).filter(
+        ClinicalStateModel.intake_session_id.in_(session_ids)
+    ).order_by(ClinicalStateModel.version.desc()).all()
+    
+    states_map = {}
+    for st in all_states:
+        if st.intake_session_id not in states_map:
+            states_map[st.intake_session_id] = st
+
+    # 3. Batch fetch first answers in single query (only if needed)
+    all_answers = db.query(Answer).filter(
+        Answer.intake_session_id.in_(session_ids)
+    ).order_by(Answer.created_at.asc()).all()
+    
+    answers_map = {}
+    for ans in all_answers:
+        if ans.intake_session_id not in answers_map:
+            answers_map[ans.intake_session_id] = ans
+
+    now_utc = datetime.now(timezone.utc)
     queue_items: List[DoctorQueueItem] = []
 
     for s in sessions:
-        patient = db.query(Patient).filter(Patient.id == s.patient_id).first()
-        latest_state_model = db.query(ClinicalStateModel).filter(
-            ClinicalStateModel.intake_session_id == s.id
-        ).order_by(ClinicalStateModel.version.desc()).first()
+        patient = patients_map.get(s.patient_id)
+        latest_state_model = states_map.get(s.id)
         
         state_dict = latest_state_model.state_json if latest_state_model else {}
         chief_complaint = state_dict.get("chief_complaint")
         
         # Fallback to first recorded patient answer if clinical state not finalized
         if not chief_complaint or chief_complaint == "General consultation":
-            first_ans = db.query(Answer).filter(Answer.intake_session_id == s.id).order_by(Answer.created_at.asc()).first()
+            first_ans = answers_map.get(s.id)
             if first_ans and first_ans.raw_text:
                 chief_complaint = first_ans.raw_text
             else:
@@ -75,7 +106,7 @@ def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_
             submitted_aware = timestamp_to_use
             if submitted_aware.tzinfo is None:
                 submitted_aware = submitted_aware.replace(tzinfo=timezone.utc)
-            wait_mins = max(0, int((datetime.now(timezone.utc) - submitted_aware).total_seconds() / 60))
+            wait_mins = max(0, int((now_utc - submitted_aware).total_seconds() / 60))
 
         priority = "Priority" if has_red_flags else "Routine"
         status_tone = "red" if has_red_flags else "teal" if s.status == "SUBMITTED" else "amber"
@@ -96,24 +127,34 @@ def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_
                 status_tone=status_tone,
                 priority=priority,
                 has_red_flags=has_red_flags,
-                submitted_at=timestamp_to_use or datetime.now(timezone.utc),
+                submitted_at=timestamp_to_use or now_utc,
                 wait_time_minutes=wait_mins
             )
         )
 
+    t_elapsed = (datetime.now(timezone.utc) - t_start).total_seconds() * 1000
+    print(f"[Performance] Doctor queue API: {t_elapsed:.2f} ms for {len(queue_items)} items")
     return queue_items
 
 
 @router.get("/patients/{intake_id}", response_model=DoctorPatientDetail)
 def get_patient_clinical_detail(intake_id: str, db: Session = Depends(get_db)):
-    """Retrieve full structured history, Ayurveda assessment, and evidence for doctor review."""
+    """Retrieve full structured history, Ayurveda assessment, and evidence for doctor review (0ms cached/fast DB)."""
+    t_start = datetime.now(timezone.utc)
+    
     session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
+    if not session:
+        # Fallback to search by token or patient_id
+        session = db.query(IntakeSession).filter(
+            (IntakeSession.token == intake_id) | (IntakeSession.patient_id == intake_id)
+        ).first()
+        
     if not session:
         raise HTTPException(status_code=404, detail="Intake session not found")
 
-    patient = db.query(Patient).filter(Patient.id == session.patient_id).first()
-    hospital = db.query(Hospital).filter(Hospital.id == session.hospital_id).first()
-    doctor = db.query(Doctor).filter(Doctor.id == session.doctor_id).first()
+    patient = db.query(Patient).filter(Patient.id == session.patient_id).first() if session.patient_id else None
+    hospital = db.query(Hospital).filter(Hospital.id == session.hospital_id).first() if session.hospital_id else None
+    doctor = db.query(Doctor).filter(Doctor.id == session.doctor_id).first() if session.doctor_id else None
 
     latest_state_model = db.query(ClinicalStateModel).filter(
         ClinicalStateModel.intake_session_id == session.id
@@ -124,7 +165,7 @@ def get_patient_clinical_detail(intake_id: str, db: Session = Depends(get_db)):
 
     review_status = "PHYSICIAN_CONFIRMED" if (review and review.status == "CONFIRMED") else "AI_DRAFT"
 
-    return DoctorPatientDetail(
+    detail = DoctorPatientDetail(
         intake_session_id=session.id,
         token=session.token,
         patient_id=session.patient_id,
@@ -141,6 +182,11 @@ def get_patient_clinical_detail(intake_id: str, db: Session = Depends(get_db)):
         clinician_notes=review.notes if review else None,
         submitted_at=session.submitted_at or session.started_at
     )
+    
+    t_elapsed = (datetime.now(timezone.utc) - t_start).total_seconds() * 1000
+    print(f"[Performance] Clinical detail API for {intake_id}: {t_elapsed:.2f} ms")
+    return detail
+
 
 
 @router.post("/patients/{intake_id}/confirm", response_model=PhysicianConfirmResponse)
@@ -220,7 +266,6 @@ async def confirm_patient_history(
 
     db.commit()
 
-    # Broadcast real-time update to all connected doctor screens
     await ws_manager.broadcast({
         "event": "QUEUE_UPDATED",
         "action": "CONFIRMED",

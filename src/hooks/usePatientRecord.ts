@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { type PatientDetail, fallbackQueue } from '../lib/clinicianData';
+import { type PatientDetail } from '../lib/clinicianData';
 
 export interface PatientRecordState {
   patientDetail: PatientDetail | null;
@@ -23,86 +23,54 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
   const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!patientId) return;
+    if (!patientId) {
+      setLoading(false);
+      setError('Invalid patient ID');
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
 
     const loadDetail = async () => {
-      setLoading(true);
-      setError(null);
-
       try {
         const res = await fetch(`/api/v1/doctor/patients/${patientId}`);
+        if (!isMounted) return;
+
         if (res.ok) {
           const data = await res.json();
           setPatientDetail(data);
           setNote(data.clinician_notes || '');
           if (data.review_status === 'PHYSICIAN_CONFIRMED') setConfirmed(true);
+          setError(null);
+        } else if (res.status === 404) {
+          setError(`Patient record "${patientId}" was not found in database.`);
+          setPatientDetail(null);
         } else {
-          // Fallback matching by token or index
-          const found =
-            fallbackQueue.find(
-              (p) => p.intake_session_id === patientId || p.token === patientId
-            ) || fallbackQueue[0];
-
-          setPatientDetail({
-            intake_session_id: found.intake_session_id,
-            token: found.token,
-            patient_id: found.patient_id,
-            patient_name: found.patient_name,
-            patient_age: found.patient_age,
-            patient_gender: found.patient_gender,
-            hospital_name: 'District Hospital',
-            doctor_name: 'Dr. Ananya Rao',
-            workflow_type: found.workflow_type,
-            language_code: found.language_code,
-            status: found.status,
-            review_status: 'AI_DRAFT',
-            clinical_state: {
-              chief_complaint: found.chief_complaint,
-              symptoms: [found.chief_complaint],
-              onset: 'Sudden onset (2 hours ago)',
-              duration: '2 hours',
-              severity: 8,
-              location: 'Substernal / Left chest',
-              character: 'Crushing, heavy pressure',
-              radiation: 'Left shoulder and arm',
-              associated_symptoms: ['Cold sweating', 'Shortness of breath'],
-              medications: ['Telmisartan 40mg (daily)'],
-              ayush:
-                found.workflow_type === 'AYUSH'
-                  ? {
-                      agni: 'Manda (low)',
-                      koshtha: 'Krura (hard)',
-                      doshas: [67, 15, 18],
-                    }
-                  : undefined,
-              red_flags: found.has_red_flags
-                ? [
-                    {
-                      rule_id: 'RF-CP-001',
-                      title: 'Chest Pain with High-Risk Associated Signals',
-                      reason:
-                        'Patient reported crushing chest pressure with breathlessness, cold sweat, and left shoulder radiation.',
-                      severity: 'PRIORITY',
-                    },
-                  ]
-                : [],
-              confidence: 0.94,
-            },
-            submitted_at: found.submitted_at,
-          });
+          setError(`Server returned status ${res.status} when loading patient record.`);
+          setPatientDetail(null);
         }
-      } catch (e) {
-        console.warn('Loading fallback patient record:', e);
+      } catch (err: any) {
+        if (!isMounted) return;
+        console.error('Error fetching patient clinical record:', err);
+        setError('Network error: Unable to connect to backend server.');
+        setPatientDetail(null);
       } finally {
-        try {
-          const savedDoc = localStorage.getItem('swasthya_uploaded_doc_name');
-          if (savedDoc) setUploadedDocName(savedDoc);
-        } catch {}
-        setLoading(false);
+        if (isMounted) {
+          try {
+            const savedDoc = localStorage.getItem('swasthya_uploaded_doc_name');
+            if (savedDoc) setUploadedDocName(savedDoc);
+          } catch {}
+          setLoading(false);
+        }
       }
     };
 
     loadDetail();
+    return () => {
+      isMounted = false;
+    };
   }, [patientId]);
 
   const confirmPatient = async (edits: Record<string, string> = {}): Promise<boolean> => {
@@ -132,12 +100,12 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
         setConfirmed(true);
         return true;
       }
+      setError(`Unable to confirm patient record (status ${res.status}).`);
     } catch (e) {
-      console.warn('Physician confirm offline fallback:', e);
+      console.warn('Physician confirm notice:', e);
+      setError('Network error: Unable to confirm patient record.');
     }
-    setConfirmed(true);
-    setFhirId(`FHIR-BUNDLE-${patientDetail.token}-2026`);
-    return true;
+    return false;
   };
 
   return {
