@@ -481,58 +481,5 @@ export function HomePage() {
     </main>
   );
 }
-
 export default HomePage;
-        </div >
-  <div className="principles-copy">
-    <div className="section-kicker">The SwasthyaVaani promise</div>
-    <h2>
-      Advanced where
-      <br />
-      it matters.
-      <br />
-      <em>Human always.</em>
-    </h2>
-    <p>AI handles the structure. Doctors hold the expertise. Patients keep their voice. That’s the line we never cross.</p>
-    <div className="principle-points">
-      <div>
-        <ShieldCheck size={18} />
-        <span>Built for trust</span>
-      </div>
-      <div>
-        <Hospital size={18} />
-        <span>Ready for real hospitals</span>
-      </div>
-      <div>
-        <Languages size={18} />
-        <span>Made for India’s diversity</span>
-      </div>
-    </div>
-  </div>
-      </section >
 
-  <footer className="site-footer">
-    <div className="footer-top">
-      <Brand light />
-      <div className="footer-callout">
-        Every patient has a story.
-        <br />
-        <em>Let’s make it heard.</em>
-      </div>
-      <AppButton onClick={() => setLocation('/patient')}>
-        Start with SwasthyaVaani <ArrowRight size={16} />
-      </AppButton>
-    </div>
-    <div className="footer-bottom">
-      <span>SIH 2026 · PS 26047</span>
-      <span>Ministry of AYUSH</span>
-      <span>ABDM-ready architecture</span>
-      <span>Privacy & security</span>
-      <span>© 2026 SwasthyaVaani</span>
-    </div>
-  </footer>
-    </main >
-  );
-}
-
-export default HomePage;
