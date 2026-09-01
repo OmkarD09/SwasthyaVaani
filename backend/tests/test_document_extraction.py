@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 
+from app.core.config import settings
 from app.models.document import (
     DocumentCandidateEvidenceLinkModel,
     DocumentCandidateModel,
@@ -22,8 +23,10 @@ from app.services.document_extraction import (
     _groq_strict_json_schema,
     build_document_extraction_input,
     extract_and_persist_candidates,
+    get_configured_document_extractor,
     get_document_extractor,
     persist_candidate_result,
+    validate_candidate_evidence,
 )
 from app.services.document_intelligence import replace_ocr_evidence
 from app.services.providers.base import OCRExtractionResult
@@ -151,7 +154,9 @@ def test_gemini_document_extractor_validates_and_persists_candidates(
 
 
 def test_missing_gemini_key_creates_no_candidates(db, evidence_context):
-    with pytest.raises(DocumentExtractorConfigurationError, match="GEMINI_API_KEY"):
+    with pytest.raises(
+        DocumentExtractorConfigurationError, match="KUNAL_GEMINI_API_KEY"
+    ):
         GeminiDocumentExtractor(api_key=None, model_name="gemini-test")
     assert db.query(DocumentCandidateModel).count() == 0
     assert db.query(DocumentOCREvidenceModel).count() == 3
@@ -185,8 +190,62 @@ def test_document_extractor_selection_is_explicit():
 
 
 def test_missing_groq_key_fails_without_fallback():
-    with pytest.raises(DocumentExtractorConfigurationError, match="GROQ_API_KEY"):
+    with pytest.raises(
+        DocumentExtractorConfigurationError, match="KUNAL_GROQ_API_KEY"
+    ):
         GroqDocumentExtractor(None, "openai/gpt-oss-20b")
+
+
+@pytest.mark.parametrize(
+    ("provider", "kunal_key_setting", "kunal_model_setting", "expected_type"),
+    [
+        (
+            "groq",
+            "KUNAL_GROQ_API_KEY",
+            "KUNAL_GROQ_DOCUMENT_MODEL",
+            GroqDocumentExtractor,
+        ),
+        (
+            "gemini",
+            "KUNAL_GEMINI_API_KEY",
+            "KUNAL_GEMINI_DOCUMENT_MODEL",
+            GeminiDocumentExtractor,
+        ),
+    ],
+)
+def test_configured_extractor_uses_only_kunal_credentials(
+    monkeypatch, provider, kunal_key_setting, kunal_model_setting, expected_type
+):
+    monkeypatch.setenv("GROQ_API_KEY", "OMKAR_TEST_VALUE")
+    monkeypatch.setenv("GEMINI_API_KEY", "OMKAR_TEST_VALUE")
+    monkeypatch.setattr(settings, "KUNAL_DOCUMENT_EXTRACTOR_PROVIDER", provider)
+    monkeypatch.setattr(settings, kunal_key_setting, "KUNAL_TEST_VALUE")
+    monkeypatch.setattr(settings, kunal_model_setting, "kunal-test-model")
+
+    extractor = get_configured_document_extractor()
+
+    assert isinstance(extractor, expected_type)
+    assert extractor._api_key == "KUNAL_TEST_VALUE"
+    assert extractor.model_name == "kunal-test-model"
+
+
+@pytest.mark.parametrize(
+    ("provider", "kunal_key_setting", "error_setting"),
+    [
+        ("groq", "KUNAL_GROQ_API_KEY", "KUNAL_GROQ_API_KEY"),
+        ("gemini", "KUNAL_GEMINI_API_KEY", "KUNAL_GEMINI_API_KEY"),
+    ],
+)
+def test_generic_key_cannot_replace_missing_kunal_key(
+    monkeypatch, provider, kunal_key_setting, error_setting
+):
+    monkeypatch.setenv("GROQ_API_KEY", "OMKAR_TEST_VALUE")
+    monkeypatch.setenv("GEMINI_API_KEY", "OMKAR_TEST_VALUE")
+    monkeypatch.setattr(settings, "KUNAL_DOCUMENT_EXTRACTOR_PROVIDER", provider)
+    monkeypatch.setattr(settings, kunal_key_setting, "")
+
+    with pytest.raises(DocumentExtractorConfigurationError, match=error_setting):
+        get_configured_document_extractor()
 
 
 def test_groq_strict_schema_requires_and_closes_every_object():
@@ -419,3 +478,56 @@ def test_metformin_does_not_create_inferred_diagnosis(db, evidence_context):
         )
     )
     assert result.history == []
+
+
+def extraction_input_with_source_date(extraction_input):
+    dated_input = extraction_input.model_copy(deep=True)
+    date_block = dated_input.evidence_blocks[0].model_copy(
+        update={
+            "evidence_id": "date-evidence",
+            "block_index": len(dated_input.evidence_blocks),
+            "text": "Date: 01-09-2026",
+        }
+    )
+    dated_input.evidence_blocks.append(date_block)
+    dated_input.raw_ocr_text += "\nDate: 01-09-2026"
+    return dated_input
+
+
+def dated_lab_payload(extraction_input, date, include_date_evidence):
+    payload = valid_payload(extraction_input)
+    payload["labs"][0]["date"] = date
+    if include_date_evidence:
+        payload["labs"][0]["source_evidence"].append(
+            {"evidence_id": "date-evidence"}
+        )
+    return DocumentCandidateExtractionResult.model_validate(payload)
+
+
+def test_exact_source_date_with_date_evidence_is_accepted(evidence_context):
+    _, _, extraction_input = evidence_context
+    dated_input = extraction_input_with_source_date(extraction_input)
+    result = dated_lab_payload(dated_input, "01-09-2026", True)
+
+    validate_candidate_evidence(dated_input, result)
+    assert result.labs[0].date == "01-09-2026"
+
+
+def test_normalized_date_is_rejected_when_source_contains_only_raw_date(
+    evidence_context,
+):
+    _, _, extraction_input = evidence_context
+    dated_input = extraction_input_with_source_date(extraction_input)
+    result = dated_lab_payload(dated_input, "2026-09-01", True)
+
+    with pytest.raises(DocumentCandidateValidationError, match="unsupported"):
+        validate_candidate_evidence(dated_input, result)
+
+
+def test_populated_date_without_date_evidence_is_rejected(evidence_context):
+    _, _, extraction_input = evidence_context
+    dated_input = extraction_input_with_source_date(extraction_input)
+    result = dated_lab_payload(dated_input, "01-09-2026", False)
+
+    with pytest.raises(DocumentCandidateValidationError, match="unsupported"):
+        validate_candidate_evidence(dated_input, result)

@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.document import (
     DocumentCandidateEvidenceLinkModel,
     DocumentCandidateModel,
@@ -60,7 +61,10 @@ SYSTEM_INSTRUCTION = """You extract untrusted candidates from OCR evidence only.
 Extract only facts explicitly stated in the supplied blocks. Never diagnose, prescribe,
 infer diseases, calculate lab interpretations, or add unsupported medical details.
 Preserve missing information as null. Every candidate must cite one or more supplied
-evidence IDs. Return schema-valid structured output only. Every result is a candidate
+evidence IDs that support every populated field. Preserve source-backed string values
+exactly as written in OCR evidence: do not normalize, reformat, translate, or infer
+numeric date ordering. For example, keep 01-09-2026 as 01-09-2026, never 2026-09-01.
+Return schema-valid structured output only. Every result is a candidate
 requiring physician review; never mark anything confirmed or processed. Do not provide
 reasoning or chain-of-thought."""
 
@@ -111,7 +115,7 @@ class GeminiDocumentExtractor(AbstractDocumentExtractor):
     ):
         if not api_key:
             raise DocumentExtractorConfigurationError(
-                "Gemini document extraction requires GEMINI_API_KEY"
+                "Gemini document extraction requires KUNAL_GEMINI_API_KEY"
             )
         self.model_name = model_name
         self._api_key = api_key
@@ -188,7 +192,7 @@ class GroqDocumentExtractor(AbstractDocumentExtractor):
     ):
         if not api_key:
             raise DocumentExtractorConfigurationError(
-                "Groq document extraction requires GROQ_API_KEY"
+                "Groq document extraction requires KUNAL_GROQ_API_KEY"
             )
         self.model_name = model_name
         self._api_key = api_key
@@ -276,6 +280,17 @@ def get_document_extractor(
         return GeminiDocumentExtractor(gemini_api_key, gemini_model)
     raise DocumentExtractorConfigurationError(
         f"Unsupported document extractor provider: {provider_name!r}"
+    )
+
+
+def get_configured_document_extractor() -> AbstractDocumentExtractor:
+    """Build Kunal's extractor exclusively from Kunal-scoped settings."""
+    return get_document_extractor(
+        settings.KUNAL_DOCUMENT_EXTRACTOR_PROVIDER,
+        groq_api_key=settings.KUNAL_GROQ_API_KEY,
+        groq_model=settings.KUNAL_GROQ_DOCUMENT_MODEL,
+        gemini_api_key=settings.KUNAL_GEMINI_API_KEY,
+        gemini_model=settings.KUNAL_GEMINI_DOCUMENT_MODEL,
     )
 
 

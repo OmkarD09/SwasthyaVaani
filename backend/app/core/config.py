@@ -47,12 +47,16 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "mock"
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
-    GEMINI_DOCUMENT_MODEL: str = "gemini-2.5-flash"
-    DOCUMENT_EXTRACTOR_PROVIDER: str = "groq"
     GROQ_API_KEY: str = ""
-    GROQ_DOCUMENT_MODEL: str = "openai/gpt-oss-20b"
     SARVAM_API_KEY: str = ""
     BHASHINI_API_KEY: str = ""
+
+    # Kunal - Document Intelligence
+    KUNAL_DOCUMENT_EXTRACTOR_PROVIDER: str = "groq"
+    KUNAL_GROQ_API_KEY: str = ""
+    KUNAL_GROQ_DOCUMENT_MODEL: str = "openai/gpt-oss-20b"
+    KUNAL_GEMINI_API_KEY: str = ""
+    KUNAL_GEMINI_DOCUMENT_MODEL: str = "gemini-2.5-flash-lite"
 
     # Interview Safety Guardrail Defaults
     MAX_QUESTIONS_DEFAULT: int = 15
