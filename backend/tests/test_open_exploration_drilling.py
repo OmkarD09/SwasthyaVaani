@@ -49,7 +49,7 @@ async def test_scenario_b_acidity_and_vomiting():
         language_code="en"
     )
     assert decision.action == "ASK"
-    assert decision.target_field in ["open_gi_exploration", "food_exposure", "duration", "vomiting"]
+    assert decision.target_field in ["open_gi_exploration", "food_exposure", "duration", "vomiting", "hydration_status"]
     assert decision.target_field != "stool_frequency"
 
 

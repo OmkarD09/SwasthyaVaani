@@ -1,4 +1,4 @@
-from typing import List, Optional, Any, Set
+from typing import List, Optional, Any, Set, Tuple, Dict
 from sqlalchemy.orm import Session
 
 from app.schemas.clinical_state import ClinicalState
@@ -29,78 +29,138 @@ def is_semantic_duplicate(candidate: str, asked_questions: List[str]) -> bool:
     return False
 
 
-def _check_minimum_sufficient_history(
+def _assess_information_sufficiency(
     state: ClinicalState,
     primary_domain: str,
+    viable_candidates: List[Dict[str, Any]],
     total_questions_asked: int
-) -> bool:
+) -> Tuple[bool, Optional[str]]:
     """
-    Evaluates whether clinically sufficient information has been gathered to hand over to the physician.
-    Prevents filler questions and terminates early as soon as the core clinical picture is clear.
+    Evaluates clinical information sufficiency across the complete ClinicalState:
+    "Is there still clinically meaningful information that could change the doctor's understanding of this case?"
+    
+    Returns (is_sufficient: bool, reason: Optional[str])
     """
-    if total_questions_asked < 3:
-        return False
+    if not viable_candidates:
+        return True, "Minimum Sufficient History: All relevant clinical dimensions for this complaint are resolved."
 
     snippets = " ".join(state.raw_transcript_snippets + [state.chief_complaint or ""]).lower()
+    has_cc = bool(state.chief_complaint)
+    has_dur = is_field_already_resolved("duration", state)
 
-    if primary_domain == ClinicalDomain.GASTROINTESTINAL:
-        has_cc = bool(state.chief_complaint)
-        has_dur = is_field_already_resolved("duration", state)
-        has_food = is_field_already_resolved("food_exposure", state)
-        has_stool = is_field_already_resolved("stool_frequency", state) or is_field_already_resolved("stool_consistency", state)
-        has_upper = is_field_already_resolved("vomiting", state) or is_field_already_resolved("bloating", state) or is_field_already_resolved("abdominal_location", state)
-        
-        # Melena / Dark Stool profile
-        if state.dark_stool:
-            if has_cc and is_field_already_resolved("dark_stool_onset", state) and is_field_already_resolved("dark_stool_consistency", state):
-                return True
+    # 1. Safety Dimensions MUST NEVER be terminated early if unaddressed
+    if any(c.get("reasoning_mode") == "SAFETY_REQUIRED" for c in viable_candidates[:3]):
+        return False, None
 
-        # Gastroenteritis profile
-        if has_cc and has_dur and has_food and has_stool and has_upper:
-            return True
-        if total_questions_asked >= 4 and has_cc and has_dur and (has_food or has_stool):
-            return True
+    # 2. Check active clinical symptom complications that MUST be characterized before stopping
+    has_vomiting = (
+        "vomiting" in state.associated_symptoms 
+        or "Vomiting" in state.associated_symptoms
+        or any(w in snippets for w in ["vomit", "ulti"])
+    ) and "vomiting" not in state.negated_symptoms
 
-        # Acidity/GERD profile
-        has_acidity = any(w in snippets for w in ["acidity", "acid", "heartburn", "jalan"])
-        has_open_exp = is_field_already_resolved("open_gi_exploration", state) or "other_symptoms" in state.negated_symptoms
-        if has_acidity and has_cc and has_dur and (has_open_exp or is_field_already_resolved("meal_relationship", state) or is_field_already_resolved("location", state)):
-            return True
+    has_diarrhea = (
+        "diarrhea" in state.associated_symptoms
+        or any(w in snippets for w in ["diarrhea", "dast", "loose motion", "watery"])
+    ) and "diarrhea" not in state.negated_symptoms
 
-    elif primary_domain == ClinicalDomain.HEADACHE:
-        has_cc = bool(state.chief_complaint)
-        has_dur = is_field_already_resolved("duration", state)
-        has_dist = is_field_already_resolved("distribution", state)
-        has_photo = is_field_already_resolved("photophobia", state)
-        has_open_exp = is_field_already_resolved("open_headache_exploration", state) or "other_symptoms" in state.negated_symptoms
-        if has_cc and has_dur and (has_photo or (has_dist and has_open_exp)):
-            return True
+    has_dark_stool = bool(state.dark_stool) or any(w in snippets for w in ["dark stool", "black stool", "kala dast", "kala sandas"])
 
-    elif primary_domain == ClinicalDomain.RESPIRATORY:
-        has_cc = bool(state.chief_complaint)
-        has_dur = is_field_already_resolved("duration", state)
-        has_cough = is_field_already_resolved("cough_type", state)
-        has_breath = is_field_already_resolved("breathlessness", state)
-        has_open_exp = is_field_already_resolved("open_respiratory_exploration", state) or "other_symptoms" in state.negated_symptoms
-        if has_cc and has_dur and (has_cough or (has_breath and has_open_exp)):
-            return True
+    # If acute vomiting is active, fluid tolerance / hydration_status MUST be known before stopping
+    if has_vomiting and not is_field_already_resolved("hydration_status", state):
+        return False, None
 
-    elif primary_domain == ClinicalDomain.FEVER:
-        has_cc = bool(state.chief_complaint)
-        has_dur = is_field_already_resolved("duration", state)
-        has_fever_pat = is_field_already_resolved("fever_pattern", state)
-        if has_cc and has_dur and has_fever_pat:
-            return True
+    # If melena is active, onset and consistency MUST be known before stopping
+    if has_dark_stool and not (is_field_already_resolved("dark_stool_onset", state) and is_field_already_resolved("dark_stool_consistency", state)):
+        return False, None
 
-    elif primary_domain == ClinicalDomain.CARDIAC:
-        has_cc = bool(state.chief_complaint)
-        has_dur = is_field_already_resolved("duration", state)
-        has_rad = is_field_already_resolved("radiation", state)
-        has_char = is_field_already_resolved("character", state)
-        if has_cc and has_dur and (has_rad or has_char):
-            return True
+    # If diarrhea is active, consistency MUST be known before stopping
+    if has_diarrhea and not is_field_already_resolved("stool_consistency", state):
+        return False, None
 
-    return False
+    # 3. Domain-Specific Clinical Sufficiency Checks
+    if has_cc and has_dur:
+        # A. GI Presentation Sufficiency
+        if primary_domain == ClinicalDomain.GASTROINTESTINAL:
+            # Active Vomiting/Gastroenteritis
+            if has_vomiting or has_diarrhea:
+                has_food = is_field_already_resolved("food_exposure", state)
+                has_hydration = is_field_already_resolved("hydration_status", state)
+                has_bowel_known = (
+                    is_field_already_resolved("stool_frequency", state)
+                    or is_field_already_resolved("stool_consistency", state)
+                    or is_field_already_resolved("open_gi_exploration", state)
+                    or "other_symptoms" in state.negated_symptoms
+                    or "diarrhea" in state.negated_symptoms
+                )
+                if has_food and has_hydration and has_bowel_known:
+                    return True, "Minimum Sufficient History: Information sufficient for Acute Gastroenteritis: duration, food exposure, vomiting, and hydration status characterized."
+            # Melena / GI Bleeding
+            elif has_dark_stool:
+                if is_field_already_resolved("dark_stool_onset", state) and is_field_already_resolved("dark_stool_consistency", state):
+                    return True, "Minimum Sufficient History: Information sufficient for Melena presentation: onset and stool consistency characterized."
+            # Isolated Acidity / GERD
+            else:
+                has_open_exp = is_field_already_resolved("open_gi_exploration", state) or "other_symptoms" in state.negated_symptoms
+                has_upper_detail = (
+                    is_field_already_resolved("meal_relationship", state)
+                    or is_field_already_resolved("antacid_relief", state)
+                    or len(state.aggravating_factors) > 0
+                    or len(state.relieving_factors) > 0
+                )
+                if has_open_exp or (has_upper_detail and total_questions_asked >= 3):
+                    return True, "Minimum Sufficient History: Information sufficient for Acidity/GERD presentation: complaint, duration, and upper GI profile characterized."
+
+        # B. Headache Presentation Sufficiency
+        elif primary_domain == ClinicalDomain.HEADACHE:
+            has_dist = is_field_already_resolved("distribution", state) or is_field_already_resolved("location", state)
+            has_photo = is_field_already_resolved("photophobia", state)
+            has_neg_exploration = "other_symptoms" in state.negated_symptoms
+            # If light sensitivity is known, or patient explicitly denied other symptoms and lateralization is known:
+            if has_photo or (has_dist and has_neg_exploration):
+                return True, "Minimum Sufficient History: Information sufficient for Headache presentation: duration, lateralization, and photophobia characterized."
+
+        # C. Respiratory Presentation Sufficiency
+        elif primary_domain == ClinicalDomain.RESPIRATORY:
+            has_cough = is_field_already_resolved("cough_type", state)
+            has_breath = is_field_already_resolved("breathlessness", state)
+            has_neg_exp = "other_symptoms" in state.negated_symptoms
+            if has_cough or (has_breath and has_neg_exp):
+                return True, "Minimum Sufficient History: Information sufficient for Respiratory presentation: cough type and breathlessness characterized."
+
+        # D. Fever Presentation Sufficiency
+        elif primary_domain == ClinicalDomain.FEVER:
+            if is_field_already_resolved("fever_pattern", state) or "other_symptoms" in state.negated_symptoms:
+                return True, "Minimum Sufficient History: Information sufficient for Fever presentation: duration and pattern characterized."
+
+        # E. Cardiac Presentation Sufficiency
+        elif primary_domain == ClinicalDomain.CARDIAC:
+            has_rad = is_field_already_resolved("radiation", state)
+            has_char = is_field_already_resolved("character", state)
+            if has_rad or has_char:
+                return True, "Minimum Sufficient History: Information sufficient for Cardiac presentation: radiation and chest discomfort character evaluated."
+
+    # 4. If Open Exploration or High-Yield Targeted Dimension (score >= 65) is pending, don't stop
+    top_candidate = viable_candidates[0]
+    top_score = top_candidate.get("score", 0)
+    top_mode = top_candidate.get("reasoning_mode", "TARGETED_FOLLOW_UP")
+
+    if top_mode in ["SAFETY_REQUIRED", "OPEN_EXPLORATION"]:
+        return False, None
+
+    # If any high-gain clinical dimension remains unresolved, do not terminate
+    if top_score >= 65:
+        return False, None
+
+    # If duration is missing, we must ask duration
+    if not has_dur:
+        return False, None
+
+    # If only low-gain details (score < 65) remain and core history is established:
+    if has_cc and (has_dur or total_questions_asked >= 4):
+        return True, f"Minimum Sufficient History: Information sufficient for {primary_domain} presentation (no high-yield clinical gaps remain)."
+
+    return False, None
 
 
 async def evaluate_next_question(
@@ -181,20 +241,19 @@ async def evaluate_next_question(
         if not is_field_already_resolved(c["field_name"], state) and c["score"] > 0
     ]
 
-    # 6. Minimum Sufficient History Stop Condition (Early Stop)
-    if _check_minimum_sufficient_history(state, primary_domain, total_questions_asked):
-        return QuestionDecision(
-            action="STOP",
-            reason=f"Minimum Sufficient History achieved for {primary_domain} presentation.",
-            confidence=0.96,
-            language_code=lang
-        )
+    # 6. Information Sufficiency & Termination Reasoning Gate
+    is_sufficient, stop_reason = _assess_information_sufficiency(
+        state=state,
+        primary_domain=primary_domain,
+        viable_candidates=viable_candidates,
+        total_questions_asked=total_questions_asked
+    )
 
-    if not viable_candidates:
+    if is_sufficient:
         return QuestionDecision(
             action="STOP",
-            reason="All relevant clinical dimensions for this complaint are resolved.",
-            confidence=0.98,
+            reason=stop_reason or f"Clinical information sufficiency achieved for {primary_domain} presentation.",
+            confidence=0.96,
             language_code=lang
         )
 

@@ -239,7 +239,12 @@ def is_field_already_resolved(field_name: str, state: ClinicalState) -> bool:
     elif field_name == "hydration_status":
         if state.hydration_status:
             return True
-        return any(w in combined_snippets for w in ["fluids", "water intake", "drink water", "dehydrat", "thirsty", "dizzy"])
+        hydration_words = [
+            "keep water down", "retaining fluids", "drink water", "drinking fluids",
+            "unable to drink", "vomiting water", "paani pee", "paani nahi ruk", "fluids down",
+            "tolerating fluids", "dehydration", "paani pee pa", "can drink water", "fluids: "
+        ]
+        return any(w in combined_snippets for w in hydration_words)
 
     elif field_name == "blood_in_stool":
         return any(w in combined_snippets for w in ["blood in stool", "black stool", "khoon", "red stool", "no blood", "dark stool"])
@@ -382,9 +387,15 @@ def score_candidate_dimensions(
             if (has_diarrhea or state.stool_consistency == "Watery") and field_name in ["laxative_use", "bowel_movement_recency"]:
                 score -= 100
 
-            if (has_dizziness or has_weakness) and not is_field_already_resolved("hydration_status", state):
+            if (has_vomiting or has_diarrhea or has_dizziness or has_weakness) and not is_field_already_resolved("hydration_status", state):
                 if field_name == "hydration_status":
-                    score += 60
+                    score += 85
+                    reasoning_mode = "TARGETED_FOLLOW_UP"
+
+            if (has_vomiting or has_diarrhea) and not is_field_already_resolved("food_exposure", state):
+                if field_name == "food_exposure":
+                    score += 50
+                    reasoning_mode = "TARGETED_FOLLOW_UP"
 
             # 5. Check if already resolved or answered
             if is_field_already_resolved(field_name, state):

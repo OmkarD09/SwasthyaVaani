@@ -28,7 +28,7 @@ async def test_speech_provider_transcription():
 
 @pytest.mark.asyncio
 async def test_ocr_provider_processing():
-    ocr = get_ocr_service()
+    ocr = MockOCRProvider()
     res = await ocr.process_document(
         file_bytes=b"%PDF-1.4...",
         filename="prescription_may2026.pdf",

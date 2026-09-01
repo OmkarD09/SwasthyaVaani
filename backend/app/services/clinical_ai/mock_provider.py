@@ -59,9 +59,9 @@ def extract_clinical_facts_from_answer(
         updated_state.duration = "1 day (since yesterday)"
         extracted["duration"] = "1 day"
         progress = True
-    elif "today" in text or "aaj se" in text or "आजपासून" in text or "आज से" in text:
-        updated_state.duration = "Since today"
-        extracted["duration"] = "1 day"
+    elif "today" in text or "aaj se" in text or "आजपासून" in text or "आज से" in text or "morning" in text or "subah" in text:
+        updated_state.duration = "Since this morning (<24 hours)"
+        extracted["duration"] = "Since this morning"
         progress = True
 
     # 2. Check for Onset
@@ -286,7 +286,24 @@ def extract_clinical_facts_from_answer(
         extracted["open_exploration"] = "Negative (no other symptoms reported)"
         progress = True
 
-    # 16. Partial Answers to Multi-part Questions (e.g. meal vs lying down)
+    # 16. Check for Hydration / Fluid Retention
+    hydration_phrases = [
+        "keep water down", "retaining fluids", "drink water", "drinking water", "drinking fluids",
+        "able to drink", "can drink", "paani pee", "water intake", "vomiting water", "unable to drink",
+        "fluids down", "tolerating fluids", "paani pee pa", "cannot keep water down", "drink small amounts"
+    ]
+    if any(hp in text for hp in hydration_phrases) or target_field == "hydration_status":
+        if any(w in text for w in ["unable", "cannot", "vomiting everything", "vomiting water", "nahi ruk raha", "vomiting all"]):
+            val = "Unable to retain fluids / Severe dehydration risk"
+        else:
+            val = "Tolerating fluids / Drinking water"
+        updated_state.hydration_status = val
+        extracted["hydration_status"] = val
+        if "hydration_status" not in updated_state.resolved_dimensions:
+            updated_state.resolved_dimensions.append("hydration_status")
+        progress = True
+
+    # 17. Partial Answers to Multi-part Questions (e.g. meal vs lying down)
     if target_field == "meal_relationship" and text in ["yes", "ha", "haan"]:
         updated_state.dimension_status["meal_relationship"] = "PARTIALLY_KNOWN"
         extracted["meal_relationship"] = "Symptoms related to meals / eating (unspecified if postprandial vs position)"
