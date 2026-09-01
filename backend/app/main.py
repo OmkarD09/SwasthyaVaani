@@ -1,14 +1,12 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
-from app.core.database import Base, engine, SessionLocal
 from app.api.router import api_router
+from app.core.config import settings
+from app.core.database import SessionLocal
 from app.seed.seed_data import seed_database
-
-# Ensure all database tables exist on startup
-Base.metadata.create_all(bind=engine)
 
 
 @asynccontextmanager
@@ -19,6 +17,7 @@ async def lifespan(app: FastAPI):
         seed_database(db)
     finally:
         db.close()
+
     yield
 
 

@@ -3,7 +3,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=["backend/.env", ".env"],
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     PROJECT_NAME: str = "SwasthyaVaani API"
@@ -44,12 +46,17 @@ class Settings(BaseSettings):
     ]
 
     # AI & Speech Providers
+    PROVIDER_LLM: str = "mock"
+    PROVIDER_SPEECH: str = "mock"
+    PROVIDER_OCR: str = "mock"
+    EMBEDDING_PROVIDER: str = "mock"
     LLM_PROVIDER: str = "mock"
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     SARVAM_API_KEY: str = ""
     BHASHINI_API_KEY: str = ""
+    BHASHINI_USER_ID: str = ""
 
     # Kunal - Document Intelligence
     KUNAL_DOCUMENT_EXTRACTOR_PROVIDER: str = "groq"
@@ -59,7 +66,7 @@ class Settings(BaseSettings):
     KUNAL_GEMINI_DOCUMENT_MODEL: str = "gemini-2.5-flash-lite"
 
     # Interview Safety Guardrail Defaults
-    MAX_QUESTIONS_DEFAULT: int = 15
+    MAX_QUESTIONS_DEFAULT: int = 10
     MAX_CONSECUTIVE_LOW_PROGRESS: int = 2
 
 

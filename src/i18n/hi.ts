@@ -1,4 +1,4 @@
-import { en, type TranslationKey } from './en';
+import { type TranslationKey } from './en';
 
 export const hi: Record<TranslationKey, string> = {
   // Navigation & General

@@ -1,14 +1,19 @@
 import pytest
 from fastapi.testclient import TestClient
+
 # pyrefly: ignore [missing-import]
 from sqlalchemy import create_engine
+
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import sessionmaker
-# pyrefly: ignore [missing-import]
-from sqlalchemy.pool import StaticPool  
 
+# pyrefly: ignore [missing-import]
+from sqlalchemy.pool import StaticPool
+
+from app.core.config import settings
 from app.core.database import Base, get_db
 from app.main import app
+from app.services.providers.factory import provider_registry
 
 # Create in-memory SQLite database for deterministic test runs
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -19,6 +24,24 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def deterministic_provider_settings(monkeypatch):
+    monkeypatch.setattr(settings, "PROVIDER_LLM", "mock")
+    monkeypatch.setattr(settings, "PROVIDER_SPEECH", "mock")
+    monkeypatch.setattr(settings, "PROVIDER_OCR", "mock")
+    monkeypatch.setattr(settings, "EMBEDDING_PROVIDER", "mock")
+    monkeypatch.setattr(settings, "MAX_QUESTIONS_DEFAULT", 10)
+    provider_registry._llm_provider = None
+    provider_registry._speech_provider = None
+    provider_registry._ocr_provider = None
+    provider_registry._embedding_provider = None
+    yield
+    provider_registry._llm_provider = None
+    provider_registry._speech_provider = None
+    provider_registry._ocr_provider = None
+    provider_registry._embedding_provider = None
 
 
 @pytest.fixture(scope="function")

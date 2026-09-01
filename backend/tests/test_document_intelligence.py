@@ -331,12 +331,12 @@ def test_paddle_provider_rejects_malformed_engine_output():
 
 
 def test_provider_factory_selects_mock_explicitly(monkeypatch):
-    monkeypatch.setenv("PROVIDER_OCR", "mock")
+    monkeypatch.setattr(settings, "PROVIDER_OCR", "mock")
     assert isinstance(ProviderRegistry().get_ocr(), MockOCRProvider)
 
 
 def test_provider_factory_selects_paddle_without_mock_fallback(monkeypatch):
-    monkeypatch.setenv("PROVIDER_OCR", "paddle")
+    monkeypatch.setattr(settings, "PROVIDER_OCR", "paddle")
     selected = ProviderRegistry().get_ocr()
     assert isinstance(selected, PaddleOCRProvider)
     assert not isinstance(selected, MockOCRProvider)

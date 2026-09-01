@@ -17,8 +17,6 @@ import {
   RotateCcw,
   Paperclip,
   Activity,
-  AlertCircle,
-  HelpCircle,
 } from 'lucide-react';
 import { patientApi } from '../services/patientApi';
 

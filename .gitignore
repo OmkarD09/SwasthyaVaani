@@ -8,6 +8,7 @@ env/
 # Environment Variables & Secrets (NEVER COMMIT)
 .env
 backend/.env
+backend/env
 *.env
 *.env.local
 

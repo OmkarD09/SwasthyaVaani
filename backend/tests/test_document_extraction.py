@@ -248,6 +248,13 @@ def test_generic_key_cannot_replace_missing_kunal_key(
         get_configured_document_extractor()
 
 
+def test_invalid_kunal_document_provider_fails_explicitly(monkeypatch):
+    monkeypatch.setattr(settings, "KUNAL_DOCUMENT_EXTRACTOR_PROVIDER", "invalid")
+
+    with pytest.raises(DocumentExtractorConfigurationError, match="Unsupported document"):
+        get_configured_document_extractor()
+
+
 def test_groq_strict_schema_requires_and_closes_every_object():
     schema = _groq_strict_json_schema(
         DocumentCandidateExtractionResult.model_json_schema()

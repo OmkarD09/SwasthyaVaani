@@ -18,10 +18,8 @@ import {
   MoreHorizontal,
   Plus,
   RefreshCw,
-  Settings2,
   Sparkles,
   Users,
-  UsersRound,
 } from 'lucide-react';
 import { Brand, AppButton } from '../components/Brand';
 

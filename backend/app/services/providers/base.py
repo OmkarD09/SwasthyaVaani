@@ -40,13 +40,21 @@ class TranslationResult(BaseModel):
 class AbstractLLMProvider(ABC):
     @abstractmethod
     async def extract_clinical_facts(
-        self, raw_text: str, current_state: dict[str, Any], language_code: str = "en"
+        self,
+        raw_text: str,
+        current_state: Any,
+        language_code: str = "en",
+        target_field: str = "chief_complaint",
     ) -> ExtractionResult:
         """Extract structured clinical findings from patient voice/text transcript."""
 
     @abstractmethod
     async def generate_adaptive_question(
-        self, target_field: str, chief_complaint: str | None, language_code: str = "en"
+        self,
+        target_field: str,
+        chief_complaint: str | None,
+        language_code: str = "en",
+        rag_context: Any | None = None,
     ) -> str:
         """Generate dynamic clinical question if deterministic fallback is not used."""
 
@@ -58,6 +66,12 @@ class AbstractSpeechProvider(ABC):
         self, audio_bytes: bytes, language_code: str | None = None
     ) -> TranscriptionResult:
         """Transcribe incoming patient audio into normalized text."""
+
+    @abstractmethod
+    async def text_to_speech(
+        self, text: str, language_code: str | None = None
+    ) -> str | None:
+        """Synthesize spoken audio for patient-facing questions."""
 
 
 # 3. Document OCR Service Interface

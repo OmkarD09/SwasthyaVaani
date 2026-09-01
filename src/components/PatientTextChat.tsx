@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, ArrowRight, Mic, CheckCircle2, RotateCcw, Sparkles } from 'lucide-react';
 import { getKioskTranslation } from '../lib/kioskTranslations';
+import { recordIntakeAnswer } from '../lib/conversationStore';
 
 export interface ChatMessage {
   id: string;
@@ -240,6 +241,15 @@ export function PatientTextChat({
     const newAnswers = { ...answers, [currentQ.id]: trimmedAnswer };
     setAnswers(newAnswers);
 
+    // Record into unified conversation store (used for Review Summary)
+    recordIntakeAnswer(
+      currentQ.id,
+      trimmedAnswer,
+      'text',
+      currentQ.category,
+      getLocalizedText(currentQ.question)
+    );
+
     if (intakeSessionId) {
       const langCode = currentLang === 'हिन्दी' ? 'hi' : currentLang === 'मराठी' ? 'mr' : 'en';
       fetch(`/api/v1/intakes/${intakeSessionId}/answers`, {
@@ -250,7 +260,7 @@ export function PatientTextChat({
           input_mode: 'TEXT',
           language_code: langCode,
         }),
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     const userMessage: ChatMessage = {
@@ -284,14 +294,14 @@ export function PatientTextChat({
           currentLang === 'हिन्दी'
             ? 'धन्यवाद! आपकी सभी जानकारी रिकॉर्ड कर ली गई है। अब आप अपनी पुरानी पर्ची या रिपोर्ट अपलोड कर सकते हैं।'
             : currentLang === 'বাংলা'
-            ? 'ধন্যবাদ! আপনার সমস্ত তথ্য রেকর্ড করা হয়েছে। এখন আপনি আপনার পূর্বের প্রেসক্রিপশন বা রিপোর্ট যুক্ত করতে পারেন।'
-            : currentLang === 'मराठी'
-            ? 'धन्यवाद! तुमची सर्व माहिती नोंदवली गेली आहे. आता तुम्ही तुमचे मागील प्रिस्क्रिप्शन किंवा रिपोर्ट अपलोड करू शकता.'
-            : currentLang === 'తెలుగు'
-            ? 'ధన్యవాదాలు! మీ వివరాలు నమోదు చేయబడ్డాయి. ఇప్పుడు మీరు మీ పాత ప్రిస్క్రిప్షన్ లేదా నివేదికలను అప్‌లోడ్ చేయవచ్చు.'
-            : currentLang === 'தமிழ்'
-            ? 'நன்றி! உங்கள் தகவல்கள் பதிவு செய்யப்பட்டுள்ளன. இப்போது நீங்கள் உங்கள் பழைய மருந்து சீட்டு அல்லது அறிக்கைகளை பதிவேற்றலாம்.'
-            : 'Thank you! Your intake responses have been recorded. You can now proceed to attach any previous prescriptions or reports.';
+              ? 'ধন্যবাদ! আপনার সমস্ত তথ্য রেকর্ড করা হয়েছে। এখন আপনি আপনার পূর্বের প্রেসক্রিপশন বা রিপোর্ট যুক্ত করতে পারেন।'
+              : currentLang === 'मराठी'
+                ? 'धन्यवाद! तुमची सर्व माहिती नोंदवली गेली आहे. आता तुम्ही तुमचे मागील प्रिस्क्रिप्शन किंवा रिपोर्ट अपलोड करू शकता.'
+                : currentLang === 'తెలుగు'
+                  ? 'ధన్యవాదాలు! మీ వివరాలు నమోదు చేయబడ్డాయి. ఇప్పుడు మీరు మీ పాత ప్రిస్క్రిప్షన్ లేదా నివేదికలను అప్‌లోడ్ చేయవచ్చు.'
+                  : currentLang === 'தமிழ்'
+                    ? 'நன்றி! உங்கள் தகவல்கள் பதிவு செய்யப்பட்டுள்ளன. இப்போது நீங்கள் உங்கள் பழைய மருந்து சீட்டு அல்லது அறிக்கைகளை பதிவேற்றலாம்.'
+                    : 'Thank you! Your intake responses have been recorded. You can now proceed to attach any previous prescriptions or reports.';
 
         const finalAiMessage: ChatMessage = {
           id: `msg-final-${Date.now()}`,
@@ -482,10 +492,10 @@ export function PatientTextChat({
             currentLang === 'हिन्दी'
               ? 'अपना उत्तर यहाँ लिखें...'
               : currentLang === 'বাংলা'
-              ? 'আপনার উত্তর এখানে লিখুন...'
-              : currentLang === 'मराठी'
-              ? 'तुमचे उत्तर येथे टाईप करा...'
-              : 'Type your answer here...'
+                ? 'আপনার উত্তর এখানে লিখুন...'
+                : currentLang === 'मराठी'
+                  ? 'तुमचे उत्तर येथे टाईप करा...'
+                  : 'Type your answer here...'
           }
           value={inputText}
           disabled={isFinished || isThinking}

@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  UsersRound,
   X,
 } from 'lucide-react';
 
