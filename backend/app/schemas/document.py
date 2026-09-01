@@ -69,3 +69,66 @@ class DocumentFieldReviewRecord(BaseModel):
     corrected_value: Any | None = None
     reason: str
     reviewed_at: datetime
+
+
+class DocumentEvidenceReference(BaseModel):
+    evidence_id: str
+
+
+class PersistedOCREvidenceBlock(BaseModel):
+    evidence_id: str
+    ocr_run_id: str
+    document_id: str
+    block_index: int = Field(ge=0)
+    text: str
+    ocr_confidence: float = Field(ge=0.0, le=1.0)
+    page_number: int = Field(ge=1)
+    bounding_box: list[float] | None = None
+    provider_name: str
+    provider_version: str
+    processed_at: datetime
+
+
+class MedicationCandidate(BaseModel):
+    name: str | None = None
+    strength_or_dose: str | None = None
+    frequency: str | None = None
+    duration: str | None = None
+    source_evidence: list[DocumentEvidenceReference] = Field(min_length=1)
+    extraction_confidence: float = Field(ge=0.0, le=1.0)
+    status: Literal["NEEDS_REVIEW"] = "NEEDS_REVIEW"
+
+
+class LabCandidate(BaseModel):
+    test_name: str | None = None
+    value: str | None = None
+    unit: str | None = None
+    reference_range: str | None = None
+    date: str | None = None
+    source_evidence: list[DocumentEvidenceReference] = Field(min_length=1)
+    extraction_confidence: float = Field(ge=0.0, le=1.0)
+    status: Literal["NEEDS_REVIEW"] = "NEEDS_REVIEW"
+
+
+class HistoricalCandidate(BaseModel):
+    fact_type: str | None = None
+    value: str | None = None
+    date: str | None = None
+    source_evidence: list[DocumentEvidenceReference] = Field(min_length=1)
+    extraction_confidence: float = Field(ge=0.0, le=1.0)
+    status: Literal["NEEDS_REVIEW"] = "NEEDS_REVIEW"
+
+
+class DocumentExtractionInput(BaseModel):
+    document_id: str
+    ocr_run_id: str
+    document_type_hint: str | None = None
+    file_name: str
+    raw_ocr_text: str
+    evidence_blocks: list[PersistedOCREvidenceBlock]
+
+
+class DocumentCandidateExtractionResult(BaseModel):
+    medications: list[MedicationCandidate] = Field(default_factory=list)
+    labs: list[LabCandidate] = Field(default_factory=list)
+    history: list[HistoricalCandidate] = Field(default_factory=list)

@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "mock"
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    GEMINI_DOCUMENT_MODEL: str = "gemini-2.5-flash"
+    DOCUMENT_EXTRACTOR_PROVIDER: str = "groq"
+    GROQ_API_KEY: str = ""
+    GROQ_DOCUMENT_MODEL: str = "openai/gpt-oss-20b"
     SARVAM_API_KEY: str = ""
     BHASHINI_API_KEY: str = ""
 

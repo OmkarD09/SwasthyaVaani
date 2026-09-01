@@ -3,11 +3,24 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.core.config import settings
-from app.models.document import DocumentExtractionModel, DocumentModel
+from app.models.document import (
+    DocumentExtractionModel,
+    DocumentModel,
+    DocumentOCREvidenceModel,
+    DocumentOCRRunModel,
+)
 from app.models.intake import ClinicalStateModel, IntakeSession
 from app.models.user import Doctor, Hospital, Patient
+from app.schemas.document import (
+    DocumentEvidenceReference,
+    HistoricalCandidate,
+    LabCandidate,
+    MedicationCandidate,
+)
+from app.services.document_intelligence import replace_ocr_evidence
 from app.services.providers.base import AbstractOCRProvider, OCRExtractionResult
 from app.services.providers.factory import ProviderRegistry, get_ocr_service
 from app.services.providers.ocr_provider import (
@@ -196,6 +209,22 @@ def test_all_extractions_require_review_and_retain_provenance(
         .one()
     )
     assert stored.status == "NEEDS_REVIEW"
+    run = db.query(DocumentOCRRunModel).filter_by(document_id=uploaded["document_id"]).one()
+    block = (
+        db.query(DocumentOCREvidenceModel)
+        .filter_by(document_id=uploaded["document_id"])
+        .one()
+    )
+    assert run.provider_name == "MockOCRProvider"
+    assert run.provider_version == "1.0"
+    assert block.ocr_run_id == run.id
+    assert block.document_id == uploaded["document_id"]
+    assert block.block_index == 0
+    assert block.text == result["raw_ocr_text"]
+    expected_ocr_confidence = 0.42 if "low_confidence" in filename else 0.94
+    assert block.confidence == pytest.approx(expected_ocr_confidence)
+    assert block.page_number == 1
+    assert block.bounding_box_json == [0.0, 0.0, 600.0, 800.0]
     assert db.query(ClinicalStateModel).count() == 0
 
 
@@ -349,7 +378,91 @@ def test_processing_passes_exact_stored_bytes_to_provider(client, db, patient):
     assert response.json()["status"] == "NEEDS_REVIEW"
     assert provider.file_bytes == content
     assert db.query(DocumentExtractionModel).count() == 0
+    assert db.query(DocumentOCRRunModel).count() == 1
     assert db.query(ClinicalStateModel).count() == 0
+
+
+def test_replacing_ocr_evidence_does_not_accumulate_duplicate_blocks(db, patient):
+    document = DocumentModel(
+        patient_id=patient.id,
+        file_name="synthetic.jpg",
+        storage_object_id="prescription/2026/synthetic.jpg",
+        mime_type="image/jpeg",
+        file_size=10,
+        sha256="a" * 64,
+        page_count=1,
+        document_type="PRESCRIPTION",
+    )
+    db.add(document)
+    db.commit()
+    first = OCRExtractionResult(
+        document_type="UNCLASSIFIED",
+        extracted_fields={},
+        confidence_score=0.71,
+        pages_processed=1,
+        provider_name="PaddleOCR",
+        provider_version="3.7.0",
+        raw_text="first run",
+        text_blocks=[
+            {
+                "text": "first run",
+                "confidence": 0.71,
+                "page": 1,
+                "bounding_box": [1.0, 2.0, 3.0, 4.0],
+            }
+        ],
+    )
+    second = first.model_copy(
+        update={
+            "raw_text": "replacement run",
+            "confidence_score": 0.83,
+            "text_blocks": [
+                {
+                    "text": "replacement run",
+                    "confidence": 0.83,
+                    "page": 1,
+                    "bounding_box": [5.0, 6.0, 7.0, 8.0],
+                }
+            ],
+        }
+    )
+
+    first_run = replace_ocr_evidence(db, document, first)
+    db.commit()
+    first_run_id = first_run.id
+    second_run = replace_ocr_evidence(db, document, second)
+    db.commit()
+
+    assert second_run.id != first_run_id
+    assert db.query(DocumentOCRRunModel).filter_by(document_id=document.id).count() == 1
+    blocks = db.query(DocumentOCREvidenceModel).filter_by(document_id=document.id).all()
+    assert len(blocks) == 1
+    assert blocks[0].text == "replacement run"
+    assert blocks[0].confidence == pytest.approx(0.83)
+
+
+def test_document_candidate_contract_is_nullable_and_always_needs_review():
+    source = [DocumentEvidenceReference(evidence_id="evidence-1")]
+    medication = MedicationCandidate(
+        source_evidence=source, extraction_confidence=0.9
+    )
+    lab = LabCandidate(source_evidence=source, extraction_confidence=0.8)
+    history = HistoricalCandidate(source_evidence=source, extraction_confidence=0.7)
+
+    assert medication.name is None
+    assert medication.strength_or_dose is None
+    assert medication.frequency is None
+    assert medication.duration is None
+    assert lab.reference_range is None
+    assert lab.value is None
+    assert history.value is None
+    assert {medication.status, lab.status, history.status} == {"NEEDS_REVIEW"}
+    with pytest.raises(ValidationError):
+        MedicationCandidate(
+            source_evidence=source,
+            extraction_confidence=0.99,
+            status="CONFIRMED",
+        )
 
 
 def test_processing_failure_sets_safe_status(client, db, patient):
@@ -371,3 +484,5 @@ def test_processing_failure_sets_safe_status(client, db, patient):
     stored = db.query(DocumentModel).filter_by(id=uploaded["document_id"]).one()
     assert stored.status == "PROCESSING_FAILED"
     assert db.query(DocumentExtractionModel).count() == 0
+    assert db.query(DocumentOCRRunModel).count() == 0
+    assert db.query(DocumentOCREvidenceModel).count() == 0

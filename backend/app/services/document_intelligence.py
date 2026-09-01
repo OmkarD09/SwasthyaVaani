@@ -1,13 +1,28 @@
 import hashlib
 import re
 import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
-from app.schemas.document import ExtractedFact
+from app.models.document import (
+    DocumentCandidateEvidenceLinkModel,
+    DocumentCandidateModel,
+    DocumentCandidateSetModel,
+    DocumentModel,
+    DocumentOCREvidenceModel,
+    DocumentOCRRunModel,
+)
+from app.schemas.document import (
+    DocumentCandidateExtractionResult,
+    DocumentExtractionInput,
+    ExtractedFact,
+)
 from app.services.providers.base import OCRExtractionResult
 
 
@@ -15,6 +30,16 @@ class DocumentValidationError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code = code
+
+
+class AbstractDocumentExtractor(ABC):
+    """Future boundary for rules or Gemini; it consumes persisted OCR evidence."""
+
+    @abstractmethod
+    async def extract_candidates(
+        self, extraction_input: DocumentExtractionInput
+    ) -> DocumentCandidateExtractionResult:
+        """Return untrusted, schema-validated candidates requiring review."""
 
 
 @dataclass(frozen=True)
@@ -138,3 +163,54 @@ def build_proposed_facts(
                 )
             )
     return facts
+
+
+def replace_ocr_evidence(
+    db: Session, document: DocumentModel, ocr: OCRExtractionResult
+) -> DocumentOCRRunModel:
+    """Replace a document's prior OCR evidence with one complete normalized run."""
+    candidate_ids = [
+        candidate_id
+        for (candidate_id,) in db.query(DocumentCandidateModel.id)
+        .filter_by(document_id=document.id)
+        .all()
+    ]
+    if candidate_ids:
+        db.query(DocumentCandidateEvidenceLinkModel).filter(
+            DocumentCandidateEvidenceLinkModel.candidate_id.in_(candidate_ids)
+        ).delete(synchronize_session=False)
+        db.query(DocumentCandidateModel).filter(
+            DocumentCandidateModel.id.in_(candidate_ids)
+        ).delete(synchronize_session=False)
+    db.query(DocumentCandidateSetModel).filter_by(document_id=document.id).delete(
+        synchronize_session=False
+    )
+    db.query(DocumentOCREvidenceModel).filter_by(document_id=document.id).delete(
+        synchronize_session=False
+    )
+    db.query(DocumentOCRRunModel).filter_by(document_id=document.id).delete(
+        synchronize_session=False
+    )
+    run = DocumentOCRRunModel(
+        document_id=document.id,
+        provider_name=ocr.provider_name,
+        provider_version=ocr.provider_version,
+        aggregate_confidence=ocr.confidence_score,
+        pages_processed=ocr.pages_processed,
+        raw_text=ocr.raw_text,
+    )
+    db.add(run)
+    db.flush()
+    for block_index, block in enumerate(ocr.text_blocks):
+        db.add(
+            DocumentOCREvidenceModel(
+                ocr_run_id=run.id,
+                document_id=document.id,
+                block_index=block_index,
+                text=str(block.get("text", "")),
+                confidence=float(block["confidence"]),
+                page_number=int(block.get("page", 1)),
+                bounding_box_json=block.get("bounding_box"),
+            )
+        )
+    return run

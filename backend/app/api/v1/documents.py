@@ -13,6 +13,7 @@ from app.services.document_intelligence import (
     build_proposed_facts,
     create_storage_key,
     load_private_file,
+    replace_ocr_evidence,
     store_private_file,
     validate_document,
 )
@@ -135,6 +136,7 @@ async def process_document_ocr(
     try:
         file_bytes = load_private_file(doc.storage_object_id)
         result = await ocr.process_document(file_bytes, doc.file_name, doc.mime_type)
+        replace_ocr_evidence(db, doc, result)
         facts = build_proposed_facts(doc.id, result)
         for fact in facts:
             db.add(
