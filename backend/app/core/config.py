@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     BHASHINI_API_KEY: str = ""
     BHASHINI_USER_ID: str = ""
 
+    # Kunal - Document Intelligence isolated config
+    KUNAL_DOCUMENT_EXTRACTOR_PROVIDER: str = "groq"
+    KUNAL_GROQ_API_KEY: str = ""
+    KUNAL_GROQ_DOCUMENT_MODEL: str = "openai/gpt-oss-20b"
+    KUNAL_GEMINI_API_KEY: str = ""
+    KUNAL_GEMINI_DOCUMENT_MODEL: str = "gemini-2.5-flash-lite"
+
     # Interview Safety Guardrail Defaults
     MAX_QUESTIONS_DEFAULT: int = 10
     MAX_CONSECUTIVE_LOW_PROGRESS: int = 2
