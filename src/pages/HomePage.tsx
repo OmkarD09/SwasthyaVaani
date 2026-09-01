@@ -224,10 +224,56 @@ export function HomePage() {
             <span className="tag-number tag-green">03</span> Doctor reviews
           </div>
           <svg className="connector connector-one" viewBox="0 0 150 110" fill="none">
-            <path d="M4 104C65 103 52 8 147 7" stroke="rgba(110,213,200,.6)" strokeDasharray="4 6" />
+            <defs>
+              <filter id="glow-dot-1" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#78ded0" floodOpacity="0.9" />
+              </filter>
+            </defs>
+            <path className="connector-path" d="M4 104C65 103 52 8 147 7" stroke="rgba(110,213,200,.6)" strokeDasharray="4 6" />
+            <circle r="3" fill="#78ded0" filter="url(#glow-dot-1)">
+              <animateMotion
+                dur="6s"
+                repeatCount="indefinite"
+                path="M4 104C65 103 52 8 147 7"
+                keyPoints="0;0.05;0.95;1;1"
+                keyTimes="0;0.05;0.42;0.45;1"
+                calcMode="spline"
+                keySplines="0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1"
+              />
+              <animate
+                attributeName="opacity"
+                values="0;0.95;0.95;0;0"
+                keyTimes="0;0.05;0.40;0.44;1"
+                dur="6s"
+                repeatCount="indefinite"
+              />
+            </circle>
           </svg>
           <svg className="connector connector-two" viewBox="0 0 150 110" fill="none">
-            <path d="M2 5C72 3 53 104 148 103" stroke="rgba(110,213,200,.6)" strokeDasharray="4 6" />
+            <defs>
+              <filter id="glow-dot-2" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#78ded0" floodOpacity="0.9" />
+              </filter>
+            </defs>
+            <path className="connector-path" d="M2 5C72 3 53 104 148 103" stroke="rgba(110,213,200,.6)" strokeDasharray="4 6" />
+            <circle r="3" fill="#78ded0" filter="url(#glow-dot-2)">
+              <animateMotion
+                dur="6s"
+                repeatCount="indefinite"
+                path="M2 5C72 3 53 104 148 103"
+                keyPoints="0;0;0.05;0.95;1"
+                keyTimes="0;0.48;0.53;0.90;1"
+                calcMode="spline"
+                keySplines="0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1"
+              />
+              <animate
+                attributeName="opacity"
+                values="0;0;0.95;0.95;0"
+                keyTimes="0;0.48;0.53;0.88;0.92"
+                dur="6s"
+                repeatCount="indefinite"
+              />
+            </circle>
           </svg>
         </div>
         <div className="hero-footnote">
@@ -433,6 +479,59 @@ export function HomePage() {
         </div>
       </footer>
     </main>
+  );
+}
+
+export default HomePage;
+        </div >
+  <div className="principles-copy">
+    <div className="section-kicker">The SwasthyaVaani promise</div>
+    <h2>
+      Advanced where
+      <br />
+      it matters.
+      <br />
+      <em>Human always.</em>
+    </h2>
+    <p>AI handles the structure. Doctors hold the expertise. Patients keep their voice. That’s the line we never cross.</p>
+    <div className="principle-points">
+      <div>
+        <ShieldCheck size={18} />
+        <span>Built for trust</span>
+      </div>
+      <div>
+        <Hospital size={18} />
+        <span>Ready for real hospitals</span>
+      </div>
+      <div>
+        <Languages size={18} />
+        <span>Made for India’s diversity</span>
+      </div>
+    </div>
+  </div>
+      </section >
+
+  <footer className="site-footer">
+    <div className="footer-top">
+      <Brand light />
+      <div className="footer-callout">
+        Every patient has a story.
+        <br />
+        <em>Let’s make it heard.</em>
+      </div>
+      <AppButton onClick={() => setLocation('/patient')}>
+        Start with SwasthyaVaani <ArrowRight size={16} />
+      </AppButton>
+    </div>
+    <div className="footer-bottom">
+      <span>SIH 2026 · PS 26047</span>
+      <span>Ministry of AYUSH</span>
+      <span>ABDM-ready architecture</span>
+      <span>Privacy & security</span>
+      <span>© 2026 SwasthyaVaani</span>
+    </div>
+  </footer>
+    </main >
   );
 }
 
