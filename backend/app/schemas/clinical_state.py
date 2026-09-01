@@ -92,6 +92,24 @@ class ClinicalState(BaseModel):
     allergies: List[str] = Field(default_factory=list)
     investigations: List[Investigation] = Field(default_factory=list)
     
+    # Focused Domain Detail Tracking
+    food_exposure: Optional[str] = None
+    stool_consistency: Optional[str] = None
+    stool_frequency: Optional[str] = None
+    hydration_status: Optional[str] = None
+    bloating: Optional[str] = None
+    dark_stool: Optional[bool] = None
+    blood_in_stool: Optional[str] = None
+    dizziness: Optional[str] = None
+    weakness: Optional[str] = None
+    negated_symptoms: List[str] = Field(default_factory=list)
+    resolved_dimensions: List[str] = Field(default_factory=list)
+    dimension_status: Dict[str, str] = Field(default_factory=dict) # e.g. {"stool_frequency": "AMBIGUOUS", "duration": "RESOLVED"}
+    
+    # Clinical Reasoning & Exploration State
+    active_exploration_mode: Optional[Literal["SAFETY_REQUIRED", "TARGETED_FOLLOW_UP", "OPEN_EXPLORATION"]] = None
+    explored_areas: List[str] = Field(default_factory=list)
+
     # Specialized Domains
     ayush: Optional[AyushState] = None
     

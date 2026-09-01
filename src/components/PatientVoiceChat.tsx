@@ -619,31 +619,13 @@ export function PatientVoiceChat({
             Patient: <b>{patientName}</b> ({patientAge} yrs)
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <span className="text-xs font-mono font-bold text-[#173e35] block">
-              {isFinished
-                ? 'Intake Complete'
-                : `Question ${questionCount} of max ${MAX_QUESTIONS}`}
-            </span>
-            <span className="text-[10px] text-[#5c726a]">
-              {isFinished ? 'Sufficient History Gathered' : 'Hands-Free Dynamic AI Voice'}
-            </span>
-          </div>
-          <div className="flex gap-1">
-            {Array.from({ length: MAX_QUESTIONS }).map((_, idx) => (
-              <span
-                key={idx}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  idx < questionCount - 1 || isFinished
-                    ? 'w-2.5 bg-[#1f5b4e]'
-                    : idx === questionCount - 1
-                    ? 'w-4 bg-[#eaba61]'
-                    : 'w-1.5 bg-[#dcd7c5]'
-                }`}
-              />
-            ))}
-          </div>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold font-mono ${
+            isFinished ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100/80 text-amber-900'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${isFinished ? 'bg-emerald-600' : 'bg-amber-500 animate-pulse'}`} />
+            {isFinished ? 'Intake Complete' : 'Active Clinical Intake'}
+          </span>
         </div>
       </div>
 

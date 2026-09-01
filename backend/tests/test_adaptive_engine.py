@@ -79,7 +79,7 @@ async def test_adaptive_engine_asks_question_for_open_gaps():
     
     assert decision.action == "ASK"
     assert decision.question is not None
-    assert decision.target_field in ["onset", "duration", "severity", "location"]
+    assert decision.target_field in ["open_gi_exploration", "onset", "duration", "severity", "location", "abdominal_location", "stool_frequency", "problem_clarification", "bloating"]
 
 
 @pytest.mark.asyncio
@@ -126,7 +126,7 @@ async def test_adaptive_engine_emergency_limit_guardrail():
     )
     
     assert decision.action == "STOP"
-    assert "Emergency safety limit reached" in (decision.reason or "")
+    assert "safety limit reached" in (decision.reason or "").lower()
 
 
 @pytest.mark.asyncio

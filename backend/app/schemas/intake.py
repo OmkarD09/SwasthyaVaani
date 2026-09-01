@@ -35,6 +35,17 @@ class AnswerSubmitResponse(BaseModel):
     decision: QuestionDecision
 
 
+class VoiceAnswerSubmitResponse(BaseModel):
+    answer_id: str
+    intake_session_id: str
+    transcript_text: str
+    detected_language: str
+    audio_base64: Optional[str] = None
+    extracted_facts: Dict[str, Any]
+    clinical_state: ClinicalState
+    decision: QuestionDecision
+
+
 class IntakeReviewUpdateRequest(BaseModel):
     corrected_state: ClinicalState
     patient_notes: Optional[str] = None
