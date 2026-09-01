@@ -197,17 +197,17 @@ export function PatientModeSelection() {
                 </button>
               </div>
 
-              <div className="pt-4 border-t border-[#e6efed] flex items-center justify-between">
+              <div className="kiosk-form-actions">
                 <button
                   type="button"
                   onClick={() => setLocation('/patient/details')}
-                  className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer"
+                  className="kiosk-back-btn"
                 >
                   <ArrowLeft size={16} />
                   <span>Back</span>
                 </button>
 
-                <AppButton variant="amber" onClick={handleContinue} className="kiosk-next">
+                <AppButton variant="amber" onClick={handleContinue} className="kiosk-submit-btn">
                   {t.btnContinue} <ArrowRight size={17} />
                 </AppButton>
               </div>

@@ -17,6 +17,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { getKioskTranslation } from '../lib/kioskTranslations';
+import { recordIntakeAnswer } from '../lib/conversationStore';
 
 export interface VoiceQuestionConfig {
   id: string;
@@ -620,7 +621,7 @@ export function PatientVoiceChat({
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (e) {}
+      } catch (e) { }
       recognitionRef.current = null;
     }
 
@@ -628,13 +629,13 @@ export function PatientVoiceChat({
       try {
         mediaRecorderRef.current.stop();
         mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       try {
         audioContextRef.current.close();
-      } catch (e) {}
+      } catch (e) { }
     }
 
     setIsListening(false);
@@ -666,6 +667,15 @@ export function PatientVoiceChat({
         audioUrl: audioUrl || undefined,
       },
     ]);
+
+    // Record into unified conversation store (used for Review Summary)
+    recordIntakeAnswer(
+      currentQ.id,
+      answerToSubmit,
+      'voice',
+      currentQ.category,
+      questionText
+    );
 
     // Send answer to Backend API session if active
     if (intakeSessionId) {
@@ -700,10 +710,10 @@ export function PatientVoiceChat({
         currentLang === 'हिन्दी'
           ? 'धन्यवाद! आपकी सभी 6 जानकारियां रिकॉर्ड कर ली गई हैं। अब आप अपनी पुरानी पर्ची या रिपोर्ट जोड़ सकते हैं।'
           : currentLang === 'मराठी'
-          ? 'धन्यवाद! तुमचे सर्व 6 प्रश्नांची उत्तरे नोंदवली गेली आहेत. आता तुम्ही तुमची कागदपत्रे जोडू शकता.'
-          : currentLang === 'বাংলা'
-          ? 'ধন্যবাদ! আপনার সমস্ত উত্তর রেকর্ড করা হয়েছে। এখন আপনি আপনার পূর্বের রিপোর্ট যুক্ত করতে পারেন।'
-          : 'Thank you! All 6 clinical intake questions have been recorded. You can now proceed to attach previous prescriptions or reports.';
+            ? 'धन्यवाद! तुमचे सर्व 6 प्रश्नांची उत्तरे नोंदवली गेली आहेत. आता तुम्ही तुमची कागदपत्रे जोडू शकता.'
+            : currentLang === 'বাংলা'
+              ? 'ধন্যবাদ! আপনার সমস্ত উত্তর রেকর্ড করা হয়েছে। এখন আপনি আপনার পূর্বের রিপোর্ট যুক্ত করতে পারেন।'
+              : 'Thank you! All 6 clinical intake questions have been recorded. You can now proceed to attach previous prescriptions or reports.';
       speakQuestionText(completionSpeech);
     }
   };
@@ -742,13 +752,12 @@ export function PatientVoiceChat({
             {INTAKE_QUESTIONS_VOICE.map((_, idx) => (
               <span
                 key={idx}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  idx < currentQuestionIndex || isFinished
+                className={`h-2 rounded-full transition-all duration-300 ${idx < currentQuestionIndex || isFinished
                     ? 'w-4 bg-[#1f5b4e]'
                     : idx === currentQuestionIndex
-                    ? 'w-6 bg-[#eaba61]'
-                    : 'w-2 bg-[#dcd7c5]'
-                }`}
+                      ? 'w-6 bg-[#eaba61]'
+                      : 'w-2 bg-[#dcd7c5]'
+                  }`}
               />
             ))}
           </div>

@@ -99,7 +99,7 @@ export function PatientDetails() {
             {/* Step 1: Language (Completed) */}
             <div className="kiosk-step done">
               <span className="step-icon">
-                <Check size={17} />
+                <Check size={20} />
               </span>
               <span>
                 <b>{t.steps.language.title}</b>
@@ -110,10 +110,10 @@ export function PatientDetails() {
             {/* Step 2: Patient Details (Current Step) */}
             <div className="kiosk-step current">
               <span className="step-icon">
-                <UserRound size={17} />
+                <UserRound size={20} />
               </span>
               <span>
-                <b>Patient Details</b>
+                <b>Your Details</b>
                 <small>Personal info</small>
               </span>
             </div>
@@ -121,10 +121,10 @@ export function PatientDetails() {
             {/* Step 3: Interaction Mode (Upcoming) */}
             <div className="kiosk-step">
               <span className="step-icon">
-                <Mic size={17} />
+                <Mic size={20} />
               </span>
               <span>
-                <b>Interaction Mode</b>
+                <b>Your Story</b>
                 <small>Voice or Text</small>
               </span>
             </div>
@@ -132,7 +132,7 @@ export function PatientDetails() {
             {/* Step 4: Records (Upcoming) */}
             <div className="kiosk-step">
               <span className="step-icon">
-                <FileText size={17} />
+                <FileText size={20} />
               </span>
               <span>
                 <b>{t.steps.records.title}</b>
@@ -142,7 +142,7 @@ export function PatientDetails() {
           </div>
 
           <div className="kiosk-help">
-            <CircleHelp size={16} />
+            <CircleHelp size={18} />
             <span>{t.needHelp}</span>
           </div>
         </aside>
