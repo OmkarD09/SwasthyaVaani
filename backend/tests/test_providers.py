@@ -1,14 +1,14 @@
 import pytest
 from app.services.providers.factory import provider_registry, get_llm_service, get_speech_service, get_ocr_service
-from app.services.providers.llm_provider import MockLLMProvider, GeminiLLMProvider
+from app.services.providers.llm_provider import MockLLMProvider, GeminiLLMProvider, GroqLLMProvider
 from app.services.providers.speech_provider import MockSpeechProvider
 from app.services.providers.ocr_provider import MockOCRProvider
 
 
 @pytest.mark.asyncio
 async def test_llm_provider_extraction():
-    llm = get_llm_service()
-    res = await llm.extract_clinical_facts(
+    mock_llm = MockLLMProvider()
+    res = await mock_llm.extract_clinical_facts(
         raw_text="I have had severe headache and fever for 4 days, pain is 7 out of 10",
         current_state={}
     )

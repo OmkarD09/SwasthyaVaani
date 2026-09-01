@@ -77,7 +77,8 @@ class AbstractLLMProvider(ABC):
         self,
         target_field: str,
         chief_complaint: Optional[str],
-        language_code: str = "en"
+        language_code: str = "en",
+        rag_context: Optional[Any] = None
     ) -> str:
         """Generate dynamic clinical question if deterministic fallback is not used."""
         pass

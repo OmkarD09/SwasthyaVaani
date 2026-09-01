@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     PROVIDER_OCR: str = "mock"
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
     SARVAM_API_KEY: str = ""
     BHASHINI_API_KEY: str = ""
     BHASHINI_USER_ID: str = ""

@@ -202,7 +202,8 @@ async def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = 
         asked_questions=past_questions,
         consecutive_low_progress=0 if has_progress else 1,
         total_questions_asked=session.question_count,
-        language_code=req.language_code or "en"
+        language_code=req.language_code or "en",
+        db=db
     )
 
     # If action is ASK, persist QuestionEvent

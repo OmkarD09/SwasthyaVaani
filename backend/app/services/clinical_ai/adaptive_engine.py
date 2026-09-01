@@ -1,4 +1,6 @@
-from typing import List, Optional
+from typing import List, Optional, Any
+from sqlalchemy.orm import Session
+
 from app.schemas.clinical_state import ClinicalState
 from app.schemas.question import QuestionDecision
 from app.services.clinical_ai.gap_analysis import find_information_gaps
@@ -6,6 +8,7 @@ from app.services.safety.red_flags import evaluate_red_flags
 from app.services.safety.contradictions import detect_contradictions
 from app.core.config import settings
 from app.services.providers.factory import get_llm_service
+from app.services.rag.rag_service import rag_service
 
 
 def is_semantic_duplicate(candidate: str, asked_questions: List[str]) -> bool:
@@ -31,17 +34,19 @@ async def evaluate_next_question(
     asked_questions: Optional[List[str]] = None,
     consecutive_low_progress: int = 0,
     total_questions_asked: int = 0,
-    language_code: str = "en"
+    language_code: str = "en",
+    db: Optional[Session] = None
 ) -> QuestionDecision:
     """
-    Main Adaptive Clinical Engine.
-    Evaluates Information Gaps and dynamically generates the next follow-up question via LLM (Gemini 2.5 Flash).
+    Main Adaptive Clinical Engine with RAG Knowledge-Grounding.
+    Evaluates Information Gaps, retrieves clinical reference context where beneficial (e.g. AYUSH),
+    and dynamically generates the next follow-up question via LLM (Groq / Gemini / Mock).
     Executes Minimum Sufficient History, Anti-Loop Guardrails, and Red Flag Safety Rules.
     """
     asked_questions = asked_questions or []
     lang = "hi" if language_code.startswith("hi") else "mr" if language_code.startswith("mr") else "en"
     
-    # 1. Evaluate Safety Rules first
+    # 1. Evaluate Safety Rules first (Deterministic Priority)
     red_flags = evaluate_red_flags(state)
     state.red_flags = red_flags
     state.contradictions = detect_contradictions(state)
@@ -88,15 +93,33 @@ async def evaluate_next_question(
             language_code=lang
         )
         
-    # 6. Dynamic Question Generation via LLM (Gemini 2.5 Flash)
+    # 6. Target Selection & Optional RAG Knowledge Retrieval
     llm = get_llm_service()
     target_gap = gaps[0]
     target_field = target_gap.field_name
 
+    rag_context = None
+    # Use RAG selectively for AYUSH workflow or knowledge-dependent clinical fields
+    if db is not None and (workflow_type == "AYUSH" or target_field in ["appetite", "bowel_habits", "sleep_pattern", "associated_symptoms"]):
+        try:
+            rag_query = f"AYUSH clinical assessment for {target_field} with {state.chief_complaint or 'symptoms'}"
+            rag_context = await rag_service.retrieve(
+                query=rag_query,
+                db=db,
+                workflow=workflow_type if workflow_type == "AYUSH" else "ALL",
+                language=lang,
+                top_k=3,
+                min_similarity=0.45
+            )
+        except Exception as e:
+            # Fallback gracefully if RAG retrieval fails
+            rag_context = None
+
     selected_question = await llm.generate_adaptive_question(
         target_field=target_field,
         chief_complaint=state.chief_complaint,
-        language_code=lang
+        language_code=lang,
+        rag_context=rag_context
     )
 
     # 7. Guardrail C: Deduplication check
@@ -106,7 +129,8 @@ async def evaluate_next_question(
             alt_q = await llm.generate_adaptive_question(
                 target_field=alt_field,
                 chief_complaint=state.chief_complaint,
-                language_code=lang
+                language_code=lang,
+                rag_context=rag_context
             )
             if not is_semantic_duplicate(alt_q, asked_questions):
                 selected_question = alt_q
@@ -118,7 +142,7 @@ async def evaluate_next_question(
         action="ASK",
         question=selected_question,
         target_field=target_field,
-        reason=f"Targeting unresolved {target_gap.priority.lower()}-priority clinical gap: {target_field}",
+        reason=f"Targeting unresolved {target_gap.priority.lower()}-priority clinical gap: {target_field}" + (" (RAG-grounded)" if rag_context and rag_context.has_relevant_context else ""),
         confidence=0.93,
         language_code=lang
     )
