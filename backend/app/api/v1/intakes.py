@@ -15,15 +15,15 @@ from app.schemas.intake import (
 from app.schemas.clinical_state import ClinicalState
 from app.schemas.question import QuestionDecision
 from app.services.clinical_ai.adaptive_engine import evaluate_next_question
-from app.services.clinical_ai.mock_provider import extract_clinical_facts_from_answer
 from app.services.safety.red_flags import evaluate_red_flags
 from app.models.safety import RedFlagModel
+from app.services.providers.factory import get_llm_service
 
 router = APIRouter(prefix="/intakes", tags=["Patient Intake"])
 
 
 def generate_token():
-    return f"A-{uuid.uuid4().hex[:3].upper()}"
+    return f"A-{uuid.uuid4().hex[:6].upper()}"
 
 
 @router.post("", response_model=IntakeSessionDetail)
@@ -59,19 +59,18 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
 
     # Initialize empty ClinicalState
     init_state = ClinicalState()
-    state_record = ClinicalStateModel(
+    state_model = ClinicalStateModel(
         intake_session_id=session.id,
         version=1,
         state_json=init_state.model_dump()
     )
-    db.add(state_record)
+    db.add(state_model)
     db.commit()
-    db.refresh(session)
 
     return IntakeSessionDetail(
         id=session.id,
         token=session.token,
-        patient_id=patient_id,
+        patient_id=session.patient_id,
         patient_name=req.patient_name,
         patient_age=req.patient_age,
         patient_gender=req.patient_gender,
@@ -123,10 +122,10 @@ def get_intake_session(intake_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{intake_id}/answers", response_model=AnswerSubmitResponse)
-def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = Depends(get_db)):
+async def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = Depends(get_db)):
     """
-    Ingest patient answer, update structured ClinicalState, evaluate safety rules,
-    and compute next QuestionDecision.
+    Ingest patient answer, extract structured facts dynamically using LLM (Gemini 2.5 Flash),
+    evaluate safety rules, and compute next QuestionDecision.
     """
     session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
     if not session:
@@ -158,12 +157,24 @@ def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = Depend
         if q_event:
             target_field = q_event.target_field
 
-    # Extract structured clinical updates
-    updated_state, extracted_facts, has_progress = extract_clinical_facts_from_answer(
-        raw_answer=req.raw_text,
-        target_field=target_field,
-        current_state=current_state
+    # Extract structured clinical updates dynamically via LLM (Gemini 2.5 Flash / Mock)
+    llm = get_llm_service()
+    extraction_res = await llm.extract_clinical_facts(
+        raw_text=req.raw_text,
+        current_state=current_state,
+        language_code=req.language_code or "en",
+        target_field=target_field or "chief_complaint"
     )
+
+    extracted_facts = extraction_res.extracted_facts
+    has_progress = len(extracted_facts) > 0
+
+    # Merge extracted facts into current clinical state
+    updated_dict = current_state.model_dump()
+    for k, v in extracted_facts.items():
+        if v is not None:
+            updated_dict[k] = v
+    updated_state = ClinicalState(**updated_dict)
 
     # Save new ClinicalState version
     new_version = (latest_state_model.version + 1) if latest_state_model else 1
@@ -185,13 +196,13 @@ def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = Depend
     ]
 
     # Evaluate Adaptive Next Question Decision
-    decision = evaluate_next_question(
+    decision = await evaluate_next_question(
         state=updated_state,
         workflow_type=session.workflow_type,
         asked_questions=past_questions,
         consecutive_low_progress=0 if has_progress else 1,
         total_questions_asked=session.question_count,
-        language_code=req.language_code
+        language_code=req.language_code or "en"
     )
 
     # If action is ASK, persist QuestionEvent
@@ -219,29 +230,11 @@ def submit_answer(intake_id: str, req: AnswerSubmitRequest, db: Session = Depend
     )
 
 
-@router.post("/{intake_id}/review")
-def update_patient_review(intake_id: str, req: IntakeReviewUpdateRequest, db: Session = Depends(get_db)):
-    """Patient review screen field updates/corrections prior to final submission."""
-    session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
-    if not session:
-        raise HTTPException(status_code=404, detail="Intake session not found")
-
-    state_model = ClinicalStateModel(
-        intake_session_id=session.id,
-        version=999,  # Reviewed state
-        state_json=req.corrected_state.model_dump()
-    )
-    db.add(state_model)
-    session.status = "READY_TO_SUBMIT"
-    db.commit()
-    return {"status": "SUCCESS", "message": "Patient review updated"}
-
-
 @router.post("/{intake_id}/submit", response_model=IntakeSubmissionResponse)
-async def submit_intake_to_doctor(intake_id: str, db: Session = Depends(get_db)):
+async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)):
     """
-    Transactional submission of patient intake into doctor queue.
-    Authoritative state change to SUBMITTED.
+    Patient signs off on interview draft.
+    Pushes case to live clinician WebSocket queue with calculated priority triage badge.
     """
     session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
     if not session:
@@ -249,24 +242,43 @@ async def submit_intake_to_doctor(intake_id: str, db: Session = Depends(get_db))
 
     session.status = "SUBMITTED"
     session.submitted_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(session)
 
-    # Broadcast real-time event to all connected doctor screens
+    # Load latest clinical state for triage evaluation
+    latest_state_model = db.query(ClinicalStateModel).filter(
+        ClinicalStateModel.intake_session_id == session.id
+    ).order_by(ClinicalStateModel.version.desc()).first()
+    
+    current_state = ClinicalState(**(latest_state_model.state_json if latest_state_model else {}))
+    
+    # Calculate priority level
+    priority = "NORMAL"
+    if current_state.red_flags:
+        priority = "URGENT"
+        for rf in current_state.red_flags:
+            red_flag_entry = RedFlagModel(
+                intake_session_id=session.id,
+                flag_type=rf,
+                description=f"Automated Clinical Red Flag: {rf}",
+                acknowledged_by_doctor=False
+            )
+            db.add(red_flag_entry)
+
+    db.commit()
+
+    # Broadcast to Doctor Queue via WebSocket
     await ws_manager.broadcast({
-        "event": "QUEUE_UPDATED",
-        "action": "PATIENT_SUBMITTED",
+        "event": "NEW_PATIENT_INTAKE",
         "intake_session_id": session.id,
         "token": session.token,
-        "doctor_id": session.doctor_id,
-        "message": f"New patient #{session.token} submitted to triage queue."
+        "priority": priority,
+        "submitted_at": session.submitted_at.isoformat()
     })
 
     return IntakeSubmissionResponse(
         intake_session_id=session.id,
+        status="SUBMITTED",
         token=session.token,
-        status=session.status,
-        doctor_id=session.doctor_id,
+        doctor_id=session.doctor_id or "doc_001",
         submitted_at=session.submitted_at,
-        message=f"Intake successfully transferred to Doctor queue with Token #{session.token}"
+        message="Patient intake successfully submitted to clinician queue."
     )
