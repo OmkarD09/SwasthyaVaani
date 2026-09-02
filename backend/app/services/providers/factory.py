@@ -1,11 +1,15 @@
 import os
 from typing import Optional
+from app.core.config import settings
 from app.services.providers.base import (
     AbstractLLMProvider, AbstractSpeechProvider, AbstractOCRProvider
 )
-from app.services.providers.llm_provider import MockLLMProvider, GeminiLLMProvider
+from app.services.providers.llm_provider import MockLLMProvider, GeminiLLMProvider, GroqLLMProvider
 from app.services.providers.speech_provider import MockSpeechProvider, BhashiniSpeechProvider, SarvamSpeechProvider
 from app.services.providers.ocr_provider import MockOCRProvider, PaddleOCRProvider
+from app.services.providers.embedding_provider import (
+    AbstractEmbeddingProvider, MockEmbeddingProvider, GeminiEmbeddingProvider
+)
 
 
 class ProviderRegistry:
@@ -15,40 +19,53 @@ class ProviderRegistry:
         self._llm_provider: Optional[AbstractLLMProvider] = None
         self._speech_provider: Optional[AbstractSpeechProvider] = None
         self._ocr_provider: Optional[AbstractOCRProvider] = None
+        self._embedding_provider: Optional[AbstractEmbeddingProvider] = None
 
     def get_llm(self) -> AbstractLLMProvider:
-        if self._llm_provider is None:
-            provider_type = os.getenv("PROVIDER_LLM", "mock").lower()
-            if provider_type == "gemini":
-                self._llm_provider = GeminiLLMProvider(api_key=os.getenv("GEMINI_API_KEY"))
-            else:
-                self._llm_provider = MockLLMProvider()
-        return self._llm_provider
+        if self._llm_provider is not None:
+            return self._llm_provider
+        provider_type = (os.getenv("PROVIDER_LLM", "") or getattr(settings, "PROVIDER_LLM", "mock")).lower()
+        groq_key = getattr(settings, "GROQ_API_KEY", None) or os.getenv("GROQ_API_KEY")
+        gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.getenv("GEMINI_API_KEY")
+
+        if provider_type == "groq" or (provider_type != "mock" and groq_key):
+            return GroqLLMProvider(api_key=groq_key)
+        elif provider_type == "gemini" or (provider_type != "mock" and gemini_key):
+            return GeminiLLMProvider(api_key=gemini_key)
+        else:
+            return MockLLMProvider()
 
     def get_speech(self) -> AbstractSpeechProvider:
-        if self._speech_provider is None:
-            provider_type = os.getenv("PROVIDER_SPEECH", "mock").lower()
-            if provider_type == "sarvam":
-                self._speech_provider = SarvamSpeechProvider(
-                    api_key=os.getenv("SARVAM_API_KEY")
-                )
-            elif provider_type == "bhashini":
-                self._speech_provider = BhashiniSpeechProvider(
-                    api_key=os.getenv("BHASHINI_API_KEY"),
-                    user_id=os.getenv("BHASHINI_USER_ID")
-                )
-            else:
-                self._speech_provider = MockSpeechProvider()
-        return self._speech_provider
+        if self._speech_provider is not None:
+            return self._speech_provider
+        provider_type = (os.getenv("PROVIDER_SPEECH", "") or getattr(settings, "PROVIDER_SPEECH", "mock")).lower()
+        sarvam_key = getattr(settings, "SARVAM_API_KEY", None) or os.getenv("SARVAM_API_KEY")
+
+        if provider_type == "sarvam" or (provider_type != "mock" and sarvam_key):
+            return SarvamSpeechProvider(api_key=sarvam_key)
+        elif provider_type == "bhashini":
+            return BhashiniSpeechProvider(
+                api_key=getattr(settings, "BHASHINI_API_KEY", None) or os.getenv("BHASHINI_API_KEY"),
+                user_id=getattr(settings, "BHASHINI_USER_ID", None) or os.getenv("BHASHINI_USER_ID")
+            )
+        else:
+            return MockSpeechProvider()
 
     def get_ocr(self) -> AbstractOCRProvider:
-        if self._ocr_provider is None:
-            provider_type = os.getenv("PROVIDER_OCR", "mock").lower()
-            if provider_type == "paddle":
-                self._ocr_provider = PaddleOCRProvider()
-            else:
-                self._ocr_provider = MockOCRProvider()
-        return self._ocr_provider
+        if self._ocr_provider is not None:
+            return self._ocr_provider
+        provider_type = (os.getenv("PROVIDER_OCR", "") or getattr(settings, "PROVIDER_OCR", "") or getattr(settings, "OCR_PROVIDER", "mock")).lower()
+        if provider_type in ["paddle", "paddleocr"]:
+            return PaddleOCRProvider()
+        return MockOCRProvider()
+
+    def get_embedding(self) -> AbstractEmbeddingProvider:
+        if self._embedding_provider is not None:
+            return self._embedding_provider
+        gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.getenv("GEMINI_API_KEY")
+        if gemini_key:
+            return GeminiEmbeddingProvider(api_key=gemini_key)
+        return MockEmbeddingProvider()
 
     def override_llm(self, provider: AbstractLLMProvider):
         """Allows test suites or dynamic runtimes to swap the provider."""
@@ -59,6 +76,9 @@ class ProviderRegistry:
 
     def override_ocr(self, provider: AbstractOCRProvider):
         self._ocr_provider = provider
+
+    def override_embedding(self, provider: AbstractEmbeddingProvider):
+        self._embedding_provider = provider
 
 
 # Global singleton factory
@@ -76,3 +96,7 @@ def get_speech_service() -> AbstractSpeechProvider:
 
 def get_ocr_service() -> AbstractOCRProvider:
     return provider_registry.get_ocr()
+
+
+def get_embedding_service() -> AbstractEmbeddingProvider:
+    return provider_registry.get_embedding()

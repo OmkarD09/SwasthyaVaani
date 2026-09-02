@@ -1,184 +1,223 @@
-import hashlib
-import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Optional
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.models.document import DocumentModel, DocumentExtractionModel
-from app.schemas.document import DocumentUploadResponse, DocumentExtractionResult, ExtractedFact
+from app.models.document import DocumentExtractionModel, DocumentModel
+from app.schemas.document import DocumentExtractionResult, DocumentUploadResponse, ExtractedFact
+from app.services.document_intelligence import (
+    DocumentValidationError,
+    build_proposed_facts,
+    create_storage_key,
+    load_private_file,
+    replace_ocr_evidence,
+    store_private_file,
+    validate_document,
+)
+from app.services.providers.base import AbstractOCRProvider
 from app.services.providers.factory import get_ocr_service
 
 router = APIRouter(prefix="/documents", tags=["Medical Documents & OCR"])
 
 
-@router.post("/upload", response_model=DocumentUploadResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/upload", response_model=DocumentUploadResponse, status_code=202)
 async def upload_medical_document(
     file: UploadFile = File(...),
     patient_id: str = Form(...),
     intake_session_id: Optional[str] = Form(None),
     document_type: str = Form("PRESCRIPTION"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Asynchronous upload endpoint for medical documents (Prescriptions, Lab Reports, Discharge Summaries).
-    Returns 202 Accepted with document_id and PENDING status.
-    Deduplicates within the same intake session.
-    """
-    file_bytes = await file.read()
+    """Validate and store a document under a generated private object key."""
+    if not file:
+        raise HTTPException(status_code=400, detail={"code": "EMPTY_PAYLOAD", "message": "No file provided"})
+
+    file_bytes = await file.read(settings.DOCUMENT_MAX_FILE_SIZE_BYTES + 1)
     if not file_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded file cannot be empty")
+        raise HTTPException(status_code=400, detail={"code": "EMPTY_FILE", "message": "Uploaded file cannot be empty"})
 
-    file_hash = hashlib.sha256(file_bytes).hexdigest()
+    try:
+        validated = validate_document(file_bytes, file.content_type)
+        storage_key = create_storage_key(document_type, validated.extension)
+    except DocumentValidationError as exc:
+        raise HTTPException(
+            status_code=400, detail={"code": exc.code, "message": str(exc)}
+        ) from exc
 
-    # Intake-scoped duplicate check
+    duplicate = None
     if intake_session_id:
-        existing = db.query(DocumentModel).filter(
-            DocumentModel.intake_session_id == intake_session_id,
-            DocumentModel.file_hash == file_hash
-        ).first()
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Duplicate document already uploaded in this intake session"
+        duplicate = (
+            db.query(DocumentModel)
+            .filter(
+                DocumentModel.intake_session_id == intake_session_id,
+                DocumentModel.sha256 == validated.sha256,
             )
+            .first()
+        )
+    if duplicate:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "DUPLICATE_DOCUMENT", "document_id": duplicate.id},
+        )
 
-    doc_id = str(uuid.uuid4())
-    storage_object_id = f"doc_{doc_id}_{file.filename}"
-
-    doc = DocumentModel(
-        id=doc_id,
-        patient_id=patient_id,
-        intake_session_id=intake_session_id,
-        file_name=file.filename or "uploaded_document.pdf",
-        storage_object_id=storage_object_id,
-        mime_type=file.content_type or "application/pdf",
-        file_size=len(file_bytes),
-        file_hash=file_hash,
-        document_type=document_type,
-        status="PENDING"
-    )
-    db.add(doc)
-    db.commit()
-    db.refresh(doc)
+    stored_path: Optional[Path] = None
+    try:
+        stored_path = store_private_file(file_bytes, storage_key)
+        doc = DocumentModel(
+            patient_id=patient_id,
+            intake_session_id=intake_session_id,
+            file_name=Path(file.filename or f"document{validated.extension}").name,
+            storage_object_id=storage_key,
+            mime_type=validated.mime_type,
+            file_size=len(file_bytes),
+            sha256=validated.sha256,
+            page_count=validated.page_count,
+            document_type=document_type.upper(),
+            status="PENDING",
+        )
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+    except Exception:
+        db.rollback()
+        if stored_path and stored_path.exists():
+            stored_path.unlink()
+        raise
 
     return DocumentUploadResponse(
         document_id=doc.id,
         file_name=doc.file_name,
         file_size=doc.file_size,
         mime_type=doc.mime_type,
-        file_hash=doc.file_hash,
-        storage_url=f"/api/v1/documents/{doc.id}/view",
-        status="PENDING",
-        uploaded_at=doc.uploaded_at
+        storage_path=doc.storage_object_id,
+        file_hash=doc.sha256,
+        page_count=doc.page_count,
+        status=doc.status,
+        uploaded_at=doc.uploaded_at,
     )
 
 
 @router.get("/{document_id}/status")
 def get_document_status(document_id: str, db: Session = Depends(get_db)):
-    """Retrieve current processing status and extractions for an uploaded document."""
+    """Return processing state without exposing a public document URL."""
     doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-
-    extractions = db.query(DocumentExtractionModel).filter(
-        DocumentExtractionModel.document_id == doc.id
-    ).all()
-
+    extraction_count = (
+        db.query(DocumentExtractionModel)
+        .filter(DocumentExtractionModel.document_id == doc.id)
+        .count()
+    )
     return {
         "document_id": doc.id,
         "status": doc.status,
         "file_name": doc.file_name,
         "document_type": doc.document_type,
-        "extraction_count": len(extractions),
+        "extraction_count": extraction_count,
         "uploaded_at": doc.uploaded_at,
-        "processed_at": doc.processed_at
+        "processed_at": doc.processed_at,
     }
 
 
-@router.post("/{document_id}/process", response_model=DocumentExtractionResult)
-async def process_document_ocr(document_id: str, db: Session = Depends(get_db)):
-    """
-    Executes OCR and clinical entity extraction on uploaded document.
-    All extracted clinical fields default to NEEDS_REVIEW for physician confirmation.
-    """
+@router.get("/{document_id}/extractions", response_model=List[ExtractedFact])
+def get_document_extractions(document_id: str, db: Session = Depends(get_db)):
+    """Retrieve all structured clinical facts extracted from a document."""
     doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    ocr_service = get_ocr_service()
+    records = db.query(DocumentExtractionModel).filter(
+        DocumentExtractionModel.document_id == doc.id
+    ).all()
+
+    return [
+        ExtractedFact(
+            field_type=r.field_type,
+            field_name=r.field_name,
+            proposed_value=r.value_json if isinstance(r.value_json, dict) else {"value": r.value_json},
+            extraction_confidence=float(r.extraction_confidence or r.confidence or 90) / 100.0 if (r.confidence and r.confidence > 1.0) else float(r.extraction_confidence or 0.9),
+            ocr_confidence=float(r.ocr_confidence or 0.9),
+            source_page=r.source_page or 1,
+            original_source_text=r.original_source_text or "",
+            bounding_box=r.source_region_json.get("bounding_box") if isinstance(r.source_region_json, dict) else None,
+            engine_name=r.ocr_engine or "PaddleOCR",
+            engine_version=r.ocr_engine_version or "1.0",
+            extractor_version=r.extractor_version or "1.0",
+            status=r.status or "NEEDS_REVIEW"
+        )
+        for r in records
+    ]
+
+
+@router.post("/{document_id}/process", response_model=DocumentExtractionResult)
+async def process_document_ocr(
+    document_id: str,
+    db: Session = Depends(get_db),
+    ocr: AbstractOCRProvider = Depends(get_ocr_service),
+):
+    """Create untrusted, provenance-bearing proposals that require human review."""
+    doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if doc.status == "NEEDS_REVIEW":
+        raise HTTPException(
+            status_code=409, detail="Document has already been processed"
+        )
+
     doc.status = "PROCESSING"
     db.commit()
 
-    # Call OCR Provider
-    ocr_result = await ocr_service.process_document(
-        file_bytes=b"%PDF-1.4...",  # In live storage, loads bytes from Supabase
-        filename=doc.file_name,
-        mime_type=doc.mime_type
-    )
-
-    facts: List[ExtractedFact] = []
-    # Medication facts
-    if "medications" in ocr_result.extracted_fields:
-        for med in ocr_result.extracted_fields["medications"]:
-            facts.append(
-                ExtractedFact(
-                    field_type="MEDICATION",
-                    field_name=med.get("name", "Prescribed Medication"),
-                    value=f"{med.get('dosage', '')} {med.get('frequency', '')}".strip(),
-                    confidence=float(ocr_result.confidence_score),
-                    source_page=1,
-                    status="NEEDS_REVIEW"
+    try:
+        file_bytes = load_private_file(doc.storage_object_id)
+        result = await ocr.process_document(file_bytes, doc.file_name, doc.mime_type)
+        replace_ocr_evidence(db, doc, result)
+        facts = build_proposed_facts(doc.id, result)
+        for fact in facts:
+            db.add(
+                DocumentExtractionModel(
+                    document_id=doc.id,
+                    field_type=fact.field_type,
+                    field_name=fact.field_name,
+                    value_json=fact.proposed_value,
+                    confidence=round(fact.extraction_confidence * 100),
+                    ocr_confidence=fact.ocr_confidence,
+                    extraction_confidence=fact.extraction_confidence,
+                    source_page=fact.source_page,
+                    source_region_json={"bounding_box": fact.bounding_box}
+                    if fact.bounding_box
+                    else None,
+                    original_source_text=fact.original_source_text,
+                    ocr_engine=fact.engine_name,
+                    ocr_engine_version=fact.engine_version,
+                    extractor_version=fact.extractor_version,
+                    status="NEEDS_REVIEW",
                 )
             )
-
-    # Date facts
-    if "date" in ocr_result.extracted_fields:
-        facts.append(
-            ExtractedFact(
-                field_type="DATE",
-                field_name="PrescriptionDate",
-                value=ocr_result.extracted_fields["date"],
-                confidence=float(ocr_result.confidence_score),
-                source_page=1,
-                status="NEEDS_REVIEW"
-            )
-        )
-
-    # Lab / other facts
-    if not facts:
-        facts.append(
-            ExtractedFact(
-                field_type="DIAGNOSIS",
-                field_name="ClinicalFinding",
-                value="Unspecified document finding",
-                confidence=float(ocr_result.confidence_score),
-                source_page=1,
-                status="NEEDS_REVIEW"
-            )
-        )
-
-    # Persist extractions
-    for f in facts:
-        ext = DocumentExtractionModel(
+        doc.status = "NEEDS_REVIEW"
+        doc.processed_at = datetime.now(timezone.utc)
+        db.commit()
+        return DocumentExtractionResult(
             document_id=doc.id,
-            field_type=f.field_type,
-            field_name=f.field_name,
-            value_json={"value": f.value},
-            confidence=int(f.confidence * 100),
-            source_page=f.source_page,
-            status="NEEDS_REVIEW"
+            status="NEEDS_REVIEW",
+            extracted_facts=facts,
+            raw_ocr_text=result.raw_text,
         )
-        db.add(ext)
-
-    doc.status = "EXTRACTED"
-    doc.processed_at = datetime.now(timezone.utc)
-    db.commit()
-
-    return DocumentExtractionResult(
-        document_id=doc.id,
-        status="NEEDS_REVIEW",
-        extracted_facts=facts,
-        raw_ocr_text=f"OCR Extractions processed via {ocr_result.provider_name}"
-    )
+    except Exception as exc:
+        db.rollback()
+        doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+        if doc:
+            doc.status = "PROCESSING_FAILED"
+            doc.failure_code = type(exc).__name__
+            doc.processed_at = datetime.now(timezone.utc)
+            db.commit()
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "DOCUMENT_PROCESSING_FAILED",
+                "message": f"Document processing failed safely: {str(exc)}",
+            },
+        ) from exc

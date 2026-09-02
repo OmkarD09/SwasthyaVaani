@@ -1,11 +1,10 @@
-import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=["backend/.env", ".env"],
         env_file_encoding="utf-8",
         extra="ignore"
     )
@@ -13,7 +12,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "SwasthyaVaani API"
     ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api/v1"
-    
+
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
@@ -37,15 +36,40 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "medical-documents"
 
+    # Private document processing
+    DOCUMENT_STORAGE_DIR: str = "./private_uploads"
+    DOCUMENT_MAX_FILE_SIZE_BYTES: int = 10 * 1024 * 1024
+    DOCUMENT_MAX_PAGE_COUNT: int = 20
+    DOCUMENT_ALLOWED_MIME_TYPES: List[str] = [
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+    ]
+
     # AI & Speech Providers
+    PROVIDER_LLM: str = "mock"
     LLM_PROVIDER: str = "mock"
+    PROVIDER_SPEECH: str = "mock"
+    PROVIDER_OCR: str = "mock"
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    GEMINI_DOCUMENT_MODEL: str = "gemini-3.5-flash-lite"
+    DOCUMENT_EXTRACTOR_PROVIDER: str = "groq"
+    GROQ_API_KEY: str = ""
+    GROQ_DOCUMENT_MODEL: str = "qwen/qwen3.8-27b"
     SARVAM_API_KEY: str = ""
     BHASHINI_API_KEY: str = ""
+    BHASHINI_USER_ID: str = ""
+
+    # Kunal - Document Intelligence isolated config
+    KUNAL_DOCUMENT_EXTRACTOR_PROVIDER: str = "groq"
+    KUNAL_GROQ_API_KEY: str = ""
+    KUNAL_GROQ_DOCUMENT_MODEL: str = "openai/gpt-oss-20b"
+    KUNAL_GEMINI_API_KEY: str = ""
+    KUNAL_GEMINI_DOCUMENT_MODEL: str = "gemini-2.5-flash-lite"
 
     # Interview Safety Guardrail Defaults
-    MAX_QUESTIONS_DEFAULT: int = 15
+    MAX_QUESTIONS_DEFAULT: int = 10
     MAX_CONSECUTIVE_LOW_PROGRESS: int = 2
 
 

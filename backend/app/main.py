@@ -7,18 +7,22 @@ from app.core.database import Base, engine, SessionLocal
 from app.api.router import api_router
 from app.seed.seed_data import seed_database
 
-# Ensure all database tables exist on startup
-Base.metadata.create_all(bind=engine)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Seed initial synthetic clinical demo data if empty
-    db = SessionLocal()
+    # Ensure database schema is initialized
     try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"[Database Warning] Table creation skipped or pool unavailable: {e}")
+
+    # Startup: Seed initial synthetic clinical demo data if empty
+    try:
+        db = SessionLocal()
         seed_database(db)
-    finally:
         db.close()
+    except Exception as e:
+        print(f"[Seed Warning] Database seeding skipped: {e}")
+
     yield
 
 

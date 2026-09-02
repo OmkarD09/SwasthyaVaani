@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import require_doctor, get_current_user
 from app.core.events import ws_manager
-from app.models.intake import IntakeSession, ClinicalStateModel, Answer
+from app.models.intake import IntakeSession, ClinicalStateModel, Answer, QuestionEvent
 from app.models.user import Patient, Hospital, Doctor
 from app.models.review import PhysicianReviewModel, PhysicianEditModel, AuditEventModel
 from app.schemas.doctor import (
@@ -160,7 +160,8 @@ def get_patient_clinical_detail(intake_id: str, db: Session = Depends(get_db)):
         ClinicalStateModel.intake_session_id == session.id
     ).order_by(ClinicalStateModel.version.desc()).first()
 
-    state = ClinicalState(**(latest_state_model.state_json if latest_state_model else {}))
+    state_data = latest_state_model.state_json if (latest_state_model and isinstance(latest_state_model.state_json, dict)) else {}
+    state = ClinicalState(**state_data)
     review = db.query(PhysicianReviewModel).filter(PhysicianReviewModel.intake_session_id == session.id).first()
 
     review_status = "PHYSICIAN_CONFIRMED" if (review and review.status == "CONFIRMED") else "AI_DRAFT"
@@ -189,6 +190,48 @@ def get_patient_clinical_detail(intake_id: str, db: Session = Depends(get_db)):
 
 
 
+@router.get("/patients/{intake_id}/conversation")
+def get_patient_conversation_timeline(intake_id: str, db: Session = Depends(get_db)):
+    """Retrieve the full chronological interview trajectory stored in the database."""
+    session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Intake session not found")
+
+    questions = db.query(QuestionEvent).filter(
+        QuestionEvent.intake_session_id == session.id
+    ).order_by(QuestionEvent.sequence_number.asc()).all()
+
+    answers = db.query(Answer).filter(
+        Answer.intake_session_id == session.id
+    ).order_by(Answer.created_at.asc()).all()
+
+    exchanges = []
+    for idx, ans in enumerate(answers):
+        matching_q = None
+        if ans.question_event_id:
+            matching_q = next((q for q in questions if q.id == ans.question_event_id), None)
+        if not matching_q and idx < len(questions):
+            matching_q = questions[idx]
+
+        q_text = matching_q.question_text if matching_q else (
+            "What main symptom or health concern brings you in today?" if idx == 0 else "Could you provide more details about this?"
+        )
+        category = matching_q.target_field if matching_q else "Clinical Intake"
+
+        exchanges.append({
+            "id": ans.id,
+            "category": category.replace("_", " ").title(),
+            "questionText": q_text,
+            "patientResponse": ans.raw_text,
+            "originalPatientText": ans.raw_text,
+            "originalLanguage": ans.language_code or "en",
+            "inputMode": ans.input_mode.lower() if ans.input_mode else "text",
+            "timestamp": ans.created_at.strftime("%I:%M %p") if ans.created_at else "Today"
+        })
+
+    return {"intake_session_id": session.id, "exchanges": exchanges}
+
+
 @router.post("/patients/{intake_id}/confirm", response_model=PhysicianConfirmResponse)
 async def confirm_patient_history(
     intake_id: str,
@@ -211,7 +254,8 @@ async def confirm_patient_history(
     latest_state_model = db.query(ClinicalStateModel).filter(
         ClinicalStateModel.intake_session_id == session.id
     ).order_by(ClinicalStateModel.version.desc()).first()
-    state = ClinicalState(**(latest_state_model.state_json if latest_state_model else {}))
+    state_data = latest_state_model.state_json if (latest_state_model and isinstance(latest_state_model.state_json, dict)) else {}
+    state = ClinicalState(**state_data)
 
     # Persist or update PhysicianReview
     review = db.query(PhysicianReviewModel).filter(PhysicianReviewModel.intake_session_id == session.id).first()

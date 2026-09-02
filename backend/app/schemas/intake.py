@@ -30,6 +30,19 @@ class AnswerSubmitRequest(BaseModel):
 class AnswerSubmitResponse(BaseModel):
     answer_id: str
     intake_session_id: str
+    question_event_id: Optional[str] = None
+    extracted_facts: Dict[str, Any]
+    clinical_state: ClinicalState
+    decision: QuestionDecision
+
+
+class VoiceAnswerSubmitResponse(BaseModel):
+    answer_id: str
+    intake_session_id: str
+    question_event_id: Optional[str] = None
+    transcript_text: str
+    detected_language: str
+    audio_base64: Optional[str] = None
     extracted_facts: Dict[str, Any]
     clinical_state: ClinicalState
     decision: QuestionDecision
