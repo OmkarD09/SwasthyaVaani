@@ -5,6 +5,8 @@ from app.models.intake import IntakeSession, ClinicalStateModel, QuestionEvent, 
 from app.models.safety import RedFlagModel, ContradictionModel
 from app.models.review import PhysicianReviewModel, PhysicianEditModel, AuditEventModel
 from app.models.document import DocumentModel
+from app.core.config import settings
+from app.core.security import hash_password
 
 
 def seed_database(db: Session):
@@ -95,16 +97,25 @@ def _seed_staff_users(db: Session):
         {"id": "user_rec_01", "email": "kiosk.desk@district-hospital.in", "display_name": "Rajesh Sharma", "role": "RECEPTIONIST", "phone": "+91 98200 33003"},
         {"id": "user_lab_01", "email": "lab.tech@district-hospital.in", "display_name": "Pooja Verma", "role": "LAB_STAFF", "phone": "+91 98200 44004"},
     ]
+    seed_passwords = {
+        "user_doc_01": settings.SEED_USER_DOC_01_PASSWORD,
+        "user_admin_01": settings.SEED_USER_ADMIN_01_PASSWORD,
+    }
     for s in staff:
-        if not db.query(User).filter(User.id == s["id"]).first():
-            db.add(User(
+        user = db.query(User).filter(User.id == s["id"]).first()
+        if not user:
+            user = User(
                 id=s["id"],
                 email=s["email"],
                 display_name=s["display_name"],
                 role=s["role"],
                 phone=s["phone"],
                 is_active=True
-            ))
+            )
+            db.add(user)
+        seed_password = seed_passwords.get(s["id"])
+        if seed_password and not user.password_hash:
+            user.password_hash = hash_password(seed_password)
     db.flush()
 
 

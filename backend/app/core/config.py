@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "swasthyavaani-dev-secret-key-32-chars-minimum-secure"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
+    SEED_USER_DOC_01_PASSWORD: str = ""
+    SEED_USER_ADMIN_01_PASSWORD: str = ""
 
     # Database
     DATABASE_URL: str = "sqlite:///./swasthyavaani.db"
