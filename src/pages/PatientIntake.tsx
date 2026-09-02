@@ -39,7 +39,22 @@ import {
   getStoredDocumentUpload,
   storeDocumentUpload,
 } from '../lib/documentUploadState';
-import { patientApi } from '../services/patientApi';
+
+function getStoredPatientIdentity(): { name: string; age: string } {
+  try {
+    const storedProfile = localStorage.getItem('sv_patient_profile');
+    if (storedProfile) {
+      const profile = JSON.parse(storedProfile);
+      return {
+        name: typeof profile.name === 'string' ? profile.name.trim() : '',
+        age: typeof profile.age === 'string' ? profile.age.trim() : '',
+      };
+    }
+  } catch {
+    // Invalid or unavailable profile storage is handled by the identity guard below.
+  }
+  return { name: '', age: '' };
+}
 
 export function PatientIntake() {
   const [, setLocation] = useLocation();
@@ -55,8 +70,7 @@ export function PatientIntake() {
   const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [patientName, setPatientName] = useState('Ananya Sharma');
-  const [patientAge, setPatientAge] = useState('34');
+  const [{ name: patientName, age: patientAge }] = useState(getStoredPatientIdentity);
   const [consentGiven, setConsentGiven] = useState(false);
   const [consentError, setConsentError] = useState(false);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
@@ -67,11 +81,6 @@ export function PatientIntake() {
   useEffect(() => {
     setLanguage(getStoredLanguage());
     setMode(getStoredMode());
-    patientApi.getProfile().then((p) => {
-      if (p.name) setPatientName(p.name);
-      if (p.age) setPatientAge(p.age);
-    });
-
     const activeIntakeId = localStorage.getItem('swasthya_active_intake_id');
     const savedDocument = getStoredDocumentUpload(activeIntakeId);
     setUploadedDocName(savedDocument?.file_name ?? null);
@@ -79,6 +88,9 @@ export function PatientIntake() {
   }, [subStep]);
 
   const t = getKioskTranslation(language || 'English');
+  const parsedPatientAge = Number.parseInt(patientAge, 10);
+  const hasValidPatientIdentity =
+    patientName.length > 0 && Number.isInteger(parsedPatientAge) && parsedPatientAge > 0;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
@@ -315,7 +327,20 @@ export function PatientIntake() {
 
             {/* Substep 0: Story (Voice/Text Chat) */}
             {subStep === 0 &&
-              (mode === 'text' ? (
+              (!hasValidPatientIdentity ? (
+                <div className="kiosk-card" role="alert">
+                  <div className="kiosk-consent-error">
+                    <AlertCircle size={14} />
+                    <span>Please provide your name and age before starting the patient intake.</span>
+                  </div>
+                  <div className="kiosk-form-actions">
+                    <button type="button" onClick={handleBack} className="kiosk-back-btn">
+                      <ArrowLeft size={16} />
+                      <span>Return to patient details</span>
+                    </button>
+                  </div>
+                </div>
+              ) : mode === 'text' ? (
                 <PatientTextChat
                   language={language}
                   patientName={patientName}

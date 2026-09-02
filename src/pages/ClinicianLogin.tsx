@@ -18,8 +18,8 @@ import { storeClinicianSession, type ClinicianSession } from '../lib/clinicianAu
 
 export function ClinicianLogin() {
   const [, setLocation] = useLocation();
-  const [staffId, setStaffId] = useState('DOC-001');
-  const [password, setPassword] = useState('demo123');
+  const [staffId, setStaffId] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -63,18 +63,6 @@ export function ClinicianLogin() {
     } finally {
       setBusy(false);
     }
-  };
-
-  const handleAutofillDoctor = () => {
-    setStaffId('DOC-001');
-    setPassword('demo123');
-    setError(null);
-  };
-
-  const handleAutofillAdmin = () => {
-    setStaffId('ADMIN-001');
-    setPassword('demo123');
-    setError(null);
   };
 
   return (
@@ -308,11 +296,7 @@ export function ClinicianLogin() {
 
                   <button
                     type="button"
-                    onClick={() =>
-                      alert(
-                        'For prototype demonstration, please use the provided demo access credentials below.'
-                      )
-                    }
+                    onClick={() => alert('Please contact your administrator to reset your credentials.')}
                     className="text-[#e1b968] hover:underline cursor-pointer font-medium"
                   >
                     Forgot password?
@@ -340,71 +324,6 @@ export function ClinicianLogin() {
                 </button>
               </form>
 
-              {/* Demo Access Section */}
-              <div className="mt-7 pt-5 border-t border-[#1c3e34]">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-[#7d9e90]">
-                    DEMO ACCESS
-                  </span>
-                  <span className="text-[10px] text-[#5e8072] font-mono">Prototype Mode</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Doctor Workspace Card */}
-                  <div className="p-3 rounded-xl bg-[#0b1f1a] border border-[#1e4438] flex flex-col justify-between gap-2">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[#f7f0df]">Doctor Workspace</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#173e33] text-[#9fc4b3]">
-                          Doctor Dashboard
-                        </span>
-                      </div>
-                      <div className="text-[11px] font-mono text-[#86a899] mt-1 space-y-0.5">
-                        <div>
-                          Staff ID: <span className="text-[#f7f0df] font-semibold">DOC-001</span>
-                        </div>
-                        <div>
-                          Passcode: <span className="text-[#f7f0df] font-semibold">demo123</span>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleAutofillDoctor}
-                      className="w-full py-1.5 px-2 rounded-lg bg-[#16382f] hover:bg-[#1e4b3f] text-[#e1b968] text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer border border-[#275345]"
-                    >
-                      <span>Use Doctor Demo</span>
-                    </button>
-                  </div>
-
-                  {/* Administrator Workspace Card */}
-                  <div className="p-3 rounded-xl bg-[#0b1f1a] border border-[#1e4438] flex flex-col justify-between gap-2">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[#f7f0df]">Admin Workspace</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#173e33] text-[#9fc4b3]">
-                          Hospital Ops
-                        </span>
-                      </div>
-                      <div className="text-[11px] font-mono text-[#86a899] mt-1 space-y-0.5">
-                        <div>
-                          Staff ID: <span className="text-[#f7f0df] font-semibold">ADMIN-001</span>
-                        </div>
-                        <div>
-                          Passcode: <span className="text-[#f7f0df] font-semibold">demo123</span>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleAutofillAdmin}
-                      className="w-full py-1.5 px-2 rounded-lg bg-[#16382f] hover:bg-[#1e4b3f] text-[#e1b968] text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer border border-[#275345]"
-                    >
-                      <span>Use Admin Demo</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Security Footer */}
