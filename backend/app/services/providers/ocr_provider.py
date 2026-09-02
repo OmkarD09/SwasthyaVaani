@@ -2,6 +2,7 @@ import logging
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from app.core.config import settings
 from app.services.providers.base import AbstractOCRProvider, OCRExtractionResult
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ class MockOCRProvider(AbstractOCRProvider):
 
 
 class PaddleOCRProvider(AbstractOCRProvider):
-    """Lazy PaddleOCR adapter for single-page PNG and JPEG documents."""
+    """Lazy PaddleOCR adapter for PNG, JPEG, and rendered PDF pages."""
 
     def __init__(self, use_gpu: bool = False, engine_factory=None, image_decoder=None):
         self.use_gpu = use_gpu
@@ -133,10 +134,6 @@ class PaddleOCRProvider(AbstractOCRProvider):
         return self._ocr_engine
 
     def _decode_image(self, file_bytes: bytes, mime_type: str):
-        if mime_type == "application/pdf":
-            raise OCRUnsupportedDocumentError(
-                "PaddleOCR PDF rendering is not implemented; use a PNG or JPEG image"
-            )
         if mime_type not in {"image/png", "image/jpeg"}:
             raise OCRUnsupportedDocumentError(
                 f"PaddleOCR does not support document MIME type {mime_type!r}"
@@ -156,6 +153,50 @@ class PaddleOCRProvider(AbstractOCRProvider):
                 "PaddleOCR could not decode the supplied PNG or JPEG bytes"
             )
         return image
+
+    def _render_pdf_pages(self, file_bytes: bytes) -> list[Any]:
+        try:
+            import pymupdf
+        except (ImportError, ModuleNotFoundError) as exc:
+            raise OCRProviderConfigurationError(
+                "PaddleOCR PDF rendering requires the pinned PyMuPDF dependency"
+            ) from exc
+
+        document = None
+        try:
+            document = pymupdf.open(stream=file_bytes, filetype="pdf")
+            if document.needs_pass:
+                raise OCRUnsupportedDocumentError(
+                    "Encrypted PDF documents cannot be rendered without a password"
+                )
+            if document.page_count < 1:
+                raise OCRUnsupportedDocumentError("PDF document contains no pages")
+            if document.page_count > settings.DOCUMENT_MAX_PAGE_COUNT:
+                raise OCRUnsupportedDocumentError(
+                    "PDF document exceeds the configured page-count limit"
+                )
+
+            rendered_pages = []
+            render_matrix = pymupdf.Matrix(2.0, 2.0)
+            for page in document:
+                pixmap = page.get_pixmap(
+                    matrix=render_matrix,
+                    colorspace=pymupdf.csRGB,
+                    alpha=False,
+                )
+                rendered_pages.append(
+                    self._decode_image(pixmap.tobytes("png"), "image/png")
+                )
+            return rendered_pages
+        except OCRProviderError:
+            raise
+        except Exception as exc:
+            raise OCRUnsupportedDocumentError(
+                "PaddleOCR could not render the supplied PDF bytes"
+            ) from exc
+        finally:
+            if document is not None:
+                document.close()
 
     @staticmethod
     def _flatten_box(box: Any) -> list[float]:
@@ -242,23 +283,33 @@ class PaddleOCRProvider(AbstractOCRProvider):
     async def process_document(
         self, file_bytes: bytes, filename: str, mime_type: str
     ) -> OCRExtractionResult:
-        image = self._decode_image(file_bytes, mime_type)
-        engine = self._init_engine()
-        try:
-            if hasattr(engine, "predict"):
-                result = engine.predict(image)
-            elif hasattr(engine, "ocr"):
-                result = engine.ocr(image, cls=True)
-            else:
-                raise OCRProviderConfigurationError(
-                    "Configured PaddleOCR engine exposes no supported inference method"
-                )
-        except OCRProviderError:
-            raise
-        except Exception as exc:
-            raise OCRInferenceError("PaddleOCR inference failed") from exc
+        if mime_type == "application/pdf":
+            images = self._render_pdf_pages(file_bytes)
+        else:
+            images = [self._decode_image(file_bytes, mime_type)]
 
-        blocks = self._normalize_result(result)
+        engine = self._init_engine()
+        blocks = []
+        for page_number, image in enumerate(images, start=1):
+            try:
+                if hasattr(engine, "predict"):
+                    result = engine.predict(image)
+                elif hasattr(engine, "ocr"):
+                    result = engine.ocr(image, cls=True)
+                else:
+                    raise OCRProviderConfigurationError(
+                        "Configured PaddleOCR engine exposes no supported inference method"
+                    )
+            except OCRProviderError:
+                raise
+            except Exception as exc:
+                raise OCRInferenceError("PaddleOCR inference failed") from exc
+
+            page_blocks = self._normalize_result(result)
+            for block in page_blocks:
+                block["page"] = page_number
+            blocks.extend(page_blocks)
+
         nonempty_blocks = [block for block in blocks if block["text"].strip()]
         confidence = (
             sum(block["confidence"] for block in nonempty_blocks)
@@ -270,7 +321,7 @@ class PaddleOCRProvider(AbstractOCRProvider):
             document_type="UNCLASSIFIED",
             extracted_fields={},
             confidence_score=confidence,
-            pages_processed=1,
+            pages_processed=len(images),
             provider_name="PaddleOCR",
             provider_version=self._provider_version(),
             raw_text="\n".join(block["text"] for block in nonempty_blocks),

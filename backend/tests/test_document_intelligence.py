@@ -322,7 +322,78 @@ def test_paddle_provider_uses_real_bytes_and_normalizes_engine_confidence():
     assert result.extracted_fields == {}
 
 
-def test_paddle_provider_rejects_pdf_before_engine_initialization():
+def _synthetic_pdf(*page_lines: list[str]) -> bytes:
+    import pymupdf
+
+    document = pymupdf.open()
+    for lines in page_lines:
+        page = document.new_page(width=600, height=800)
+        for line_number, text in enumerate(lines):
+            page.insert_text((50, 80 + line_number * 40), text, fontsize=20)
+    content = document.tobytes()
+    document.close()
+    return content
+
+
+def test_paddle_provider_renders_single_page_pdf_and_preserves_metadata():
+    observed_images = []
+
+    class FakeEngine:
+        def ocr(self, image, cls):
+            observed_images.append(image)
+            return [[[[[10, 20], [210, 20], [210, 45], [10, 45]], ("Patient: Demo Patient", 0.91)], [[[10, 60], [230, 60], [230, 85], [10, 85]], ("Paracetamol 500 mg", 0.87)]]]
+
+    provider = PaddleOCRProvider(engine_factory=FakeEngine)
+    import asyncio
+
+    result = asyncio.run(
+        provider.process_document(
+            _synthetic_pdf(["Patient: Demo Patient", "Paracetamol 500 mg"]),
+            "prescription.pdf",
+            "application/pdf",
+        )
+    )
+
+    assert len(observed_images) == 1
+    assert observed_images[0].size > 0
+    assert result.pages_processed == 1
+    assert [block["page"] for block in result.text_blocks] == [1, 1]
+    assert result.raw_text == "Patient: Demo Patient\nParacetamol 500 mg"
+    assert result.text_blocks[0]["bounding_box"] == [10.0, 20.0, 210.0, 20.0, 210.0, 45.0, 10.0, 45.0]
+    assert result.text_blocks[0]["confidence"] == pytest.approx(0.91)
+    assert result.provider_name == "PaddleOCR"
+
+
+def test_paddle_provider_preserves_two_page_pdf_provenance():
+    call_count = 0
+
+    class FakeEngine:
+        def ocr(self, image, cls):
+            nonlocal call_count
+            call_count += 1
+            text = "Page one prescription" if call_count == 1 else "Page two notes"
+            return [[[[[10, 20], [210, 20], [210, 45], [10, 45]], (text, 0.9)]]]
+
+    provider = PaddleOCRProvider(engine_factory=FakeEngine)
+    import asyncio
+
+    result = asyncio.run(
+        provider.process_document(
+            _synthetic_pdf(["Page one prescription"], ["Page two notes"]),
+            "two-page.pdf",
+            "application/pdf",
+        )
+    )
+
+    assert call_count == 2
+    assert result.pages_processed == 2
+    assert [(block["text"], block["page"]) for block in result.text_blocks] == [
+        ("Page one prescription", 1),
+        ("Page two notes", 2),
+    ]
+
+
+def test_paddle_provider_rejects_corrupt_pdf_before_engine_initialization():
     initialized = False
 
     def engine_factory():
@@ -332,11 +403,46 @@ def test_paddle_provider_rejects_pdf_before_engine_initialization():
     provider = PaddleOCRProvider(engine_factory=engine_factory)
     import asyncio
 
-    with pytest.raises(OCRUnsupportedDocumentError, match="PDF rendering"):
+    with pytest.raises(OCRUnsupportedDocumentError, match="could not render"):
         asyncio.run(
-            provider.process_document(b"%PDF-1.4", "report.pdf", "application/pdf")
+            provider.process_document(b"%PDF-1.4 corrupt", "report.pdf", "application/pdf")
         )
     assert initialized is False
+
+
+def test_paddle_provider_enforces_pdf_page_limit(monkeypatch):
+    monkeypatch.setattr(settings, "DOCUMENT_MAX_PAGE_COUNT", 1)
+    provider = PaddleOCRProvider(engine_factory=lambda: object())
+    import asyncio
+
+    with pytest.raises(OCRUnsupportedDocumentError, match="page-count limit"):
+        asyncio.run(
+            provider.process_document(
+                _synthetic_pdf(["Page one"], ["Page two"]),
+                "two-page.pdf",
+                "application/pdf",
+            )
+        )
+
+
+def test_paddle_provider_rejects_encrypted_pdf_without_password_attempt():
+    import asyncio
+    import pymupdf
+
+    document = pymupdf.open()
+    document.new_page().insert_text((50, 80), "Protected prescription")
+    content = document.tobytes(
+        encryption=pymupdf.PDF_ENCRYPT_AES_256,
+        owner_pw="owner-password",
+        user_pw="user-password",
+    )
+    document.close()
+
+    provider = PaddleOCRProvider(engine_factory=lambda: object())
+    with pytest.raises(OCRUnsupportedDocumentError, match="Encrypted PDF"):
+        asyncio.run(
+            provider.process_document(content, "protected.pdf", "application/pdf")
+        )
 
 
 def test_paddle_provider_rejects_malformed_engine_output():
