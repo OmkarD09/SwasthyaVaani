@@ -15,6 +15,10 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { Brand } from '../Brand';
+import {
+  clearClinicianSession,
+  getClinicianSession,
+} from '../../lib/clinicianAuth';
 
 export interface PatientRecordShellProps {
   patientId: string;
@@ -26,6 +30,16 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
   const [mobile, setMobile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const clinicianSession = getClinicianSession();
+  const clinicianName = clinicianSession?.display_name || 'Authorized clinician';
+  const clinicianInitials =
+    clinicianName
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'CL';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -63,8 +77,8 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
             <Hospital size={16} />
           </span>
           <div>
-            <b>District Hospital</b>
-            <span>North wing · OPD 2</span>
+            <b>Clinical Workspace</b>
+            <span>Patient record</span>
           </div>
           <ChevronDown size={14} />
         </div>
@@ -127,7 +141,7 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
         {/* Section 3: System */}
         <div className="side-label side-label-spaced">SYSTEM</div>
         <nav className="portal-nav">
-          <button type="button" onClick={() => alert('Support line: OPD Helpdesk Ext 402')}>
+          <button type="button" onClick={() => alert('Support workflow is not connected in this prototype.')}>
             <CircleHelp size={18} />
             <span>Help & support</span>
           </button>
@@ -139,9 +153,11 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
             {profileOpen && (
               <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-[#264552] bg-[#0d222b] p-2.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-white">
                 <div className="px-3 py-2.5 border-b border-[#1b3945] mb-1.5 bg-[#122e3a] rounded-xl">
-                  <p className="font-bold text-xs text-[#6bdbca]">Dr. Ananya Rao</p>
-                  <p className="font-mono text-[10px] text-[#91b3bf] mt-0.5">OPD 02 · General Medicine</p>
-                  <p className="text-[10px] text-[#6d8d99] mt-0.5">District Hospital, North Wing</p>
+                  <p className="font-bold text-xs text-[#6bdbca]">{clinicianName}</p>
+                  <p className="font-mono text-[10px] text-[#91b3bf] mt-0.5">
+                    {clinicianSession?.role || 'CLINICIAN'}
+                  </p>
+                  <p className="text-[10px] text-[#6d8d99] mt-0.5">Authenticated prototype session</p>
                 </div>
 
                 <div className="space-y-1 text-xs">
@@ -149,7 +165,7 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
                     type="button"
                     onClick={() => {
                       setProfileOpen(false);
-                      alert('Physician ID: DOC-001\nLicense: MCI-2018-8472\nSpecialty: General Medicine');
+                      alert('Profile management is not connected in this prototype.');
                     }}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#a8cbdb] hover:bg-[#193845] hover:text-[#76ddcd] transition cursor-pointer font-medium"
                   >
@@ -160,11 +176,11 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
                     type="button"
                     onClick={() => {
                       setProfileOpen(false);
-                      alert('OPD Station: 02 (Active)\nConnected to live triage queue');
+                      alert('Workspace configuration is not connected in this prototype.');
                     }}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#a8cbdb] hover:bg-[#193845] hover:text-[#76ddcd] transition cursor-pointer font-medium"
                   >
-                    <Hospital size={14} className="text-[#76ddcd]" /> OPD Station 02
+                    <Hospital size={14} className="text-[#76ddcd]" /> Workspace details
                   </button>
                 </div>
 
@@ -173,6 +189,7 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
                     type="button"
                     onClick={() => {
                       setProfileOpen(false);
+                      clearClinicianSession();
                       setLocation('/');
                     }}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#f59e97] hover:bg-[#331c1e] transition cursor-pointer font-medium text-xs"
@@ -189,14 +206,16 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
               aria-expanded={profileOpen}
               aria-haspopup="true"
               className="flex items-center gap-2.5 w-full p-2 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.09)] transition cursor-pointer text-left"
-              title="Dr. Ananya Rao · Click for profile options"
+              title={`${clinicianName} · Click for profile options`}
             >
               <div className="grid place-items-center w-8 h-8 rounded-full bg-[#1e4e46] text-[#78decb] font-bold text-xs shrink-0 border border-[#2b6d61]">
-                AR
+                {clinicianInitials}
               </div>
               <div className="min-w-0 flex-1">
-                <b className="block text-xs font-bold text-white truncate">Dr. Ananya Rao</b>
-                <span className="block text-[10px] text-[#86a2ab] truncate">General Medicine · OPD 2</span>
+                <b className="block text-xs font-bold text-white truncate">{clinicianName}</b>
+                <span className="block text-[10px] text-[#86a2ab] truncate">
+                  {clinicianSession?.role || 'Clinician'} session
+                </span>
               </div>
               <ChevronDown
                 size={14}
@@ -209,7 +228,7 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
             <LockKeyhole size={16} />
             <span>
               <b>Secure clinician workspace</b>
-              <small>Last synced just now</small>
+              <small>Authenticated session active</small>
             </span>
           </div>
         </div>
@@ -235,7 +254,7 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
           </div>
           <div className="ml-auto flex items-center gap-3.5">
             <span className="flex items-center gap-1.5 font-mono text-[10px] font-bold text-[#467364] tracking-wide">
-              <span className="h-2 w-2 rounded-full bg-[#27ae60] animate-pulse" /> FASTAPI & SUPABASE LIVE
+              <span className="h-2 w-2 rounded-full bg-[#27ae60]" /> CLINICIAN API RECORD
             </span>
             <BellRing size={17} className="text-[#597e71]" />
           </div>

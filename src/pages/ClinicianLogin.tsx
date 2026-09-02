@@ -14,6 +14,7 @@ import {
   TriangleAlert,
   User,
 } from 'lucide-react';
+import { storeClinicianSession, type ClinicianSession } from '../lib/clinicianAuth';
 
 export function ClinicianLogin() {
   const [, setLocation] = useLocation();
@@ -24,7 +25,7 @@ export function ClinicianLogin() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e?: React.FormEvent) => {
+  const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
 
@@ -37,15 +38,31 @@ export function ClinicianLogin() {
     }
 
     setBusy(true);
+    const role = trimmedId.toUpperCase().startsWith('ADMIN') ? 'ADMIN' : 'DOCTOR';
 
-    setTimeout(() => {
-      // Role-based routing
-      if (trimmedId.toUpperCase().startsWith('ADMIN')) {
-        setLocation('/admin');
-      } else {
-        setLocation('/doctor');
+    try {
+      const response = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: trimmedId, password: trimmedPw, role }),
+      });
+      if (!response.ok) {
+        setError(`Unable to sign in (status ${response.status}).`);
+        return;
       }
-    }, 450);
+
+      const session = (await response.json()) as ClinicianSession;
+      if (!session.access_token || !['DOCTOR', 'ADMIN'].includes(session.role)) {
+        setError('Authentication response did not contain an authorized clinician session.');
+        return;
+      }
+      storeClinicianSession(session, rememberMe);
+      setLocation(session.role === 'ADMIN' ? '/admin' : '/doctor');
+    } catch {
+      setError('Unable to reach the authentication service. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleAutofillDoctor = () => {

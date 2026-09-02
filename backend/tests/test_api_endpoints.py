@@ -1,5 +1,5 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from app.seed.seed_data import seed_database
 
 
@@ -10,8 +10,9 @@ def test_health_check_endpoint(client: TestClient):
     assert data["status"] == "healthy"
 
 
-def test_full_intake_to_doctor_confirmation_slice(client: TestClient, db):
+def test_full_intake_to_doctor_confirmation_slice(client: TestClient, db, auth_headers):
     seed_database(db)
+    doctor_headers = auth_headers("DOCTOR")
 
     # 1. Start Patient Intake
     intake_payload = {
@@ -47,14 +48,16 @@ def test_full_intake_to_doctor_confirmation_slice(client: TestClient, db):
     assert ans1_data["clinical_state"]["chief_complaint"] is not None
     assert ans1_data["clinical_state"]["duration"] is not None
     assert ans1_data["decision"]["action"] == "ASK"
+    assert ans1_data["next_question_event_id"] is not None
 
     # 3. Patient submits second answer
     ans2_res = client.post(
         f"/api/v1/intakes/{intake_id}/answers",
         json={
-            "raw_text": "The discomfort is about 5 out of 10 in severity.",
-            "input_mode": "VOICE",
-            "language_code": "en"
+                "raw_text": "The discomfort is about 5 out of 10 in severity.",
+                "input_mode": "VOICE",
+                "language_code": "en",
+                "question_event_id": ans1_data["next_question_event_id"],
         }
     )
     assert ans2_res.status_code == 200
@@ -67,7 +70,7 @@ def test_full_intake_to_doctor_confirmation_slice(client: TestClient, db):
     assert submit_res.json()["status"] == "SUBMITTED"
 
     # 5. Doctor views Queue
-    queue_res = client.get("/api/v1/doctor/queue")
+    queue_res = client.get("/api/v1/doctor/queue", headers=doctor_headers)
     assert queue_res.status_code == 200
     queue = queue_res.json()
     matched_item = next((item for item in queue if item["intake_session_id"] == intake_id), None)
@@ -75,7 +78,9 @@ def test_full_intake_to_doctor_confirmation_slice(client: TestClient, db):
     assert matched_item["token"] == token
 
     # 6. Doctor loads patient detail
-    detail_res = client.get(f"/api/v1/doctor/patients/{intake_id}")
+    detail_res = client.get(
+        f"/api/v1/doctor/patients/{intake_id}", headers=doctor_headers
+    )
     assert detail_res.status_code == 200
     detail = detail_res.json()
     assert detail["clinical_state"]["duration"] is not None
@@ -84,6 +89,7 @@ def test_full_intake_to_doctor_confirmation_slice(client: TestClient, db):
     # 7. Doctor edits and confirms clinical history
     confirm_res = client.post(
         f"/api/v1/doctor/patients/{intake_id}/confirm",
+        headers=doctor_headers,
         json={
             "intake_session_id": intake_id,
             "notes": "Verified fever history and vital signs.",

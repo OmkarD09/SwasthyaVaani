@@ -1,19 +1,25 @@
-from typing import List, Optional, Any, Set
+
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.schemas.clinical_state import ClinicalState
 from app.schemas.question import QuestionDecision
+from app.services.clinical_ai.domain_classifier import (
+    ClinicalDomain,
+    classify_clinical_domains,
+)
 from app.services.clinical_ai.gap_analysis import find_information_gaps
-from app.services.clinical_ai.domain_classifier import classify_clinical_domains, ClinicalDomain
-from app.services.clinical_ai.question_scorer import score_candidate_dimensions, is_field_already_resolved, SEMANTIC_CLUSTERS
-from app.services.safety.red_flags import evaluate_red_flags
-from app.services.safety.contradictions import detect_contradictions
-from app.core.config import settings
+from app.services.clinical_ai.question_scorer import (
+    is_field_already_resolved,
+    score_candidate_dimensions,
+)
 from app.services.providers.factory import get_llm_service
 from app.services.rag.rag_service import rag_service
+from app.services.safety.contradictions import detect_contradictions
+from app.services.safety.red_flags import evaluate_red_flags
 
 
-def is_semantic_duplicate(candidate: str, asked_questions: List[str]) -> bool:
+def is_semantic_duplicate(candidate: str, asked_questions: list[str]) -> bool:
     """Checks whether a candidate question is redundantly similar to previously asked questions."""
     cand_norm = candidate.lower().replace("?", "").replace(".", "").replace("—", "").strip()
     for prev in asked_questions:
@@ -51,9 +57,13 @@ def _check_minimum_sufficient_history(
         has_upper = is_field_already_resolved("vomiting", state) or is_field_already_resolved("bloating", state) or is_field_already_resolved("abdominal_location", state)
         
         # Melena / Dark Stool profile
-        if state.dark_stool:
-            if has_cc and is_field_already_resolved("dark_stool_onset", state) and is_field_already_resolved("dark_stool_consistency", state):
-                return True
+        if (
+            state.dark_stool
+            and has_cc
+            and is_field_already_resolved("dark_stool_onset", state)
+            and is_field_already_resolved("dark_stool_consistency", state)
+        ):
+            return True
 
         # Gastroenteritis profile
         if has_cc and has_dur and has_food and has_stool and has_upper:
@@ -106,11 +116,11 @@ def _check_minimum_sufficient_history(
 async def evaluate_next_question(
     state: ClinicalState,
     workflow_type: str = "GENERAL_CLINICAL",
-    asked_questions: Optional[List[str]] = None,
+    asked_questions: list[str] | None = None,
     consecutive_low_progress: int = 0,
     total_questions_asked: int = 0,
     language_code: str = "en",
-    db: Optional[Session] = None
+    db: Session | None = None,
 ) -> QuestionDecision:
     """
     Domain-Aware, Information-Gain Scored Adaptive Clinical Engine.
@@ -164,7 +174,7 @@ async def evaluate_next_question(
         )
 
     # Collect previously asked target fields
-    asked_target_fields: Set[str] = set(state.resolved_dimensions)
+    asked_target_fields: set[str] = set(state.resolved_dimensions)
 
     # 5. Classify Clinical Domains & Score Candidate Question Dimensions
     domains = classify_clinical_domains(state, workflow_type)
@@ -207,19 +217,23 @@ async def evaluate_next_question(
 
     rag_context = None
     # Use RAG selectively for AYUSH workflow or knowledge-dependent clinical fields
-    if db is not None and (workflow_type == "AYUSH" or target_field in ["agni", "koshtha", "ahara_vihara", "associated_symptoms", "food_exposure"]):
-        try:
-            rag_query = f"{domains[0]} assessment for {target_field} with {state.chief_complaint or 'symptoms'}"
-            rag_context = await rag_service.retrieve(
-                query=rag_query,
-                db=db,
-                workflow=workflow_type if workflow_type == "AYUSH" else "ALL",
-                language=lang,
-                top_k=3,
-                min_similarity=0.45
-            )
-        except Exception:
-            rag_context = None
+    if db is not None and (
+        workflow_type == "AYUSH"
+        or target_field
+        in ["agni", "koshtha", "ahara_vihara", "associated_symptoms", "food_exposure"]
+    ):
+        rag_query = (
+            f"{primary_domain} assessment for {target_field} with "
+            f"{state.chief_complaint or 'symptoms'}"
+        )
+        rag_context = await rag_service.retrieve(
+            query=rag_query,
+            db=db,
+            workflow=workflow_type if workflow_type == "AYUSH" else "ALL",
+            language=lang,
+            top_k=3,
+            min_similarity=0.45,
+        )
 
     selected_question = await llm.generate_adaptive_question(
         target_field=target_field,
@@ -245,12 +259,6 @@ async def evaluate_next_question(
                 reasoning_mode = selected_candidate.get("reasoning_mode", "TARGETED_FOLLOW_UP")
                 state.active_exploration_mode = reasoning_mode
                 break
-
-    # Record target dimension in resolved tracking
-    if target_field not in state.resolved_dimensions:
-        state.resolved_dimensions.append(target_field)
-    if target_field.startswith("open_") and target_field not in state.explored_areas:
-        state.explored_areas.append(target_field)
 
     return QuestionDecision(
         action="ASK",

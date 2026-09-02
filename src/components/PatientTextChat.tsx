@@ -197,6 +197,7 @@ export function PatientTextChat({
   const [isThinking, setIsThinking] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [intakeSessionId, setIntakeSessionId] = useState<string | null>(null);
+  const [currentQuestionEventId, setCurrentQuestionEventId] = useState<string | null>(null);
 
   useEffect(() => {
     async function initSession() {
@@ -220,6 +221,7 @@ export function PatientTextChat({
           setIntakeSessionId(data.id);
           localStorage.setItem('swasthya_active_intake_id', data.id);
           localStorage.setItem('swasthya_active_token', data.token || '');
+          localStorage.setItem('swasthya_active_patient_id', data.patient_id || '');
         }
       } catch (err) {
         console.warn('Text session note:', err);
@@ -262,6 +264,7 @@ export function PatientTextChat({
             raw_text: trimmedAnswer,
             input_mode: 'TEXT',
             language_code: langCode,
+            question_event_id: currentQuestionEventId,
           }),
         });
 
@@ -269,6 +272,7 @@ export function PatientTextChat({
           const data = await res.json();
           const decision = data.decision;
           const targetField = decision?.target_field || 'symptom';
+          setCurrentQuestionEventId(data.next_question_event_id ?? null);
 
           // Record in unified conversation store
           recordIntakeAnswer(
@@ -279,7 +283,7 @@ export function PatientTextChat({
             currentQText
           );
 
-          if (decision?.action === 'STOP' || currentStepIndex >= 9) {
+          if (decision?.action === 'STOP' || decision?.action === 'ESCALATE') {
             const completionText =
               currentLang === 'हिन्दी'
                 ? 'धन्यवाद! आपकी सभी जानकारी रिकॉर्ड कर ली गई है। अब आप अपनी पुरानी पर्ची या रिपोर्ट अपलोड कर सकते हैं।'
@@ -355,6 +359,7 @@ export function PatientTextChat({
       },
     ]);
     setCurrentStepIndex(0);
+    setCurrentQuestionEventId(null);
     setInputText('');
     setIsThinking(false);
     setIsFinished(false);

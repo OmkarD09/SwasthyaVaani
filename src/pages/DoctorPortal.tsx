@@ -9,7 +9,6 @@ import {
   ChevronDown,
   CircleHelp,
   Clock3,
-  FileText,
   Hospital,
   LayoutDashboard,
   LockKeyhole,
@@ -23,6 +22,11 @@ import {
   X,
 } from 'lucide-react';
 import { Brand, AppButton } from '../components/Brand';
+import {
+  authorizedClinicianFetch,
+  clearClinicianSession,
+  getClinicianSession,
+} from '../lib/clinicianAuth';
 
 function DoctorPortalSidebar({
   active,
@@ -35,6 +39,16 @@ function DoctorPortalSidebar({
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const clinicianSession = getClinicianSession();
+  const clinicianName = clinicianSession?.display_name || 'Authorized clinician';
+  const clinicianInitials =
+    clinicianName
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'CL';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -69,8 +83,8 @@ function DoctorPortalSidebar({
           <Hospital size={16} />
         </span>
         <div>
-          <b>District Hospital</b>
-          <span>North wing · OPD 2</span>
+          <b>Clinical Workspace</b>
+          <span>Live triage queue</span>
         </div>
         <ChevronDown size={14} />
       </div>
@@ -103,9 +117,11 @@ function DoctorPortalSidebar({
           {profileOpen && (
             <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-[#264552] bg-[#0d222b] p-2.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-white">
               <div className="px-3 py-2.5 border-b border-[#1b3945] mb-1.5 bg-[#122e3a] rounded-xl">
-                <p className="font-bold text-xs text-[#6bdbca]">Dr. Ananya Rao</p>
-                <p className="font-mono text-[10px] text-[#91b3bf] mt-0.5">OPD 02 · General Medicine</p>
-                <p className="text-[10px] text-[#6d8d99] mt-0.5">District Hospital, North Wing</p>
+                <p className="font-bold text-xs text-[#6bdbca]">{clinicianName}</p>
+                <p className="font-mono text-[10px] text-[#91b3bf] mt-0.5">
+                  {clinicianSession?.role || 'CLINICIAN'}
+                </p>
+                <p className="text-[10px] text-[#6d8d99] mt-0.5">Authenticated prototype session</p>
               </div>
 
               <div className="space-y-1 text-xs">
@@ -113,7 +129,7 @@ function DoctorPortalSidebar({
                   type="button"
                   onClick={() => {
                     setProfileOpen(false);
-                    alert('Physician ID: DOC-001\nLicense: MCI-2018-8472\nSpecialty: General Medicine');
+                    alert('Profile management is not connected in this prototype.');
                   }}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#a8cbdb] hover:bg-[#193845] hover:text-[#76ddcd] transition cursor-pointer font-medium"
                 >
@@ -124,11 +140,11 @@ function DoctorPortalSidebar({
                   type="button"
                   onClick={() => {
                     setProfileOpen(false);
-                    alert('OPD Station: 02 (Active)\nConnected to live triage queue');
+                    alert('Workspace configuration is not connected in this prototype.');
                   }}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#a8cbdb] hover:bg-[#193845] hover:text-[#76ddcd] transition cursor-pointer font-medium"
                 >
-                  <Hospital size={14} className="text-[#76ddcd]" /> OPD Station 02
+                  <Hospital size={14} className="text-[#76ddcd]" /> Workspace details
                 </button>
               </div>
 
@@ -137,6 +153,7 @@ function DoctorPortalSidebar({
                   type="button"
                   onClick={() => {
                     setProfileOpen(false);
+                    clearClinicianSession();
                     onNavigate('/');
                   }}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#f59e97] hover:bg-[#331c1e] transition cursor-pointer font-medium text-xs"
@@ -153,14 +170,16 @@ function DoctorPortalSidebar({
             aria-expanded={profileOpen}
             aria-haspopup="true"
             className="flex items-center gap-2.5 w-full p-2 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.09)] transition cursor-pointer text-left"
-            title="Dr. Ananya Rao · Click for profile options"
+            title={`${clinicianName} · Click for profile options`}
           >
             <div className="grid place-items-center w-8 h-8 rounded-full bg-[#1e4e46] text-[#78decb] font-bold text-xs shrink-0 border border-[#2b6d61]">
-              AR
+              {clinicianInitials}
             </div>
             <div className="min-w-0 flex-1">
-              <b className="block text-xs font-bold text-white truncate">Dr. Ananya Rao</b>
-              <span className="block text-[10px] text-[#86a2ab] truncate">General Medicine · OPD 2</span>
+              <b className="block text-xs font-bold text-white truncate">{clinicianName}</b>
+              <span className="block text-[10px] text-[#86a2ab] truncate">
+                {clinicianSession?.role || 'Clinician'} session
+              </span>
             </div>
             <ChevronDown
               size={14}
@@ -173,7 +192,7 @@ function DoctorPortalSidebar({
           <LockKeyhole size={16} />
           <span>
             <b>Secure clinician workspace</b>
-            <small>Last synced just now</small>
+            <small>Authenticated session active</small>
           </span>
         </div>
       </div>
@@ -237,7 +256,7 @@ export function DoctorPortal() {
   const fetchLiveQueue = async (manual = false) => {
     if (manual) setIsRefreshing(true);
     try {
-      const res = await fetch('/api/v1/doctor/queue');
+      const res = await authorizedClinicianFetch('/api/v1/doctor/queue');
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -265,10 +284,10 @@ export function DoctorPortal() {
                 id: item.token || `SV-${item.intake_session_id?.slice(0, 4)}`,
                 intake_session_id: item.intake_session_id,
                 name: patientName,
-                age: item.patient_age ? `${item.patient_age} yrs` : '34 yrs',
-                gender: item.patient_gender || 'Female',
-                lang: langNames[item.language_code] || item.language_code || 'हिन्दी',
-                reason: item.chief_complaint || 'General consultation',
+                age: item.patient_age ? `${item.patient_age} yrs` : 'Age unavailable',
+                gender: item.patient_gender || 'Not recorded',
+                lang: langNames[item.language_code] || item.language_code || 'Language unavailable',
+                reason: item.chief_complaint || 'Chief complaint not recorded',
                 wait: `${String(item.wait_time_minutes || 0).padStart(2, '0')} min`,
                 wait_time_minutes: item.wait_time_minutes || 0,
                 priority: item.priority || 'Routine',
@@ -349,7 +368,7 @@ export function DoctorPortal() {
               </button>
               <div className="section-kicker">OPD TRIAGE · LIVE CONNECTED</div>
               <h1>Good morning, Doctor</h1>
-              <p>{currentDate} · District Hospital</p>
+              <p>{currentDate} · Clinical Workspace</p>
             </div>
           </div>
           <div className="doctor-stats">
@@ -626,15 +645,9 @@ export function DoctorPortal() {
                   </div>
                   <div className="summary-block">
                     <span className="summary-block-label">
-                      ATTACHMENTS <small>1</small>
+                      ATTACHMENTS <small>0</small>
                     </span>
-                    <div className="attachment-row">
-                      <FileText size={16} />
-                      <span>
-                        <b>Prescription_Uploaded.pdf</b>
-                        <small>Uploaded at intake</small>
-                      </span>
-                    </div>
+                    <p>Document metadata is not available in the current doctor API contract.</p>
                   </div>
                   <div className="summary-actions">
                     <AppButton

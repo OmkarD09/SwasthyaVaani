@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Mic,
   MessageSquare,
@@ -33,21 +33,22 @@ export interface ConversationMessageProps {
 
 export function ConversationMessage({ exchange, index }: ConversationMessageProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const isVoice = exchange.inputMode === 'voice';
 
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+    };
+  }, []);
+
   const handleToggleAudio = () => {
-    if (!exchange.audioUrl) {
-      // Simulate audio playback demonstration
-      setIsPlaying(!isPlaying);
-      if (!isPlaying) {
-        setTimeout(() => setIsPlaying(false), 3000);
-      }
-      return;
-    }
-    const audio = new Audio(exchange.audioUrl);
+    if (!exchange.audioUrl) return;
+
+    const audio = audioRef.current ?? new Audio(exchange.audioUrl);
+    audioRef.current = audio;
     if (!isPlaying) {
-      audio.play();
-      setIsPlaying(true);
+      void audio.play().then(() => setIsPlaying(true));
       audio.onended = () => setIsPlaying(false);
     } else {
       audio.pause();
@@ -147,10 +148,17 @@ export function ConversationMessage({ exchange, index }: ConversationMessageProp
               <button
                 type="button"
                 onClick={handleToggleAudio}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#c4b693] bg-[#fbf5e5] px-3 py-1.5 text-xs font-bold text-[#6d5423] hover:bg-[#f6ebd0] transition cursor-pointer"
+                disabled={!exchange.audioUrl}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#c4b693] bg-[#fbf5e5] px-3 py-1.5 text-xs font-bold text-[#6d5423] hover:bg-[#f6ebd0] transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPlaying ? <Pause size={13} /> : <Play size={13} />}
-                <span>{isPlaying ? 'Playing Audio…' : '▶ Play Audio'}</span>
+                <span>
+                  {!exchange.audioUrl
+                    ? 'Audio unavailable'
+                    : isPlaying
+                      ? 'Playing Audio…'
+                      : '▶ Play Audio'}
+                </span>
               </button>
 
               <div className="flex items-center gap-1 text-[11px] text-[#8a7651] font-mono">

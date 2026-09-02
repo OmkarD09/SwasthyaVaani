@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import {
   Mic,
@@ -34,6 +34,11 @@ import {
 import {
   buildClinicalSummary,
 } from '../lib/conversationStore';
+import {
+  clearStoredDocumentUpload,
+  getStoredDocumentUpload,
+  storeDocumentUpload,
+} from '../lib/documentUploadState';
 import { patientApi } from '../services/patientApi';
 
 export function PatientIntake() {
@@ -48,11 +53,14 @@ export function PatientIntake() {
   const [mode, setMode] = useState<'voice' | 'text'>(getStoredMode);
   const [uploaded, setUploaded] = useState(false);
   const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [patientName, setPatientName] = useState('Ananya Sharma');
   const [patientAge, setPatientAge] = useState('34');
   const [consentGiven, setConsentGiven] = useState(false);
   const [consentError, setConsentError] = useState(false);
   const [isReviewingStory, setIsReviewingStory] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setLanguage(getStoredLanguage());
@@ -62,33 +70,96 @@ export function PatientIntake() {
       if (p.age) setPatientAge(p.age);
     });
 
-    try {
-      const savedDoc = localStorage.getItem('swasthya_uploaded_doc_name');
-      if (savedDoc) {
-        setUploadedDocName(savedDoc);
-        setUploaded(true);
-      }
-    } catch {}
+    const activeIntakeId = localStorage.getItem('swasthya_active_intake_id');
+    const savedDocument = getStoredDocumentUpload(activeIntakeId);
+    setUploadedDocName(savedDocument?.file_name ?? null);
+    setUploaded(Boolean(savedDocument));
   }, [subStep]);
 
   const t = getKioskTranslation(language || 'English');
 
-  const handleFileUpload = (e?: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e?.target?.files?.[0];
-    const fileName = file ? file.name : 'Prescription_May2026.pdf';
-    setUploadedDocName(fileName);
-    setUploaded(true);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    if (!file || isUploading) return;
+
+    setIsUploading(true);
+    setUploadError(null);
+
     try {
-      localStorage.setItem('swasthya_uploaded_doc_name', fileName);
-    } catch {}
+      const intakeSessionId = localStorage.getItem('swasthya_active_intake_id');
+      let patientId = localStorage.getItem('swasthya_active_patient_id');
+
+      if (!patientId && intakeSessionId) {
+        const intakeResponse = await fetch(`/api/v1/intakes/${intakeSessionId}`);
+        if (intakeResponse.ok) {
+          const intake = await intakeResponse.json();
+          if (typeof intake.patient_id === 'string' && intake.patient_id) {
+            const resolvedPatientId: string = intake.patient_id;
+            patientId = resolvedPatientId;
+            localStorage.setItem('swasthya_active_patient_id', resolvedPatientId);
+          }
+        }
+      }
+
+      if (!patientId) {
+        throw new Error('Start an intake session before uploading a document.');
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('patient_id', patientId);
+      if (intakeSessionId) formData.append('intake_session_id', intakeSessionId);
+      formData.append('document_type', 'PRESCRIPTION');
+
+      const response = await fetch('/api/v1/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (response.status !== 202) {
+        let message = `Document upload failed with status ${response.status}.`;
+        try {
+          const body = await response.json();
+          const detail = body?.detail;
+          if (typeof detail?.message === 'string') message = detail.message;
+          else if (typeof detail === 'string') message = detail;
+        } catch {
+          // Preserve the status-based message when the response is not JSON.
+        }
+        throw new Error(message);
+      }
+
+      const uploadedDocument = await response.json();
+      if (!uploadedDocument.document_id || !uploadedDocument.file_name) {
+        throw new Error('The upload response did not include document metadata.');
+      }
+
+      storeDocumentUpload({
+        document_id: uploadedDocument.document_id,
+        file_name: uploadedDocument.file_name,
+        status: uploadedDocument.status,
+        intake_session_id: intakeSessionId,
+      });
+      localStorage.removeItem('swasthya_uploaded_doc_name');
+      setUploadedDocName(uploadedDocument.file_name);
+      setUploaded(true);
+    } catch (error: unknown) {
+      setUploaded(false);
+      setUploadedDocName(null);
+      setUploadError(
+        error instanceof Error ? error.message : 'Unable to upload this document.',
+      );
+    } finally {
+      setIsUploading(false);
+      input.value = '';
+    }
   };
 
   const handleFileRemove = () => {
     setUploaded(false);
     setUploadedDocName(null);
-    try {
-      localStorage.removeItem('swasthya_uploaded_doc_name');
-    } catch {}
+    setUploadError(null);
+    clearStoredDocumentUpload();
   };
 
   const handleBack = () => {
@@ -297,7 +368,7 @@ export function PatientIntake() {
                       <Check size={16} />
                     </span>
                     <span>
-                      <b>{uploadedDocName || 'Prescription_May2026.pdf'}</b>
+                      <b>{uploadedDocName}</b>
                       <small>{t.recordReadySub}</small>
                     </span>
                     <button onClick={handleFileRemove}>
@@ -310,16 +381,46 @@ export function PatientIntake() {
                       <Upload size={21} className="text-[#1f5b4e]" />
                       <b className="mt-2 text-sm text-[#173e35]">{t.uploadDeviceTitle}</b>
                       <small className="text-xs text-[#7b9086]">{t.uploadDeviceSub}</small>
-                      <input type="file" className="hidden" onChange={handleFileUpload} />
+                      <input
+                        type="file"
+                        accept="application/pdf,image/png,image/jpeg"
+                        className="hidden"
+                        disabled={isUploading}
+                        onChange={handleFileUpload}
+                      />
                     </label>
-                    <button onClick={() => handleFileUpload()}>
+                    <button
+                      type="button"
+                      disabled={isUploading}
+                      onClick={() => cameraInputRef.current?.click()}
+                    >
                       <span>
                         <Camera size={21} />
                       </span>
                       <b>{t.takePhotoTitle}</b>
                       <small>{t.takePhotoSub}</small>
                     </button>
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      capture="environment"
+                      className="hidden"
+                      disabled={isUploading}
+                      onChange={handleFileUpload}
+                    />
                   </div>
+                )}
+
+                {isUploading && (
+                  <p className="mt-3 text-center text-sm text-[#1f5b4e]">
+                    Uploading document securely...
+                  </p>
+                )}
+                {uploadError && (
+                  <p className="mt-3 text-center text-sm text-[#9f3f32]" role="alert">
+                    {uploadError}
+                  </p>
                 )}
 
                 <div className="kiosk-form-actions">
@@ -379,7 +480,7 @@ export function PatientIntake() {
                     <span>
                       <FileText size={15} /> {t.summaryRecords}
                     </span>
-                    <b>{uploaded ? uploadedDocName || t.summaryOneAttached : t.summaryNoneAdded}</b>
+                    <b>{uploaded && uploadedDocName ? uploadedDocName : t.summaryNoneAdded}</b>
                   </div>
                 </div>
 
@@ -486,8 +587,7 @@ export function PatientIntake() {
                         department: 'General Medicine',
                         token: generatedToken,
                         documentCount: uploaded ? 1 : 0,
-                        documentName:
-                          uploadedDocName || (uploaded ? 'Prescription_May2026.pdf' : null),
+                        documentName: uploaded ? uploadedDocName : null,
                         submittedAt: new Date().toISOString(),
                         intakeId: activeId,
                         chiefConcern: summary.chiefConcern,
@@ -623,7 +723,7 @@ export function PatientIntake() {
                     <div className="review-section-content text-xs text-[#4a635b]">
                       {uploaded ? (
                         <span className="font-semibold text-[#173e35]">
-                          📄 {uploadedDocName || 'Prescription_May2026.pdf'}
+                          📄 {uploadedDocName}
                         </span>
                       ) : (
                         'No previous prescriptions or diagnostic reports attached.'

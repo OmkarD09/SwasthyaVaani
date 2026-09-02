@@ -1,171 +1,91 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useParams } from 'wouter';
-import { RefreshCw } from 'lucide-react';
-import { usePatientRecord } from '../hooks/usePatientRecord';
-import { PatientRecordShell } from '../components/doctor/PatientRecordShell';
-import { PatientContextHeader } from '../components/doctor/PatientContextHeader';
-import { ConversationTimeline } from '../components/doctor/ConversationTimeline';
+
 import { type ConversationExchange } from '../components/doctor/ConversationMessage';
-import { getUnifiedConversation } from '../lib/conversationStore';
+import { ConversationTimeline } from '../components/doctor/ConversationTimeline';
+import { PatientContextHeader } from '../components/doctor/PatientContextHeader';
+import { PatientRecordShell } from '../components/doctor/PatientRecordShell';
+import { usePatientRecord } from '../hooks/usePatientRecord';
+import { authorizedClinicianFetch } from '../lib/clinicianAuth';
 
 export function DoctorPatientConversation() {
   const params = useParams<{ id: string }>();
-  const patientId = params?.id || 'pat_001';
-
-  const { patientDetail, loading, confirmed } = usePatientRecord(patientId);
+  const patientId = params?.id || '';
+  const {
+    patientDetail,
+    loading: patientLoading,
+    error: patientError,
+    confirmed,
+  } = usePatientRecord(patientId);
   const [exchanges, setExchanges] = useState<ConversationExchange[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Build exchanges from unified store
-    let unified: any[] = [];
-    try {
-      unified = getUnifiedConversation() || [];
-    } catch {}
+    if (!patientDetail?.intake_session_id) return;
 
-    if (unified && unified.length > 0) {
-      const builtExchanges: ConversationExchange[] = [];
-      let pendingQuestion = 'What symptoms or concerns bring you in today?';
-      let pendingCategory = 'Clinical Intake';
-
-      unified.forEach((msg, idx) => {
-        if (msg.role === 'assistant') {
-          pendingQuestion = msg.content;
-          pendingCategory = msg.category || 'Intake Question';
-        } else if (msg.role === 'patient') {
-          builtExchanges.push({
-            id: msg.id || `exch-${idx}`,
-            questionId: msg.questionId,
-            category: pendingCategory,
-            questionText: pendingQuestion,
-            patientResponse: msg.content,
-            originalPatientText: msg.content,
-            originalLanguage: 'Hindi',
-            inputMode: msg.mode || 'voice',
-            timestamp: msg.timestamp || 'Just now',
-          });
+    let active = true;
+    setTimelineLoading(true);
+    setTimelineError(null);
+    authorizedClinicianFetch(
+      `/api/v1/doctor/patients/${patientDetail.intake_session_id}/conversation`,
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Conversation request failed with status ${response.status}`);
         }
+        return response.json();
+      })
+      .then((data) => {
+        if (!active) return;
+        setExchanges(Array.isArray(data.exchanges) ? data.exchanges : []);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setExchanges([]);
+        setTimelineError(
+          error instanceof Error ? error.message : 'Conversation timeline is unavailable.',
+        );
+      })
+      .finally(() => {
+        if (active) setTimelineLoading(false);
       });
 
-      if (builtExchanges.length > 0) {
-        setExchanges(builtExchanges);
-        return;
-      }
-    }
+    return () => {
+      active = false;
+    };
+  }, [patientDetail?.intake_session_id]);
 
-    // 2. Check voice history from localStorage
-    try {
-      const rawVoice = localStorage.getItem('swasthya_voice_history');
-      if (rawVoice) {
-        const voiceItems = JSON.parse(rawVoice);
-        if (Array.isArray(voiceItems) && voiceItems.length > 0) {
-          setExchanges(
-            voiceItems.map((v, idx) => ({
-              id: `voice-${idx}`,
-              category: v.category || 'Voice Intake',
-              questionText: v.questionText || 'Clinical Question',
-              patientResponse: v.answerText,
-              originalPatientText: v.answerText,
-              originalLanguage: 'Hindi',
-              inputMode: 'voice',
-              audioUrl: v.audioUrl,
-              timestamp: 'Recorded Today',
-            }))
-          );
-          return;
-        }
-      }
-    } catch {}
-
-    // 3. Fallback rich multi-modal intake conversation for demonstration
-    setExchanges([
-      {
-        id: 'ex-1',
-        category: 'Chief Health Concern',
-        questionText:
-          'Hello! I am SwasthyaVaani, your AI health assistant. What main symptom or health concern brings you in today?',
-        patientResponse:
-          'Severe crushing chest pressure radiating down my left arm.',
-        originalPatientText:
-          'मुझे सीने में बहुत तेज दबाव और दर्द हो रहा है जो बाएं हाथ तक जा रहा है।',
-        originalLanguage: 'Hindi',
-        inputMode: 'voice',
-        timestamp: '10:42 AM',
-        isImportant: true,
-      },
-      {
-        id: 'ex-2',
-        category: 'Onset & Duration',
-        questionText:
-          'When did this chest pressure start, and was it sudden or gradual?',
-        patientResponse:
-          'Started suddenly about 2 hours ago after climbing the stairs.',
-        originalPatientText:
-          'यह लगभग 2 घंटे पहले अचानक शुरू हुआ जब मैं सीढ़ियां चढ़ रहा था।',
-        originalLanguage: 'Hindi',
-        inputMode: 'voice',
-        timestamp: '10:43 AM',
-      },
-      {
-        id: 'ex-3',
-        category: 'Pain Severity Scale',
-        questionText:
-          'On a scale from 1 (mild) to 10 (unbearable), how severe is the chest discomfort right now?',
-        patientResponse:
-          'It is about an 8 out of 10. Feels very tight like a heavy weight.',
-        originalPatientText:
-          'यह 10 में से लगभग 8 है। बहुत भारी दबाव जैसा महसूस हो रहा है।',
-        originalLanguage: 'Hindi',
-        inputMode: 'voice',
-        timestamp: '10:44 AM',
-      },
-      {
-        id: 'ex-4',
-        category: 'Associated Symptoms',
-        questionText:
-          'Are you noticing any other symptoms like difficulty breathing, sweating, nausea, or dizziness?',
-        patientResponse:
-          'Yes, cold sweats and shortness of breath when trying to lie flat.',
-        originalPatientText:
-          'हाँ, ठंडा पसीना आ रहा है और सीधा लेटने पर सांस लेने में तकलीफ होती है।',
-        originalLanguage: 'Hindi',
-        inputMode: 'voice',
-        timestamp: '10:45 AM',
-        isImportant: true,
-      },
-      {
-        id: 'ex-5',
-        category: 'Medications & Health History',
-        questionText:
-          'Do you take any regular medicines for blood pressure, sugar, or heart conditions?',
-        patientResponse:
-          'Taking Telmisartan 40mg daily for high blood pressure for the past 3 years.',
-        originalPatientText:
-          'पिछले 3 साल से हाई ब्लड प्रेशर के लिए रोजाना टेल्मिसार्टन 40mg ले रहा हूँ।',
-        originalLanguage: 'Hindi',
-        inputMode: 'text',
-        timestamp: '10:46 AM',
-      },
-    ]);
-  }, [patientId]);
-
-  if (loading || !patientDetail) {
+  if (patientLoading) {
     return (
       <PatientRecordShell patientId={patientId}>
         <div className="flex h-96 items-center justify-center">
           <div className="flex items-center gap-3 font-mono text-sm text-[#5f786d]">
-            <RefreshCw className="animate-spin" size={20} /> Loading conversation dialog…
+            <RefreshCw className="animate-spin" size={20} /> Loading patient record...
           </div>
         </div>
       </PatientRecordShell>
     );
   }
 
-  const cs = patientDetail?.clinical_state || {};
+  if (!patientDetail) {
+    return (
+      <PatientRecordShell patientId={patientId}>
+        <div className="rounded-2xl border border-[#e5c7bd] bg-[#fff9f7] p-8 text-center">
+          <AlertTriangle size={30} className="mx-auto mb-3 text-[#b4533f]" />
+          <p className="font-semibold text-[#713b36]">Patient record unavailable</p>
+          <p className="mt-1 text-xs text-[#8b5954]">{patientError}</p>
+        </div>
+      </PatientRecordShell>
+    );
+  }
+
+  const cs = patientDetail.clinical_state || {};
 
   return (
     <PatientRecordShell patientId={patientId}>
       <div className="mx-auto max-w-5xl space-y-6 pb-12">
-        {/* Patient Context Header */}
         <PatientContextHeader
           token={patientDetail.token}
           patientName={patientDetail.patient_name}
@@ -177,8 +97,18 @@ export function DoctorPatientConversation() {
           confidence={cs.confidence}
         />
 
-        {/* Complete Chronological Conversation Timeline with [All] [Text] [Voice] Filter */}
-        <ConversationTimeline exchanges={exchanges} />
+        {timelineLoading ? (
+          <div className="flex h-48 items-center justify-center rounded-2xl border border-[#d8ddd3] bg-[#f8f7ef]">
+            <RefreshCw className="mr-2 animate-spin text-[#1f5b4e]" size={18} />
+            <span className="text-sm text-[#5f786d]">Loading persisted conversation...</span>
+          </div>
+        ) : timelineError ? (
+          <div className="rounded-2xl border border-[#e5c7bd] bg-[#fff9f7] p-6 text-center text-sm text-[#713b36]">
+            {timelineError}
+          </div>
+        ) : (
+          <ConversationTimeline exchanges={exchanges} />
+        )}
       </div>
     </PatientRecordShell>
   );

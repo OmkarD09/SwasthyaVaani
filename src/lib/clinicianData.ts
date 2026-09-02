@@ -63,58 +63,6 @@ export type PatientDetail = {
   submitted_at: string;
   clinician_notes?: string;
   fhir_bundle_id?: string;
+  documents: Array<Record<string, unknown>>;
+  timeline: Array<Record<string, unknown>>;
 };
-
-export const fallbackQueue: DoctorQueueItem[] = [
-  {
-    intake_session_id: 'intake_001',
-    token: 'A-204',
-    patient_id: 'pat_001',
-    patient_name: 'Ananya Sharma',
-    patient_age: 34,
-    patient_gender: 'Female',
-    chief_complaint: 'Crushing chest pressure radiating to left arm',
-    language_code: 'hi',
-    workflow_type: 'GENERAL_CLINICAL',
-    status: 'PRIORITY_REVIEW',
-    status_tone: 'red',
-    priority: 'Priority',
-    has_red_flags: true,
-    submitted_at: new Date().toISOString(),
-    wait_time_minutes: 12,
-  },
-  {
-    intake_session_id: 'intake_002',
-    token: 'A-205',
-    patient_id: 'pat_002',
-    patient_name: 'Ramesh Patel',
-    patient_age: 48,
-    patient_gender: 'Male',
-    chief_complaint: 'Knee stiffness, worse in the morning',
-    language_code: 'en',
-    workflow_type: 'AYUSH',
-    status: 'HISTORY_READY',
-    status_tone: 'amber',
-    priority: 'Routine',
-    has_red_flags: false,
-    submitted_at: new Date().toISOString(),
-    wait_time_minutes: 32,
-  },
-  {
-    intake_session_id: 'intake_003',
-    token: 'SV-2048',
-    patient_id: 'pat_003',
-    patient_name: 'Meena Kumari',
-    patient_age: 54,
-    patient_gender: 'Female',
-    chief_complaint: 'Persistent cough and throat irritation',
-    language_code: 'en',
-    workflow_type: 'GENERAL_CLINICAL',
-    status: 'HISTORY_READY',
-    status_tone: 'teal',
-    priority: 'Routine',
-    has_red_flags: false,
-    submitted_at: new Date().toISOString(),
-    wait_time_minutes: 4,
-  },
-];

@@ -121,6 +121,7 @@ export function PatientVoiceChat({
   const [finishReason, setFinishReason] = useState<string>('');
 
   const [intakeSessionId, setIntakeSessionId] = useState<string | null>(null);
+  const [currentQuestionEventId, setCurrentQuestionEventId] = useState<string | null>(null);
   const [redFlags, setRedFlags] = useState<string[]>([]);
 
   // History of completed Q&A pairs
@@ -165,6 +166,7 @@ export function PatientVoiceChat({
             setIntakeSessionId(data.id);
             localStorage.setItem('swasthya_active_intake_id', data.id);
             localStorage.setItem('swasthya_active_token', data.token || '');
+            localStorage.setItem('swasthya_active_patient_id', data.patient_id || '');
           }
         }
       } catch (err) {
@@ -525,6 +527,7 @@ export function PatientVoiceChat({
             input_mode: 'VOICE',
             language_code: langCode,
             audio_duration_seconds: 4.0,
+            question_event_id: currentQuestionEventId,
           }),
         });
 
@@ -532,6 +535,7 @@ export function PatientVoiceChat({
           const data = await res.json();
           const decision = data.decision;
           const updatedState = data.clinical_state;
+          setCurrentQuestionEventId(data.next_question_event_id ?? null);
 
           if (updatedState?.red_flags?.length > 0) {
             setRedFlags(updatedState.red_flags);
@@ -541,7 +545,7 @@ export function PatientVoiceChat({
           setQuestionCount(nextQCount);
 
           // Check if AI Engine says STOP or reached max 10 questions
-          if (decision?.action === 'STOP' || nextQCount > MAX_QUESTIONS) {
+          if (decision?.action === 'STOP' || decision?.action === 'ESCALATE') {
             setIsFinished(true);
             setFinishReason(decision?.reason || 'Clinical intake completed.');
 

@@ -1,18 +1,21 @@
 from datetime import datetime, timezone
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import require_doctor, get_current_user
 from app.core.events import ws_manager
-from app.models.intake import IntakeSession, ClinicalStateModel, Answer, QuestionEvent
-from app.models.user import Patient, Hospital, Doctor
-from app.models.review import PhysicianReviewModel, PhysicianEditModel, AuditEventModel
-from app.schemas.doctor import (
-    DoctorQueueItem, DoctorPatientDetail, PhysicianConfirmRequest, PhysicianConfirmResponse
-)
+from app.core.security import require_doctor
+from app.models.intake import Answer, ClinicalStateModel, IntakeSession, QuestionEvent
+from app.models.review import AuditEventModel, PhysicianEditModel, PhysicianReviewModel
+from app.models.user import Doctor, Hospital, Patient
 from app.schemas.clinical_state import ClinicalState
+from app.schemas.doctor import (
+    DoctorPatientDetail,
+    DoctorQueueItem,
+    PhysicianConfirmRequest,
+    PhysicianConfirmResponse,
+)
 from app.services.fhir.mapper import map_clinical_state_to_fhir_r4
 
 router = APIRouter(prefix="/doctor", tags=["Doctor Portal"])
@@ -31,13 +34,17 @@ async def doctor_queue_websocket(websocket: WebSocket):
             if data == "ping":
                 await websocket.send_json({"event": "PONG"})
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket)
-    except Exception:
+        pass
+    finally:
         ws_manager.disconnect(websocket)
 
 
-@router.get("/queue", response_model=List[DoctorQueueItem])
-def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_db)):
+@router.get("/queue", response_model=list[DoctorQueueItem])
+def get_doctor_queue(
+    doctor_id: str | None = None,
+    db: Session = Depends(get_db),
+    _current_user: dict = Depends(require_doctor),
+):
     """Retrieve prioritized patient queue for doctor workstation with optimized batch queries."""
     t_start = datetime.now(timezone.utc)
     
@@ -79,7 +86,7 @@ def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_
             answers_map[ans.intake_session_id] = ans
 
     now_utc = datetime.now(timezone.utc)
-    queue_items: List[DoctorQueueItem] = []
+    queue_items: list[DoctorQueueItem] = []
 
     for s in sessions:
         patient = patients_map.get(s.patient_id)
@@ -138,7 +145,11 @@ def get_doctor_queue(doctor_id: Optional[str] = None, db: Session = Depends(get_
 
 
 @router.get("/patients/{intake_id}", response_model=DoctorPatientDetail)
-def get_patient_clinical_detail(intake_id: str, db: Session = Depends(get_db)):
+def get_patient_clinical_detail(
+    intake_id: str,
+    db: Session = Depends(get_db),
+    _current_user: dict = Depends(require_doctor),
+):
     """Retrieve full structured history, Ayurveda assessment, and evidence for doctor review (0ms cached/fast DB)."""
     t_start = datetime.now(timezone.utc)
     
@@ -172,8 +183,8 @@ def get_patient_clinical_detail(intake_id: str, db: Session = Depends(get_db)):
         patient_name=patient.display_name if patient else "Patient",
         patient_age=patient.age if patient else None,
         patient_gender=patient.gender if patient else None,
-        hospital_name=hospital.name if hospital else "District Hospital",
-        doctor_name=doctor.display_name if doctor else "Attending Physician",
+        hospital_name=hospital.name if hospital else "Hospital not recorded",
+        doctor_name=doctor.display_name if doctor else "Clinician not recorded",
         workflow_type=session.workflow_type,
         language_code=session.language_code,
         status=session.status,
@@ -190,7 +201,11 @@ def get_patient_clinical_detail(intake_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/patients/{intake_id}/conversation")
-def get_patient_conversation_timeline(intake_id: str, db: Session = Depends(get_db)):
+def get_patient_conversation_timeline(
+    intake_id: str,
+    db: Session = Depends(get_db),
+    _current_user: dict = Depends(require_doctor),
+):
     """Retrieve the full chronological interview trajectory stored in the database."""
     session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
     if not session:
@@ -205,27 +220,25 @@ def get_patient_conversation_timeline(intake_id: str, db: Session = Depends(get_
     ).order_by(Answer.created_at.asc()).all()
 
     exchanges = []
-    for idx, ans in enumerate(answers):
+    for ans in answers:
         matching_q = None
         if ans.question_event_id:
             matching_q = next((q for q in questions if q.id == ans.question_event_id), None)
-        if not matching_q and idx < len(questions):
-            matching_q = questions[idx]
 
-        q_text = matching_q.question_text if matching_q else (
-            "What main symptom or health concern brings you in today?" if idx == 0 else "Could you provide more details about this?"
-        )
-        category = matching_q.target_field if matching_q else "Clinical Intake"
+        q_text = matching_q.question_text if matching_q else "Question event not recorded"
+        category = matching_q.target_field if matching_q else "Unlinked patient answer"
 
         exchanges.append({
             "id": ans.id,
+            "questionId": matching_q.id if matching_q else None,
+            "questionRecorded": matching_q is not None,
             "category": category.replace("_", " ").title(),
             "questionText": q_text,
             "patientResponse": ans.raw_text,
             "originalPatientText": ans.raw_text,
             "originalLanguage": ans.language_code or "en",
             "inputMode": ans.input_mode.lower() if ans.input_mode else "text",
-            "timestamp": ans.created_at.strftime("%I:%M %p") if ans.created_at else "Today"
+            "timestamp": ans.created_at.isoformat() if ans.created_at else None,
         })
 
     return {"intake_session_id": session.id, "exchanges": exchanges}
@@ -236,7 +249,7 @@ async def confirm_patient_history(
     intake_id: str,
     req: PhysicianConfirmRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_doctor),
 ):
     """
     Explicit Physician Confirmation of structured clinical history.
@@ -301,7 +314,7 @@ async def confirm_patient_history(
             intake_session_id=session.id,
             patient_id=session.patient_id,
             patient_name=patient.display_name if patient else "Patient",
-            doctor_name=doctor.display_name if doctor else "Dr. Ananya Rao",
+            doctor_name=doctor.display_name if doctor else "Attending Physician",
             state=state
         )
         fhir_bundle_id = bundle.id

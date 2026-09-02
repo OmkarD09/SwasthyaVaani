@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.config import settings
 from app.core.database import Base, get_db
+from app.core.security import create_access_token
 from app.main import app
 from app.services.providers.factory import provider_registry
 
@@ -67,3 +68,14 @@ def client(db):
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_headers():
+    def build(role: str) -> dict[str, str]:
+        token = create_access_token(
+            {"sub": f"test-{role.lower()}", "role": role, "name": f"Test {role}"}
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    return build

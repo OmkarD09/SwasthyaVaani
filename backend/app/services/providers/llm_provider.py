@@ -82,10 +82,21 @@ class MockLLMProvider(AbstractLLMProvider):
             return questions.get(target_field, "कृपया तुमच्या लक्षणांबद्दल थोडे अधिक सांगा.")
         else:
             questions = {
+                "open_gi_exploration": "Besides this, have you noticed vomiting, bowel changes, bloating, or appetite changes?",
+                "open_headache_exploration": "Besides the headache, have you noticed nausea, vision changes, weakness, or dizziness?",
                 "duration": "How long have you been experiencing these symptoms?",
                 "severity": "On a scale of 1 to 10, how severe is your pain or discomfort?",
                 "radiation": "Does the pain spread or radiate to your arm, neck, or back?",
                 "associated_symptoms": "Are you experiencing any other symptoms like shortness of breath or dizziness?",
+                "photophobia": "Does bright light or sound make your headache worse?",
+                "nausea_vomiting": "Have you had nausea or vomiting with the headache?",
+                "visual_aura": "Have you noticed flashing lights, blurred vision, or zigzag lines?",
+                "food_exposure": "Did you eat outside food or anything unusual before these symptoms began?",
+                "stool_frequency": "Approximately how many bowel movements have you had in the last 24 hours?",
+                "stool_consistency": "Were the stools watery, loose, formed, or unusually sticky?",
+                "dark_stool_onset": "When did you first notice the dark or black stools?",
+                "dark_stool_consistency": "Are the dark stools sticky or tar-like?",
+                "blood_in_stool": "Have you noticed red blood or black, tar-like stool?",
                 "appetite": "How is your appetite (Agni) and digestion pattern after meals?",
                 "bowel_habits": "How are your bowel habits (Koshtha) - regular, loose, or constipated?",
                 "sleep_pattern": "How is your sleep quality (Nidra), and do you wake up feeling refreshed?"

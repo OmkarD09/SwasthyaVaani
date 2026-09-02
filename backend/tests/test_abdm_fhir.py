@@ -1,5 +1,5 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from app.seed.seed_data import seed_database
 from app.services.fhir.abdm_validator import validate_nrc_abdm_bundle
 
@@ -25,7 +25,7 @@ def test_abha_verification_endpoint(client: TestClient):
     assert res_addr.json()["abha_address"] == "ananya.sharma@abdm"
 
 
-def test_nrces_bundle_validation_success(client: TestClient, db):
+def test_nrces_bundle_validation_success(client: TestClient, db, auth_headers):
     seed_database(db)
 
     # 1. Create and submit an intake
@@ -48,9 +48,12 @@ def test_nrces_bundle_validation_success(client: TestClient, db):
     client.post(f"/api/v1/intakes/{intake_id}/submit")
 
     # Doctor confirms history
-    client.post(f"/api/v1/doctor/patients/{intake_id}/confirm", json={
-        "generate_fhir": True
-    })
+    confirm_res = client.post(
+        f"/api/v1/doctor/patients/{intake_id}/confirm",
+        headers=auth_headers("DOCTOR"),
+        json={"generate_fhir": True},
+    )
+    assert confirm_res.status_code == 200
 
     # Export ABDM bundle
     abdm_res = client.get(f"/api/v1/abdm/bundle/{intake_id}")

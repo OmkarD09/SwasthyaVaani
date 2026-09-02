@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { type PatientDetail } from '../lib/clinicianData';
+import { authorizedClinicianFetch } from '../lib/clinicianAuth';
 
 export interface PatientRecordState {
   patientDetail: PatientDetail | null;
@@ -10,7 +11,6 @@ export interface PatientRecordState {
   note: string;
   setNote: (note: string) => void;
   confirmPatient: (edits?: Record<string, string>) => Promise<boolean>;
-  uploadedDocName: string | null;
 }
 
 export function usePatientRecord(patientId: string | undefined): PatientRecordState {
@@ -20,7 +20,6 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
   const [confirmed, setConfirmed] = useState(false);
   const [fhirId, setFhirId] = useState<string | null>(null);
   const [note, setNote] = useState('');
-  const [uploadedDocName, setUploadedDocName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!patientId) {
@@ -35,7 +34,7 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
 
     const loadDetail = async () => {
       try {
-        const res = await fetch(`/api/v1/doctor/patients/${patientId}`);
+        const res = await authorizedClinicianFetch(`/api/v1/doctor/patients/${patientId}`);
         if (!isMounted) return;
 
         if (res.ok) {
@@ -58,10 +57,6 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
         setPatientDetail(null);
       } finally {
         if (isMounted) {
-          try {
-            const savedDoc = localStorage.getItem('swasthya_uploaded_doc_name');
-            if (savedDoc) setUploadedDocName(savedDoc);
-          } catch {}
           setLoading(false);
         }
       }
@@ -76,7 +71,7 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
   const confirmPatient = async (edits: Record<string, string> = {}): Promise<boolean> => {
     if (!patientDetail) return false;
     try {
-      const res = await fetch(
+      const res = await authorizedClinicianFetch(
         `/api/v1/doctor/patients/${patientDetail.intake_session_id}/confirm`,
         {
           method: 'POST',
@@ -117,6 +112,5 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
     note,
     setNote,
     confirmPatient,
-    uploadedDocName,
   };
 }

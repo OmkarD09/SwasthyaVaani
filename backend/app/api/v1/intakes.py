@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -16,9 +16,10 @@ from app.schemas.intake import (
     IntakeCreateRequest,
     IntakeSessionDetail,
     IntakeSubmissionResponse,
+    VoiceAnswerSubmitResponse,
 )
 from app.services.clinical_ai.adaptive_engine import evaluate_next_question
-from app.services.providers.factory import get_llm_service
+from app.services.providers.factory import get_llm_service, get_speech_service
 
 router = APIRouter(prefix="/intakes", tags=["Patient Intake"])
 
@@ -125,18 +126,20 @@ def get_intake_session(intake_id: str, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/{intake_id}/answers", response_model=AnswerSubmitResponse)
-async def submit_answer(
-    intake_id: str, req: AnswerSubmitRequest, db: Session = Depends(get_db)
-):
+async def process_intake_answer_core(
+    *,
+    session: IntakeSession,
+    raw_text: str,
+    input_mode: str,
+    language_code: str,
+    audio_duration_seconds: float | None,
+    question_event_id: str | None,
+    db: Session,
+) -> AnswerSubmitResponse:
     """
     Ingest patient answer, extract structured facts dynamically using LLM (Gemini 2.5 Flash),
     evaluate safety rules, and compute next QuestionDecision.
     """
-    session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
-    if not session:
-        raise HTTPException(status_code=404, detail="Intake session not found")
-
     # Load current ClinicalState
     latest_state_model = (
         db.query(ClinicalStateModel)
@@ -149,35 +152,43 @@ async def submit_answer(
         **(latest_state_model.state_json if latest_state_model else {})
     )
 
+    question_event = None
+    if question_event_id:
+        question_event = (
+            db.query(QuestionEvent)
+            .filter(
+                QuestionEvent.id == question_event_id,
+                QuestionEvent.intake_session_id == session.id,
+            )
+            .first()
+        )
+        if not question_event:
+            raise HTTPException(
+                status_code=400,
+                detail="Question event does not belong to this intake session",
+            )
+
     # Save the answer record
     answer = Answer(
-        question_event_id=req.question_event_id,
+        question_event_id=question_event.id if question_event else None,
         intake_session_id=session.id,
-        raw_text=req.raw_text,
-        input_mode=req.input_mode,
-        language_code=req.language_code,
-        audio_duration_seconds=req.audio_duration_seconds,
+        raw_text=raw_text,
+        input_mode=input_mode,
+        language_code=language_code,
+        audio_duration_seconds=audio_duration_seconds,
     )
     db.add(answer)
     db.flush()
 
     # Determine target field from previous question event if available
-    target_field = ""
-    if req.question_event_id:
-        q_event = (
-            db.query(QuestionEvent)
-            .filter(QuestionEvent.id == req.question_event_id)
-            .first()
-        )
-        if q_event:
-            target_field = q_event.target_field
+    target_field = question_event.target_field if question_event else ""
 
     # Extract structured clinical updates dynamically via LLM (Gemini 2.5 Flash / Mock)
     llm = get_llm_service()
     extraction_res = await llm.extract_clinical_facts(
-        raw_text=req.raw_text,
+        raw_text=raw_text,
         current_state=current_state,
-        language_code=req.language_code or "en",
+        language_code=language_code or "en",
         target_field=target_field or "chief_complaint",
     )
 
@@ -188,17 +199,22 @@ async def submit_answer(
     updated_dict = current_state.model_dump()
     for k, v in extracted_facts.items():
         if v is not None:
-            updated_dict[k] = v
+            if k == "chief_complaint" and current_state.chief_complaint:
+                continue
+            if isinstance(v, list) and isinstance(updated_dict.get(k), list):
+                updated_dict[k] = [*updated_dict[k]]
+                for item in v:
+                    if item not in updated_dict[k]:
+                        updated_dict[k].append(item)
+            elif isinstance(v, dict) and isinstance(updated_dict.get(k), dict):
+                updated_dict[k] = {**updated_dict[k], **v}
+            else:
+                updated_dict[k] = v
     updated_state = ClinicalState(**updated_dict)
-
-    # Save new ClinicalState version
-    new_version = (latest_state_model.version + 1) if latest_state_model else 1
-    new_state_model = ClinicalStateModel(
-        intake_session_id=session.id,
-        version=new_version,
-        state_json=updated_state.model_dump(),
-    )
-    db.add(new_state_model)
+    if raw_text and raw_text not in updated_state.raw_transcript_snippets:
+        updated_state.raw_transcript_snippets.append(raw_text)
+    if not updated_state.chief_complaint and raw_text:
+        updated_state.chief_complaint = raw_text.strip()
 
     # Update session metrics
     session.question_count += 1
@@ -218,11 +234,12 @@ async def submit_answer(
         asked_questions=past_questions,
         consecutive_low_progress=0 if has_progress else 1,
         total_questions_asked=session.question_count,
-        language_code=req.language_code or "en",
+        language_code=language_code or "en",
         db=db,
     )
 
     # If action is ASK, persist QuestionEvent
+    next_question_event_id = None
     if decision.action == "ASK" and decision.question:
         q_event = QuestionEvent(
             intake_session_id=session.id,
@@ -233,8 +250,20 @@ async def submit_answer(
             reason=decision.reason,
         )
         db.add(q_event)
-    elif decision.action == "STOP":
+        db.flush()
+        next_question_event_id = q_event.id
+    elif decision.action in {"STOP", "ESCALATE"}:
         session.status = "READY_TO_SUBMIT"
+
+    # Persist the post-decision state so safety and reasoning updates are not lost.
+    new_version = (latest_state_model.version + 1) if latest_state_model else 1
+    db.add(
+        ClinicalStateModel(
+            intake_session_id=session.id,
+            version=new_version,
+            state_json=updated_state.model_dump(mode="json"),
+        )
+    )
 
     db.commit()
 
@@ -244,6 +273,91 @@ async def submit_answer(
         extracted_facts=extracted_facts,
         clinical_state=updated_state,
         decision=decision,
+        next_question_event_id=next_question_event_id,
+    )
+
+
+@router.post("/{intake_id}/answers", response_model=AnswerSubmitResponse)
+async def submit_answer(
+    intake_id: str, req: AnswerSubmitRequest, db: Session = Depends(get_db)
+):
+    """Process a text, voice transcript, or touch answer through one shared engine."""
+    session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Intake session not found")
+
+    try:
+        return await process_intake_answer_core(
+            session=session,
+            raw_text=req.raw_text,
+            input_mode=req.input_mode,
+            language_code=req.language_code or "en",
+            audio_duration_seconds=req.audio_duration_seconds,
+            question_event_id=req.question_event_id,
+            db=db,
+        )
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.post("/{intake_id}/voice-answer", response_model=VoiceAnswerSubmitResponse)
+async def submit_voice_answer(
+    intake_id: str,
+    file: UploadFile = File(...),
+    language_code: str | None = Form("hi"),
+    question_event_id: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    """Transcribe audio, run the shared adaptive engine, and optionally synthesize TTS."""
+    session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Intake session not found")
+
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio file provided")
+
+    speech = get_speech_service()
+    transcription = await speech.transcribe_audio(audio_bytes, language_code)
+    transcript = transcription.transcript_text.strip()
+    if not transcript:
+        raise HTTPException(status_code=422, detail="Speech provider returned no transcript")
+    detected_language = transcription.detected_language or language_code or "hi"
+
+    try:
+        result = await process_intake_answer_core(
+            session=session,
+            raw_text=transcript,
+            input_mode="VOICE",
+            language_code=detected_language,
+            audio_duration_seconds=None,
+            question_event_id=question_event_id,
+            db=db,
+        )
+    except Exception:
+        db.rollback()
+        raise
+
+    audio_base64 = None
+    if result.decision.action == "ASK" and result.decision.question:
+        try:
+            audio_base64 = await speech.text_to_speech(
+                result.decision.question, detected_language
+            )
+        except Exception:  # noqa: BLE001 - optional TTS must not discard saved intake data
+            audio_base64 = None
+
+    return VoiceAnswerSubmitResponse(
+        answer_id=result.answer_id,
+        intake_session_id=result.intake_session_id,
+        transcript_text=transcript,
+        detected_language=detected_language,
+        audio_base64=audio_base64,
+        extracted_facts=result.extracted_facts,
+        clinical_state=result.clinical_state,
+        decision=result.decision,
+        next_question_event_id=result.next_question_event_id,
     )
 
 
@@ -279,9 +393,12 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
         for rf in current_state.red_flags:
             red_flag_entry = RedFlagModel(
                 intake_session_id=session.id,
-                flag_type=rf,
-                description=f"Automated Clinical Red Flag: {rf}",
-                acknowledged_by_doctor=False,
+                rule_id=rf.rule_id,
+                title=rf.title,
+                reason=rf.reason,
+                severity=rf.severity,
+                evidence_json=rf.evidence_ids,
+                status=rf.status,
             )
             db.add(red_flag_entry)
 

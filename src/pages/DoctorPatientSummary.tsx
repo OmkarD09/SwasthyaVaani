@@ -38,10 +38,11 @@ import {
 } from 'lucide-react';
 import { usePatientRecord } from '../hooks/usePatientRecord';
 import { PatientRecordShell } from '../components/doctor/PatientRecordShell';
+import { authorizedClinicianFetch } from '../lib/clinicianAuth';
 
 export function DoctorPatientSummary() {
   const params = useParams<{ id: string }>();
-  const patientId = params?.id || 'pat_001';
+  const patientId = params?.id || '';
   const [, setLocation] = useLocation();
 
   const {
@@ -53,7 +54,6 @@ export function DoctorPatientSummary() {
     note,
     setNote,
     confirmPatient,
-    uploadedDocName,
   } = usePatientRecord(patientId);
 
   const [editing, setEditing] = useState(false);
@@ -67,7 +67,7 @@ export function DoctorPatientSummary() {
 
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/v1/doctor/queue')
+    authorizedClinicianFetch('/api/v1/doctor/queue')
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         if (isMounted && Array.isArray(data) && data.length > 0) {
@@ -246,6 +246,10 @@ export function DoctorPatientSummary() {
   const isConfirmed = confirmed || patientDetail.review_status === 'PHYSICIAN_CONFIRMED';
   const confidencePercent =
     typeof cs.confidence === 'number' ? Math.round(cs.confidence * 100) : null;
+  const languageLabel =
+    ({ hi: 'Hindi', mr: 'Marathi', en: 'English' } as Record<string, string>)[
+      patientDetail.language_code
+    ] || patientDetail.language_code || 'Not recorded';
 
   // Next patient in triage queue (safely defined)
   const currentIndex = Array.isArray(queue)
@@ -269,16 +273,13 @@ export function DoctorPatientSummary() {
         )
       : null;
 
-  // A locally remembered filename does not prove that document bytes were uploaded.
-  const attachedFiles: any[] = [];
-  if (uploadedDocName) {
-    attachedFiles.push({
-      name: uploadedDocName,
-      type: 'document',
-      uploadedAt: 'Selected locally - upload pending',
-      localOnly: true,
-    });
-  }
+  const attachedFiles: any[] = Array.isArray(patientDetail.documents)
+    ? patientDetail.documents
+    : [];
+  const lastUpdated = new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(patientDetail.submitted_at));
 
 
   return (
@@ -332,24 +333,24 @@ export function DoctorPatientSummary() {
                 )}
               </div>
               <p className="text-xs font-medium text-[#4b6358] font-sans">
-                Last updated: 18 Jun 2026, 09:10 AM
+                Last updated: {lastUpdated}
               </p>
             </div>
           </div>
         </div>
 
-        {/* FHIR Sync Notice Banner if confirmed */}
+        {/* FHIR bundle notice after a successful physician confirmation */}
         {fhirId && (
           <div className="flex items-center justify-between rounded-xl border border-[#86efac] bg-[#ecfdf5] p-3.5 text-xs text-[#065f46] shadow-xs">
             <div className="flex items-center gap-2 font-bold">
               <CheckCircle2 size={16} className="text-[#16a34a] shrink-0" />
               <span>
-                FHIR R4 Clinical Document Generated & Synced:{' '}
+                FHIR R4 Clinical Document Generated:{' '}
                 <strong className="font-mono text-[#022c22] font-black">{fhirId}</strong>
               </span>
             </div>
             <span className="rounded-full bg-[#bbf7d0] px-2.5 py-0.5 font-mono text-[10px] font-extrabold text-[#14532d]">
-              ABDM READY
+              BUNDLE READY
             </span>
           </div>
         )}
@@ -370,8 +371,14 @@ export function DoctorPatientSummary() {
               </div>
 
               <div>
-                <span className="rounded bg-[#fee2e2] px-2.5 py-0.5 font-mono text-[11px] font-extrabold text-[#991b1b] border border-[#fca5a5] inline-block mb-1.5">
-                  {hasPriorityAlert ? 'High Priority' : 'High Priority'}
+                <span
+                  className={`rounded px-2.5 py-0.5 font-mono text-[11px] font-extrabold border inline-block mb-1.5 ${
+                    hasPriorityAlert
+                      ? 'bg-[#fee2e2] text-[#991b1b] border-[#fca5a5]'
+                      : 'bg-[#ecfdf5] text-[#065f46] border-[#86efac]'
+                  }`}
+                >
+                  {hasPriorityAlert ? 'High Priority' : 'No priority alert'}
                 </span>
                 <p className="font-extrabold text-[15px] text-[#0a2f26]">
                   {hasPriorityAlert && redFlags[0]?.title
@@ -403,20 +410,20 @@ export function DoctorPatientSummary() {
                 </div>
                 <span className="inline-flex items-center gap-1 rounded-full border border-[#86efac] bg-[#ecfdf5] px-2.5 py-0.5 text-[11px] font-extrabold text-[#065f46]">
                   <Mic size={11} className="text-[#059669]" />
-                  <span>Voice Intake</span>
+                  <span>Recorded Intake</span>
                 </span>
               </div>
 
               <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] p-3.5 my-2 text-center flex items-center justify-center min-h-[64px]">
                 <p className="text-base font-extrabold text-[#0a2f26] leading-snug">
-                  &ldquo;{editedFields.chief_complaint || cs.chief_complaint || 'Knee stiffness, worse in the morning'}&rdquo;
+                  &ldquo;{editedFields.chief_complaint || cs.chief_complaint || 'Not recorded'}&rdquo;
                 </p>
               </div>
             </div>
 
             <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#274c3d] font-sans">
               <Languages size={13} className="text-[#059669]" />
-              <span>Original: <b className="text-[#0a2f26]">{patientDetail.language_code === 'hi' ? 'Hindi' : 'English'}</b> → <b className="text-[#0a2f26]">English</b></span>
+              <span>Recorded language: <b className="text-[#0a2f26]">{languageLabel}</b></span>
             </div>
           </div>
 
@@ -428,22 +435,22 @@ export function DoctorPatientSummary() {
                   INTAKE CONTEXT
                 </span>
                 <span className="rounded bg-[#dcfce7] px-2.5 py-0.5 font-mono text-[11px] font-extrabold text-[#14532d] border border-[#bbf7d0]">
-                  OPD 02
+                  {patientDetail.status}
                 </span>
               </div>
 
               <div className="space-y-1.5 text-xs">
                 <p className="flex items-center justify-between">
                   <span className="text-[#375347] font-semibold">Facility:</span>
-                  <strong className="text-[#0a2f26] font-extrabold">District Hospital</strong>
+                  <strong className="text-[#0a2f26] font-extrabold">{patientDetail.hospital_name}</strong>
                 </p>
                 <p className="flex items-center justify-between">
                   <span className="text-[#375347] font-semibold">Physician:</span>
-                  <strong className="text-[#0a2f26] font-extrabold">Dr. Ananya Rao</strong>
+                  <strong className="text-[#0a2f26] font-extrabold">{patientDetail.doctor_name}</strong>
                 </p>
                 <p className="flex items-center justify-between">
                   <span className="text-[#375347] font-semibold">Workflow:</span>
-                  <strong className="text-[#0a2f26] font-extrabold">{patientDetail.workflow_type || 'AYUSH'}</strong>
+                  <strong className="text-[#0a2f26] font-extrabold">{patientDetail.workflow_type || 'Not recorded'}</strong>
                 </p>
               </div>
             </div>
@@ -451,7 +458,7 @@ export function DoctorPatientSummary() {
             <div className="mt-2 pt-2 border-t border-[#e5eae4] text-xs font-semibold text-[#274c3d] flex items-center justify-between">
               <span>Adaptive intake verified</span>
               <span className="inline-flex items-center gap-1.5 font-extrabold text-[#059669]">
-                Live Sync <span className="h-2 w-2 rounded-full bg-[#16a34a] animate-pulse" />
+                API record <span className="h-2 w-2 rounded-full bg-[#16a34a]" />
               </span>
             </div>
           </div>
@@ -616,10 +623,10 @@ export function DoctorPatientSummary() {
               <span className="text-xs font-bold text-[#274c3d]">
                 {notesSavedNotice ? (
                   <span className="inline-flex items-center gap-1 font-extrabold text-[#16a34a]">
-                    <Check size={14} /> Saved to record
+                    <Check size={14} /> Prepared for confirmation
                   </span>
                 ) : (
-                  'Included in final EHR'
+                  'Saved when the clinical record is confirmed'
                 )}
               </span>
 
@@ -628,7 +635,7 @@ export function DoctorPatientSummary() {
                 onClick={handleSaveNotes}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#065f46] px-4 py-2 text-xs font-extrabold text-white hover:bg-[#044e39] transition cursor-pointer shadow-xs"
               >
-                <Check size={14} /> Save Notes
+                <Check size={14} /> Keep Notes
               </button>
             </div>
           </div>
@@ -649,7 +656,7 @@ export function DoctorPatientSummary() {
                 <p className="text-xs font-semibold text-[#274c3d] mt-0.5">
                   {isConfirmed
                     ? 'Clinical intake verified and confirmed by attending physician.'
-                    : 'Review and verify the AI-drafted clinical record before committing to EHR.'}
+                    : 'Review and verify the AI-drafted clinical record before physician confirmation.'}
                 </p>
               </div>
             </div>
@@ -676,7 +683,7 @@ export function DoctorPatientSummary() {
               {/* Button 2: Request More Info */}
               <button
                 type="button"
-                onClick={() => alert('Request for additional intake information dispatched to triage desk.')}
+                onClick={() => alert('Request-more-info workflow is not connected in this prototype.')}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-[#a2d4ba] bg-white px-4 py-2.5 text-xs font-extrabold text-[#065f46] hover:bg-[#ecfdf5] transition cursor-pointer shadow-2xs"
               >
                 <HelpCircle size={14} /> Request More Info
@@ -698,7 +705,7 @@ export function DoctorPatientSummary() {
               >
                 {isConfirmed ? (
                   <>
-                    <CheckCircle2 size={16} className="text-[#16a34a]" /> Record Confirmed & Synced
+                    <CheckCircle2 size={16} className="text-[#16a34a]" /> Record Confirmed
                   </>
                 ) : (
                   <>
@@ -738,12 +745,12 @@ export function DoctorPatientSummary() {
         </div>
       </div>
 
-      {/* Confirmation & ABDM FHIR Sync Modal */}
+      {/* Confirmation and FHIR bundle generation modal */}
       {syncOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#0a2f26]/60 p-5 backdrop-blur-xs">
           <div className="w-full max-w-lg rounded-3xl border border-[#d6ded5] bg-white p-6 sm:p-7 shadow-2xl">
             {syncSuccess || (isConfirmed && !isSubmitting) ? (
-              /* Pop Screen After Clicking Confirm and Sync */
+              /* Result after physician confirmation */
               <div>
                 <div className="flex items-center justify-between border-b border-[#e5eae4] pb-3.5">
                   <div className="flex items-center gap-3">
@@ -752,10 +759,10 @@ export function DoctorPatientSummary() {
                     </div>
                     <div>
                       <p className="font-mono text-[10px] font-extrabold uppercase tracking-wider text-[#15803d]">
-                        ABDM FHIR R4 Synced
+                        FHIR R4 Bundle Generated
                       </p>
                       <h2 className="font-serif text-xl font-bold text-[#0a2f26]">
-                        Record Confirmed & Synced!
+                        Record Confirmed
                       </h2>
                     </div>
                   </div>
@@ -773,7 +780,7 @@ export function DoctorPatientSummary() {
 
                 <div className="mt-4 space-y-3">
                   <p className="text-xs font-semibold leading-relaxed text-[#274c3d]">
-                    Physician verification for <b className="text-[#0a2f26]">{patientDetail.patient_name}</b> (Token #{patientDetail.token}) has been signed off and recorded into hospital EHR.
+                    Physician verification for <b className="text-[#0a2f26]">{patientDetail.patient_name}</b> (Token #{patientDetail.token}) has been recorded in the SwasthyaVaani review log.
                   </p>
 
                   <div className="flex items-center justify-between rounded-xl bg-[#ecfdf5] p-3 border border-[#a2d4ba] text-xs">
@@ -847,7 +854,7 @@ export function DoctorPatientSummary() {
                     <p className="font-mono text-[11px] font-extrabold uppercase tracking-[.18em] text-[#92400e]">
                       Physician Confirmation
                     </p>
-                    <h2 className="mt-0.5 font-serif text-2xl font-bold text-[#0a2f26]">Confirm & Sync Record?</h2>
+                    <h2 className="mt-0.5 font-serif text-2xl font-bold text-[#0a2f26]">Confirm Record & Generate FHIR?</h2>
                   </div>
                   <button
                     onClick={() => setSyncOpen(false)}
@@ -864,7 +871,7 @@ export function DoctorPatientSummary() {
                     <FileCheck2 size={16} /> Token #{patientDetail.token} · Ready for confirmation
                   </div>
                   <p className="mt-1 text-xs font-semibold text-[#274c3d]">
-                    Clinical history, doctor notes, and diagnostic observations will be committed to hospital records.
+                    Physician notes and any review edits will be stored with this confirmation.
                   </p>
                 </div>
                 <div className="mt-5 flex justify-end gap-2.5">
@@ -883,11 +890,11 @@ export function DoctorPatientSummary() {
                   >
                     {isSubmitting ? (
                       <>
-                        <RefreshCw size={14} className="animate-spin" /> Syncing FHIR…
+                        <RefreshCw size={14} className="animate-spin" /> Confirming record…
                       </>
                     ) : (
                       <>
-                        <CloudUpload size={15} /> Confirm & Sync FHIR
+                        <CloudUpload size={15} /> Confirm & Generate FHIR
                       </>
                     )}
                   </button>

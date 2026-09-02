@@ -20,6 +20,7 @@ import { Brand, AppButton } from '../components/Brand';
 import { getKioskTranslation } from '../lib/kioskTranslations';
 import { getStoredLanguage } from '../lib/kioskState';
 import { buildClinicalSummary } from '../lib/conversationStore';
+import { getStoredDocumentUpload } from '../lib/documentUploadState';
 import { patientApi } from '../services/patientApi';
 
 export function PatientReviewSummary() {
@@ -38,12 +39,8 @@ export function PatientReviewSummary() {
       if (p.age) setPatientAge(p.age);
     });
 
-    try {
-      const savedDoc = localStorage.getItem('swasthya_uploaded_doc_name');
-      if (savedDoc) setUploadedDocName(savedDoc);
-    } catch (e) {
-      console.warn('Load review summary error:', e);
-    }
+    const activeIntakeId = localStorage.getItem('swasthya_active_intake_id');
+    setUploadedDocName(getStoredDocumentUpload(activeIntakeId)?.file_name ?? null);
   }, []);
 
   const t = getKioskTranslation(language || 'English');

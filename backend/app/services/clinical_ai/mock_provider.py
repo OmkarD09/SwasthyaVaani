@@ -1,13 +1,14 @@
 import re
-from typing import Tuple, Dict, Any, Optional
-from app.schemas.clinical_state import ClinicalState, Medication, AyushState, Provenance
+from typing import Any
+
+from app.schemas.clinical_state import ClinicalState
 
 
 def extract_clinical_facts_from_answer(
     raw_answer: str,
     target_field: str,
     current_state: ClinicalState
-) -> Tuple[ClinicalState, Dict[str, Any], bool]:
+) -> tuple[ClinicalState, dict[str, Any], bool]:
     """
     Extracts structured facts from patient natural language answer and updates ClinicalState.
     Handles partial answers, discrete GI dimensions, and negated symptoms.
@@ -15,13 +16,17 @@ def extract_clinical_facts_from_answer(
     """
     updated_state = current_state.model_copy(deep=True)
     text = raw_answer.strip().lower()
+    is_vague_answer = text in {
+        "don't know",
+        "do not know",
+        "not sure",
+        "unsure",
+        "can't say",
+        "cannot say",
+    }
     updated_state.raw_transcript_snippets.append(raw_answer)
-    extracted: Dict[str, Any] = {}
+    extracted: dict[str, Any] = {}
     progress = False
-
-    # Mark target_field as resolved if valid response provided
-    if target_field and target_field not in updated_state.resolved_dimensions:
-        updated_state.resolved_dimensions.append(target_field)
 
     # Set Chief Complaint if not already set
     if not updated_state.chief_complaint:
@@ -293,9 +298,23 @@ def extract_clinical_facts_from_answer(
         progress = True
 
     # 17. Fallback capture for domain-specific open answers
-    if target_field and target_field not in extracted:
-        if len(text) > 0:
-            extracted[target_field] = raw_answer
-            progress = True
+    if target_field and target_field not in extracted and text and not is_vague_answer:
+        extracted[target_field] = raw_answer
+        progress = True
+
+    target_status = updated_state.dimension_status.get(target_field)
+    if progress and target_field and target_status not in {
+        "AMBIGUOUS",
+        "PARTIALLY_KNOWN",
+    }:
+        if target_field not in updated_state.resolved_dimensions:
+            updated_state.resolved_dimensions.append(target_field)
+        if (
+            target_field.startswith("open_")
+            and target_field not in updated_state.explored_areas
+        ):
+            updated_state.explored_areas.append(target_field)
+        extracted["resolved_dimensions"] = list(updated_state.resolved_dimensions)
+        extracted["explored_areas"] = list(updated_state.explored_areas)
 
     return updated_state, extracted, progress
