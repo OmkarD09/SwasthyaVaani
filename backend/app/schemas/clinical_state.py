@@ -70,6 +70,17 @@ class InformationGap(BaseModel):
     status: Literal["OPEN", "RESOLVED", "DEFERRED", "NOT_APPLICABLE"] = "OPEN"
 
 
+DimensionStatusType = Literal["UNKNOWN", "KNOWN_TRUE", "KNOWN_FALSE", "AMBIGUOUS", "KNOWN_WITH_VALUE"]
+
+
+class CanonicalDimensionState(BaseModel):
+    """Explicit state representation for every clinically relevant dimension."""
+    status: DimensionStatusType = "UNKNOWN"
+    value: Optional[Any] = None
+    characterization: Dict[str, Any] = Field(default_factory=dict) # e.g. laterality, onset, progression
+    last_updated_turn: Optional[int] = None
+
+
 class ClinicalState(BaseModel):
     """Primary structured representation of the patient clinical intake."""
     chief_complaint: Optional[str] = None
@@ -91,6 +102,11 @@ class ClinicalState(BaseModel):
     medications: List[Medication] = Field(default_factory=list)
     allergies: List[str] = Field(default_factory=list)
     investigations: List[Investigation] = Field(default_factory=list)
+    
+    # Canonical Dimension Tracking (Source of Truth for Candidate Generation)
+    canonical_dimensions: Dict[str, CanonicalDimensionState] = Field(default_factory=dict)
+    asked_dimension_history: List[str] = Field(default_factory=list)
+    last_non_informative_response: Optional[str] = None
     
     # Focused Domain Detail Tracking
     food_exposure: Optional[str] = None
@@ -119,3 +135,39 @@ class ClinicalState(BaseModel):
     missing_information: List[InformationGap] = Field(default_factory=list)
     confidence: float = Field(default=0.9, ge=0.0, le=1.0)
     raw_transcript_snippets: List[str] = Field(default_factory=list)
+
+    def set_canonical_dimension(
+        self,
+        dimension: str,
+        status: DimensionStatusType,
+        value: Any = None,
+        characterization: Optional[Dict[str, Any]] = None,
+        turn: Optional[int] = None
+    ) -> None:
+        """Sets or updates the explicit canonical state for a clinical dimension."""
+        char_dict = characterization or {}
+        existing = self.canonical_dimensions.get(dimension)
+        if existing and existing.characterization:
+            char_dict = {**existing.characterization, **char_dict}
+            
+        self.canonical_dimensions[dimension] = CanonicalDimensionState(
+            status=status,
+            value=value if value is not None else (existing.value if existing else None),
+            characterization=char_dict,
+            last_updated_turn=turn
+        )
+        if status in ["KNOWN_TRUE", "KNOWN_FALSE", "KNOWN_WITH_VALUE"]:
+            if dimension not in self.resolved_dimensions:
+                self.resolved_dimensions.append(dimension)
+            self.dimension_status[dimension] = "RESOLVED"
+        elif status == "AMBIGUOUS":
+            self.dimension_status[dimension] = "AMBIGUOUS"
+
+    def get_canonical_dimension(self, dimension: str) -> Optional[CanonicalDimensionState]:
+        return self.canonical_dimensions.get(dimension)
+
+    def is_dimension_sufficiently_known(self, dimension: str) -> bool:
+        dim_state = self.canonical_dimensions.get(dimension)
+        if not dim_state:
+            return False
+        return dim_state.status in ["KNOWN_TRUE", "KNOWN_FALSE", "KNOWN_WITH_VALUE"]

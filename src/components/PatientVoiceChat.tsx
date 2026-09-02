@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Mic,
   Volume2,
@@ -11,7 +11,6 @@ import {
   Clock,
   Waves
 } from 'lucide-react';
-import { getKioskTranslation } from '../lib/kioskTranslations';
 import { recordIntakeAnswer } from '../lib/conversationStore';
 
 const INITIAL_INTAKE_GREETING: Record<string, string> = {

@@ -63,7 +63,7 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
     state_model = ClinicalStateModel(
         intake_session_id=session.id,
         version=1,
-        state_json=init_state.model_dump()
+        state_json=init_state.model_dump(mode="json")
     )
     db.add(state_model)
     db.commit()
@@ -200,7 +200,7 @@ async def process_intake_answer_core(
     new_state_model = ClinicalStateModel(
         intake_session_id=session.id,
         version=new_version,
-        state_json=updated_state.model_dump()
+        state_json=updated_state.model_dump(mode="json")
     )
     db.add(new_state_model)
 
@@ -239,6 +239,8 @@ async def process_intake_answer_core(
     elif decision.action == "STOP":
         session.status = "READY_TO_SUBMIT"
 
+    # Persist the final updated state (including resolved dimensions, explored areas & canonical tracking)
+    new_state_model.state_json = updated_state.model_dump(mode="json")
     db.commit()
 
     return AnswerSubmitResponse(

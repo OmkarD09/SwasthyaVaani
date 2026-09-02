@@ -9,12 +9,20 @@ class ClinicalDomain:
     CARDIAC = "CARDIAC"
     FEVER = "FEVER"
     MUSCULOSKELETAL = "MUSCULOSKELETAL"
+    OPHTHALMIC = "OPHTHALMIC"
+    URINARY = "URINARY"
+    DERMATOLOGY = "DERMATOLOGY"
     AYUSH = "AYUSH"
     GENERAL = "GENERAL"
 
 
 # Keyword signal banks for domain detection
 DOMAIN_KEYWORDS = {
+    ClinicalDomain.OPHTHALMIC: [
+        "eye", "eyes", "red eye", "red eyes", "vision", "blurred vision", "blurry", "watering",
+        "tearing", "eye discharge", "eye pain", "itching eye",
+        "aankh", "aankhon", "dole", "aankhe lal", "aakhan", "लाल डोळे", "डोळा", "डोळे", "आँख", "आँखें", "आंख"
+    ],
     ClinicalDomain.HEADACHE: [
         "headache", "head ache", "head pain", "migraine", "throbbing", "forehead",
         "temple", "one side of head", "sir dard", "sar dard", "doke dukhi", "mastak", "cephalalgia",
@@ -44,6 +52,14 @@ DOMAIN_KEYWORDS = {
         "joint", "knee", "back pain", "backache", "neck pain", "shoulder", "swelling",
         "sprain", "stiffness", "kamar dard", "ghutna dard", "sandhivata", "path dukhi",
         "गुडघे", "सांधेदुखी", "कमर दर्द", "घुटने"
+    ],
+    ClinicalDomain.URINARY: [
+        "urine", "urination", "burning urination", "dysuria", "frequent urination", "peeshap", "peshab",
+        "mutra", "hematuria", "burning pee", "पेशाब", "लघवी", "मूत्र"
+    ],
+    ClinicalDomain.DERMATOLOGY: [
+        "rash", "skin", "itching", "pruritus", "hives", "spots", "khujli", "chaal", "twacha",
+        "skin allergy", "त्वचा", "खाज", "खुजली"
     ]
 }
 

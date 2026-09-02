@@ -34,10 +34,7 @@ def find_information_gaps(
         )
 
     # If no specific domain gaps open, ensure basic general gaps are provided if state is empty
-    if not gaps:
-        if not state.duration:
-            gaps.append(InformationGap(field_name="duration", priority="HIGH", reason="Duration of symptoms is unresolved", status="OPEN"))
-        if not state.onset:
-            gaps.append(InformationGap(field_name="onset", priority="HIGH", reason="Onset of symptoms is unresolved", status="OPEN"))
+    if not gaps and not state.duration and not is_field_already_resolved("duration", state):
+        gaps.append(InformationGap(field_name="duration", priority="HIGH", reason="Duration of symptoms is unresolved", status="OPEN"))
 
     return gaps
