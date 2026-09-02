@@ -8,6 +8,11 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.document import DocumentExtractionModel, DocumentModel
 from app.schemas.document import DocumentExtractionResult, DocumentUploadResponse
+from app.services.document_extraction import (
+    build_document_extraction_input,
+    extract_and_persist_candidates,
+    get_configured_document_extractor,
+)
 from app.services.document_intelligence import (
     DocumentValidationError,
     build_proposed_facts,
@@ -136,7 +141,13 @@ async def process_document_ocr(
     try:
         file_bytes = load_private_file(doc.storage_object_id)
         result = await ocr.process_document(file_bytes, doc.file_name, doc.mime_type)
-        replace_ocr_evidence(db, doc, result)
+        ocr_run = replace_ocr_evidence(db, doc, result)
+        db.commit()
+
+        extraction_input = build_document_extraction_input(db, doc, ocr_run)
+        extractor = get_configured_document_extractor()
+        await extract_and_persist_candidates(db, extractor, extraction_input)
+
         facts = build_proposed_facts(doc.id, result)
         for fact in facts:
             db.add(

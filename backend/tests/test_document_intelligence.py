@@ -5,8 +5,12 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from app.api.v1 import documents as documents_api
 from app.core.config import settings
 from app.models.document import (
+    DocumentCandidateEvidenceLinkModel,
+    DocumentCandidateModel,
+    DocumentCandidateSetModel,
     DocumentExtractionModel,
     DocumentModel,
     DocumentOCREvidenceModel,
@@ -15,12 +19,16 @@ from app.models.document import (
 from app.models.intake import ClinicalStateModel, IntakeSession
 from app.models.user import Doctor, Hospital, Patient
 from app.schemas.document import (
+    DocumentCandidateExtractionResult,
     DocumentEvidenceReference,
     HistoricalCandidate,
     LabCandidate,
     MedicationCandidate,
 )
-from app.services.document_intelligence import replace_ocr_evidence
+from app.services.document_intelligence import (
+    AbstractDocumentExtractor,
+    replace_ocr_evidence,
+)
 from app.services.providers.base import AbstractOCRProvider, OCRExtractionResult
 from app.services.providers.factory import ProviderRegistry, get_ocr_service
 from app.services.providers.ocr_provider import (
@@ -32,6 +40,14 @@ from app.services.providers.ocr_provider import (
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+class EmptyDocumentExtractor(AbstractDocumentExtractor):
+    provider_name = "SyntheticEmptyExtractor"
+    model_name = "synthetic-empty"
+
+    async def extract_candidates(self, extraction_input):
+        return DocumentCandidateExtractionResult()
 
 
 @pytest.fixture
@@ -68,6 +84,11 @@ def private_storage(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "DOCUMENT_STORAGE_DIR", str(tmp_path / "private"))
     monkeypatch.setattr(settings, "DOCUMENT_MAX_FILE_SIZE_BYTES", 10 * 1024 * 1024)
     monkeypatch.setattr(settings, "DOCUMENT_MAX_PAGE_COUNT", 20)
+    monkeypatch.setattr(
+        documents_api,
+        "get_configured_document_extractor",
+        lambda: EmptyDocumentExtractor(),
+    )
 
 
 def upload(
@@ -365,6 +386,51 @@ class CapturingOCRProvider(AbstractOCRProvider):
         )
 
 
+class GroundedEndpointOCRProvider(AbstractOCRProvider):
+    async def process_document(self, file_bytes: bytes, filename: str, mime_type: str):
+        return OCRExtractionResult(
+            document_type="PRESCRIPTION",
+            extracted_fields={},
+            confidence_score=0.91,
+            pages_processed=1,
+            provider_name="SyntheticEndpointOCR",
+            provider_version="test",
+            raw_text="Metformin 500 mg",
+            text_blocks=[
+                {
+                    "text": "Metformin 500 mg",
+                    "page": 1,
+                    "bounding_box": [1.0, 2.0, 3.0, 4.0],
+                    "confidence": 0.91,
+                }
+            ],
+        )
+
+
+class RecordingDocumentExtractor(AbstractDocumentExtractor):
+    provider_name = "SyntheticEndpointExtractor"
+    model_name = "synthetic-grounded"
+
+    def __init__(self):
+        self.extraction_input = None
+
+    async def extract_candidates(self, extraction_input):
+        self.extraction_input = extraction_input
+        evidence_id = extraction_input.evidence_blocks[0].evidence_id
+        return DocumentCandidateExtractionResult(
+            medications=[
+                MedicationCandidate(
+                    name="Metformin",
+                    strength_or_dose="500 mg",
+                    frequency=None,
+                    duration=None,
+                    source_evidence=[DocumentEvidenceReference(evidence_id=evidence_id)],
+                    extraction_confidence=0.88,
+                )
+            ]
+        )
+
+
 def test_processing_passes_exact_stored_bytes_to_provider(client, db, patient):
     content = b"\xff\xd8\xffexact-stored-image-bytes\xff\xd9"
     uploaded = upload(client, patient, "scan.jpg", content, "image/jpeg").json()
@@ -379,6 +445,44 @@ def test_processing_passes_exact_stored_bytes_to_provider(client, db, patient):
     assert provider.file_bytes == content
     assert db.query(DocumentExtractionModel).count() == 0
     assert db.query(DocumentOCRRunModel).count() == 1
+    assert db.query(ClinicalStateModel).count() == 0
+
+
+def test_process_endpoint_invokes_grounded_kunal_candidate_pipeline(
+    client, db, patient, monkeypatch
+):
+    content = b"\xff\xd8\xffsynthetic-grounded-document\xff\xd9"
+    uploaded = upload(client, patient, "grounded.jpg", content, "image/jpeg").json()
+    extractor = RecordingDocumentExtractor()
+    client.app.dependency_overrides[get_ocr_service] = GroundedEndpointOCRProvider
+    monkeypatch.setattr(
+        documents_api, "get_configured_document_extractor", lambda: extractor
+    )
+    try:
+        response = client.post(f"/api/v1/documents/{uploaded['document_id']}/process")
+    finally:
+        client.app.dependency_overrides.pop(get_ocr_service, None)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "NEEDS_REVIEW"
+    assert extractor.extraction_input is not None
+    assert len(extractor.extraction_input.evidence_blocks) == 1
+
+    candidate_set = db.query(DocumentCandidateSetModel).one()
+    candidate = db.query(DocumentCandidateModel).one()
+    link = db.query(DocumentCandidateEvidenceLinkModel).one()
+    evidence = db.query(DocumentOCREvidenceModel).one()
+    assert candidate_set.provider_name == extractor.provider_name
+    assert candidate_set.model_name == extractor.model_name
+    assert candidate.status == "NEEDS_REVIEW"
+    assert candidate.value_json == {
+        "name": "Metformin",
+        "strength_or_dose": "500 mg",
+        "frequency": None,
+        "duration": None,
+    }
+    assert link.candidate_id == candidate.id
+    assert link.evidence_id == evidence.id
     assert db.query(ClinicalStateModel).count() == 0
 
 
