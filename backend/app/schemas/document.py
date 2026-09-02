@@ -46,10 +46,31 @@ class ExtractedFact(BaseModel):
     status: Literal["NEEDS_REVIEW"] = "NEEDS_REVIEW"
 
 
+class ReviewEvidenceBlock(BaseModel):
+    evidence_id: str
+    source_text: str
+    page: int = Field(ge=1)
+    bounding_box: list[float] | None = None
+    ocr_confidence: float = Field(ge=0.0, le=1.0)
+    provider_name: str
+    provider_version: str
+
+
+class DocumentReviewCandidate(BaseModel):
+    candidate_id: str
+    candidate_type: Literal["MEDICATION", "LAB", "HISTORICAL"]
+    value: dict[str, Any]
+    status: Literal["NEEDS_REVIEW"]
+    extraction_confidence: float = Field(ge=0.0, le=1.0)
+    document_id: str
+    evidence: list[ReviewEvidenceBlock] = Field(min_length=1)
+
+
 class DocumentExtractionResult(BaseModel):
     document_id: str
     status: Literal["NEEDS_REVIEW", "PROCESSING_FAILED"]
     extracted_facts: list[ExtractedFact] = Field(default_factory=list)
+    review_candidates: list[DocumentReviewCandidate] = Field(default_factory=list)
     raw_ocr_text: str | None = None
     processed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

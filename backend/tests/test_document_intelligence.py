@@ -539,6 +539,70 @@ class RecordingDocumentExtractor(AbstractDocumentExtractor):
         )
 
 
+class LabEndpointOCRProvider(AbstractOCRProvider):
+    async def process_document(self, file_bytes: bytes, filename: str, mime_type: str):
+        return OCRExtractionResult(
+            document_type="LAB_REPORT",
+            extracted_fields={},
+            confidence_score=0.89,
+            pages_processed=1,
+            provider_name="SyntheticEndpointOCR",
+            provider_version="test",
+            raw_text="Hemoglobin 12.4 g/dL",
+            text_blocks=[
+                {
+                    "text": "Hemoglobin 12.4 g/dL",
+                    "page": 1,
+                    "bounding_box": [5.0, 6.0, 7.0, 8.0],
+                    "confidence": 0.89,
+                }
+            ],
+        )
+
+
+class LabDocumentExtractor(AbstractDocumentExtractor):
+    provider_name = "SyntheticEndpointExtractor"
+    model_name = "synthetic-grounded"
+
+    async def extract_candidates(self, extraction_input):
+        evidence_id = extraction_input.evidence_blocks[0].evidence_id
+        return DocumentCandidateExtractionResult(
+            labs=[
+                LabCandidate(
+                    test_name="Hemoglobin",
+                    value="12.4",
+                    unit="g/dL",
+                    reference_range=None,
+                    date=None,
+                    source_evidence=[
+                        DocumentEvidenceReference(evidence_id=evidence_id)
+                    ],
+                    extraction_confidence=0.84,
+                )
+            ]
+        )
+
+
+class UnsupportedDocumentExtractor(AbstractDocumentExtractor):
+    provider_name = "SyntheticEndpointExtractor"
+    model_name = "synthetic-unsupported"
+
+    async def extract_candidates(self, extraction_input):
+        evidence_id = extraction_input.evidence_blocks[0].evidence_id
+        return DocumentCandidateExtractionResult(
+            medications=[
+                MedicationCandidate(
+                    name="Metformin",
+                    strength_or_dose="1000 mg",
+                    source_evidence=[
+                        DocumentEvidenceReference(evidence_id=evidence_id)
+                    ],
+                    extraction_confidence=0.5,
+                )
+            ]
+        )
+
+
 def test_processing_passes_exact_stored_bytes_to_provider(client, db, patient):
     content = b"\xff\xd8\xffexact-stored-image-bytes\xff\xd9"
     uploaded = upload(client, patient, "scan.jpg", content, "image/jpeg").json()
@@ -572,7 +636,8 @@ def test_process_endpoint_invokes_grounded_kunal_candidate_pipeline(
         client.app.dependency_overrides.pop(get_ocr_service, None)
 
     assert response.status_code == 200
-    assert response.json()["status"] == "NEEDS_REVIEW"
+    payload = response.json()
+    assert payload["status"] == "NEEDS_REVIEW"
     assert extractor.extraction_input is not None
     assert len(extractor.extraction_input.evidence_blocks) == 1
 
@@ -591,6 +656,100 @@ def test_process_endpoint_invokes_grounded_kunal_candidate_pipeline(
     }
     assert link.candidate_id == candidate.id
     assert link.evidence_id == evidence.id
+    assert len(payload["review_candidates"]) == 1
+    review = payload["review_candidates"][0]
+    assert review == {
+        "candidate_id": candidate.id,
+        "candidate_type": "MEDICATION",
+        "value": {
+            "name": "Metformin",
+            "strength_or_dose": "500 mg",
+            "frequency": None,
+            "duration": None,
+        },
+        "status": "NEEDS_REVIEW",
+        "extraction_confidence": 0.88,
+        "document_id": uploaded["document_id"],
+        "evidence": [
+            {
+                "evidence_id": evidence.id,
+                "source_text": "Metformin 500 mg",
+                "page": 1,
+                "bounding_box": [1.0, 2.0, 3.0, 4.0],
+                "ocr_confidence": 0.91,
+                "provider_name": "SyntheticEndpointOCR",
+                "provider_version": "test",
+            }
+        ],
+    }
+    assert payload["extracted_facts"][0]["proposed_value"] == review["value"]
+    assert payload["extracted_facts"][0]["status"] == "NEEDS_REVIEW"
+    status_response = client.get(
+        f"/api/v1/documents/{uploaded['document_id']}/status"
+    )
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["review_candidate_count"] == 1
+    assert status_payload["review_candidates"] == [review]
+    assert db.query(ClinicalStateModel).count() == 0
+
+
+def test_lab_review_candidate_is_returned_without_interpretation(
+    client, db, patient, monkeypatch
+):
+    content = b"\xff\xd8\xffsynthetic-lab-document\xff\xd9"
+    uploaded = upload(
+        client, patient, "lab.jpg", content, "image/jpeg", "LAB_REPORT"
+    ).json()
+    client.app.dependency_overrides[get_ocr_service] = LabEndpointOCRProvider
+    monkeypatch.setattr(
+        documents_api,
+        "get_configured_document_extractor",
+        lambda: LabDocumentExtractor(),
+    )
+    try:
+        response = client.post(f"/api/v1/documents/{uploaded['document_id']}/process")
+    finally:
+        client.app.dependency_overrides.pop(get_ocr_service, None)
+
+    assert response.status_code == 200
+    review = response.json()["review_candidates"][0]
+    assert review["candidate_type"] == "LAB"
+    assert review["value"] == {
+        "test_name": "Hemoglobin",
+        "value": "12.4",
+        "unit": "g/dL",
+        "reference_range": None,
+        "date": None,
+    }
+    assert review["evidence"][0]["source_text"] == "Hemoglobin 12.4 g/dL"
+    assert not any(
+        interpretation in str(review).upper()
+        for interpretation in ("NORMAL", "LOW", "HIGH", "ELEVATED")
+    )
+    assert db.query(ClinicalStateModel).count() == 0
+
+
+def test_unsupported_candidate_returns_no_partial_review_response(
+    client, db, patient, monkeypatch
+):
+    content = b"\xff\xd8\xffsynthetic-unsupported-document\xff\xd9"
+    uploaded = upload(client, patient, "unsupported.jpg", content, "image/jpeg").json()
+    client.app.dependency_overrides[get_ocr_service] = GroundedEndpointOCRProvider
+    monkeypatch.setattr(
+        documents_api,
+        "get_configured_document_extractor",
+        lambda: UnsupportedDocumentExtractor(),
+    )
+    try:
+        response = client.post(f"/api/v1/documents/{uploaded['document_id']}/process")
+    finally:
+        client.app.dependency_overrides.pop(get_ocr_service, None)
+
+    assert response.status_code == 502
+    assert "review_candidates" not in response.json()
+    assert db.query(DocumentCandidateModel).count() == 0
+    assert db.query(DocumentCandidateEvidenceLinkModel).count() == 0
     assert db.query(ClinicalStateModel).count() == 0
 
 

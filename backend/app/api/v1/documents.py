@@ -6,9 +6,24 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.document import DocumentExtractionModel, DocumentModel
-from app.schemas.document import DocumentExtractionResult, DocumentUploadResponse
+from app.models.document import (
+    DocumentCandidateEvidenceLinkModel,
+    DocumentCandidateModel,
+    DocumentCandidateSetModel,
+    DocumentExtractionModel,
+    DocumentModel,
+    DocumentOCREvidenceModel,
+    DocumentOCRRunModel,
+)
+from app.schemas.document import (
+    DocumentExtractionResult,
+    DocumentReviewCandidate,
+    DocumentUploadResponse,
+    ExtractedFact,
+    ReviewEvidenceBlock,
+)
 from app.services.document_extraction import (
+    DocumentCandidateValidationError,
     build_document_extraction_input,
     extract_and_persist_candidates,
     get_configured_document_extractor,
@@ -26,6 +41,116 @@ from app.services.providers.base import AbstractOCRProvider
 from app.services.providers.factory import get_ocr_service
 
 router = APIRouter(prefix="/documents", tags=["Medical Documents & OCR"])
+
+
+def _load_review_candidates(
+    db: Session,
+    document_id: str,
+    ocr_run_id: str,
+) -> list[DocumentReviewCandidate]:
+    """Load review data exclusively from persisted candidates and OCR evidence."""
+    candidates = (
+        db.query(DocumentCandidateModel)
+        .filter_by(document_id=document_id, ocr_run_id=ocr_run_id)
+        .order_by(DocumentCandidateModel.created_at, DocumentCandidateModel.id)
+        .all()
+    )
+    review_candidates = []
+    for candidate in candidates:
+        linked_evidence = (
+            db.query(DocumentOCREvidenceModel)
+            .join(
+                DocumentCandidateEvidenceLinkModel,
+                DocumentCandidateEvidenceLinkModel.evidence_id
+                == DocumentOCREvidenceModel.id,
+            )
+            .filter(
+                DocumentCandidateEvidenceLinkModel.candidate_id == candidate.id,
+                DocumentOCREvidenceModel.document_id == document_id,
+                DocumentOCREvidenceModel.ocr_run_id == ocr_run_id,
+            )
+            .order_by(DocumentOCREvidenceModel.block_index)
+            .all()
+        )
+        link_count = (
+            db.query(DocumentCandidateEvidenceLinkModel)
+            .filter_by(candidate_id=candidate.id)
+            .count()
+        )
+        if not linked_evidence or len(linked_evidence) != link_count:
+            raise DocumentCandidateValidationError(
+                "Candidate evidence linkage crossed its document or OCR run"
+            )
+        review_candidates.append(
+            DocumentReviewCandidate(
+                candidate_id=candidate.id,
+                candidate_type=candidate.candidate_type,
+                value=candidate.value_json,
+                status=candidate.status,
+                extraction_confidence=candidate.extraction_confidence,
+                document_id=candidate.document_id,
+                evidence=[
+                    ReviewEvidenceBlock(
+                        evidence_id=evidence.id,
+                        source_text=evidence.text,
+                        page=evidence.page_number,
+                        bounding_box=evidence.bounding_box_json,
+                        ocr_confidence=evidence.confidence,
+                        provider_name=evidence.run.provider_name,
+                        provider_version=evidence.run.provider_version,
+                    )
+                    for evidence in linked_evidence
+                ],
+            )
+        )
+    return review_candidates
+
+
+def _review_candidates_as_extracted_facts(
+    db: Session,
+    candidates: list[DocumentReviewCandidate],
+) -> list[ExtractedFact]:
+    """Build the legacy response view from persisted, untrusted review rows."""
+    facts = []
+    for candidate in candidates:
+        if candidate.candidate_type not in {"MEDICATION", "LAB"}:
+            continue
+        candidate_row = db.query(DocumentCandidateModel).filter_by(
+            id=candidate.candidate_id
+        ).one()
+        candidate_set = db.query(DocumentCandidateSetModel).filter_by(
+            id=candidate_row.candidate_set_id
+        ).one()
+        first_evidence = candidate.evidence[0]
+        field_name = (
+            candidate.value.get("name")
+            or candidate.value.get("test_name")
+            or candidate.candidate_type
+        )
+        facts.append(
+            ExtractedFact(
+                field_type=candidate.candidate_type,
+                field_name=str(field_name),
+                proposed_value=candidate.value,
+                original_source_text="\n".join(
+                    evidence.source_text for evidence in candidate.evidence
+                ),
+                document_id=candidate.document_id,
+                source_page=first_evidence.page,
+                bounding_box=first_evidence.bounding_box,
+                ocr_confidence=min(
+                    evidence.ocr_confidence for evidence in candidate.evidence
+                ),
+                extraction_confidence=candidate.extraction_confidence,
+                engine_name=first_evidence.provider_name,
+                engine_version=first_evidence.provider_version,
+                extractor_version=(
+                    f"{candidate_set.provider_name}/{candidate_set.model_name}"
+                ),
+                status="NEEDS_REVIEW",
+            )
+        )
+    return facts
 
 
 @router.post("/upload", response_model=DocumentUploadResponse, status_code=202)
@@ -110,12 +235,25 @@ def get_document_status(document_id: str, db: Session = Depends(get_db)):
         .filter(DocumentExtractionModel.document_id == doc.id)
         .count()
     )
+    latest_ocr_run = (
+        db.query(DocumentOCRRunModel)
+        .filter_by(document_id=doc.id)
+        .order_by(DocumentOCRRunModel.created_at.desc())
+        .first()
+    )
+    review_candidates = (
+        _load_review_candidates(db, doc.id, latest_ocr_run.id)
+        if latest_ocr_run
+        else []
+    )
     return {
         "document_id": doc.id,
         "status": doc.status,
         "file_name": doc.file_name,
         "document_type": doc.document_type,
         "extraction_count": extraction_count,
+        "review_candidate_count": len(review_candidates),
+        "review_candidates": review_candidates,
         "uploaded_at": doc.uploaded_at,
         "processed_at": doc.processed_at,
     }
@@ -147,8 +285,13 @@ async def process_document_ocr(
         extraction_input = build_document_extraction_input(db, doc, ocr_run)
         extractor = get_configured_document_extractor()
         await extract_and_persist_candidates(db, extractor, extraction_input)
+        db.flush()
 
-        facts = build_proposed_facts(doc.id, result)
+        review_candidates = _load_review_candidates(db, doc.id, ocr_run.id)
+
+        facts = _review_candidates_as_extracted_facts(db, review_candidates)
+        if not facts and not review_candidates:
+            facts = build_proposed_facts(doc.id, result)
         for fact in facts:
             db.add(
                 DocumentExtractionModel(
@@ -177,6 +320,7 @@ async def process_document_ocr(
             document_id=doc.id,
             status="NEEDS_REVIEW",
             extracted_facts=facts,
+            review_candidates=review_candidates,
             raw_ocr_text=result.raw_text,
         )
     except Exception as exc:
