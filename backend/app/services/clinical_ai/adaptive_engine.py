@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional, Any, Set, Tuple, Dict
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,8 @@ from app.services.safety.contradictions import detect_contradictions
 from app.core.config import settings
 from app.services.providers.factory import get_llm_service
 from app.services.rag.rag_service import rag_service
+
+logger = logging.getLogger(__name__)
 
 
 def is_semantic_duplicate(candidate: str, asked_questions: List[str]) -> bool:
@@ -352,17 +355,12 @@ async def evaluate_next_question(
                 state.active_exploration_mode = reasoning_mode
                 break
 
-    # FORENSIC AUDIT DEBUG LOGGING
-    print(f"\n[FORENSIC DEBUG] ================= Turn {total_questions_asked} =================")
-    print(f"[FORENSIC DEBUG] Chief Complaint: {state.chief_complaint}")
-    print(f"[FORENSIC DEBUG] Canonical Dimensions: {dict(state.canonical_dimensions)}")
-    print(f"[FORENSIC DEBUG] Resolved Dimensions: {state.resolved_dimensions}")
-    print(f"[FORENSIC DEBUG] Explored Areas: {state.explored_areas}")
-    print(f"[FORENSIC DEBUG] Asked Questions ({len(asked_questions)}): {asked_questions}")
-    print(f"[FORENSIC DEBUG] Viable Candidates ({len(viable_candidates)}): {[(c['field_name'], c['score'], c.get('canonical_dimension')) for c in viable_candidates[:5]]}")
-    print(f"[FORENSIC DEBUG] Selected Candidate: field={target_field}, canon={MAP_TO_CANONICAL.get(target_field, target_field)}, score={selected_candidate['score']}, mode={reasoning_mode}")
-    print(f"[FORENSIC DEBUG] Generated Question: {selected_question}")
-    print(f"[FORENSIC DEBUG] =========================================================\n")
+    # Structured Forensic Debug Logging
+    logger.debug(
+        f"[FORENSIC DEBUG] Turn {total_questions_asked}: CC='{state.chief_complaint}', "
+        f"Selected='{target_field}' (mode={reasoning_mode}, score={selected_candidate['score']}), "
+        f"Explored={state.explored_areas}, Resolved={state.resolved_dimensions}"
+    )
 
     # Record target dimension in resolved tracking
     if target_field not in state.resolved_dimensions:

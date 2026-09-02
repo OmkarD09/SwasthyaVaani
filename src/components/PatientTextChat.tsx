@@ -197,6 +197,7 @@ export function PatientTextChat({
   const [isThinking, setIsThinking] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [intakeSessionId, setIntakeSessionId] = useState<string | null>(null);
+  const [currentQuestionEventId, setCurrentQuestionEventId] = useState<string | null>(null);
 
   useEffect(() => {
     async function initSession() {
@@ -262,6 +263,7 @@ export function PatientTextChat({
             raw_text: trimmedAnswer,
             input_mode: 'TEXT',
             language_code: langCode,
+            question_event_id: currentQuestionEventId || undefined,
           }),
         });
 
@@ -269,6 +271,8 @@ export function PatientTextChat({
           const data = await res.json();
           const decision = data.decision;
           const targetField = decision?.target_field || 'symptom';
+          const nextQEventId = data.question_event_id || decision?.question_event_id || null;
+          setCurrentQuestionEventId(nextQEventId);
 
           // Record in unified conversation store
           recordIntakeAnswer(

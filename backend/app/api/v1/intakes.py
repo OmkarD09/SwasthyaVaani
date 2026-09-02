@@ -136,14 +136,42 @@ async def process_intake_answer_core(
     Processes patient natural language input, performs entity extraction, updates versioned ClinicalState,
     and runs the Domain-Aware Adaptive Question Engine and Safety Guardrails.
     """
-    # Load current ClinicalState
+    # 1. Load current ClinicalState
     latest_state_model = db.query(ClinicalStateModel).filter(
         ClinicalStateModel.intake_session_id == session.id
     ).order_by(ClinicalStateModel.version.desc()).first()
     
     current_state = ClinicalState(**(latest_state_model.state_json if latest_state_model else {}))
+
+    # 2. Determine target field with robust fallback:
+    # If question_event_id was provided, verify and use its target_field.
+    # If question_event_id is missing, look up the latest QuestionEvent for this session.
+    # Distinguish:
+    # - FIRST ANSWER: No previous QuestionEvent exists in DB -> chief_complaint is valid.
+    # - SUBSEQUENT ANSWER: A previous QuestionEvent exists -> resolve against that question's target_field.
+    target_field = ""
+    prev_q_event = None
+    if question_event_id:
+        prev_q_event = db.query(QuestionEvent).filter(
+            QuestionEvent.id == question_event_id,
+            QuestionEvent.intake_session_id == session.id
+        ).first()
+        if prev_q_event:
+            target_field = prev_q_event.target_field
+
+    if not target_field:
+        prev_q_event = db.query(QuestionEvent).filter(
+            QuestionEvent.intake_session_id == session.id
+        ).order_by(QuestionEvent.sequence_number.desc()).first()
+        if prev_q_event:
+            target_field = prev_q_event.target_field
+            if not question_event_id:
+                question_event_id = prev_q_event.id
+        else:
+            # Genuine FIRST ANSWER: No previous QuestionEvent in DB -> chief_complaint is valid
+            target_field = "chief_complaint"
     
-    # Save the answer record with modality provenance
+    # 3. Save the answer record with modality provenance and linked QuestionEvent
     answer = Answer(
         question_event_id=question_event_id,
         intake_session_id=session.id,
@@ -155,26 +183,19 @@ async def process_intake_answer_core(
     db.add(answer)
     db.flush()
 
-    # Determine target field from previous question event if available
-    target_field = ""
-    if question_event_id:
-        q_event = db.query(QuestionEvent).filter(QuestionEvent.id == question_event_id).first()
-        if q_event:
-            target_field = q_event.target_field
-
-    # Extract structured clinical updates dynamically via LLM (Groq / Gemini / Mock)
+    # 4. Extract structured clinical updates dynamically via LLM / Rule Provider against resolved target_field
     llm = get_llm_service()
     extraction_res = await llm.extract_clinical_facts(
         raw_text=raw_text,
         current_state=current_state,
         language_code=language_code or "en",
-        target_field=target_field or "chief_complaint"
+        target_field=target_field
     )
 
     extracted_facts = extraction_res.extracted_facts
     has_progress = len(extracted_facts) > 0
 
-    # Merge extracted facts into current clinical state
+    # 5. Merge extracted facts into current clinical state
     updated_dict = current_state.model_dump()
     for k, v in extracted_facts.items():
         if v is not None:
@@ -195,15 +216,6 @@ async def process_intake_answer_core(
     if not updated_state.chief_complaint and raw_text:
         updated_state.chief_complaint = raw_text.strip()
 
-    # Save new ClinicalState version
-    new_version = (latest_state_model.version + 1) if latest_state_model else 1
-    new_state_model = ClinicalStateModel(
-        intake_session_id=session.id,
-        version=new_version,
-        state_json=updated_state.model_dump(mode="json")
-    )
-    db.add(new_state_model)
-
     # Update session metrics
     session.question_count += 1
     
@@ -214,7 +226,7 @@ async def process_intake_answer_core(
         ).all()
     ]
 
-    # Evaluate Adaptive Next Question Decision
+    # 6. Evaluate Adaptive Next Question Decision
     decision = await evaluate_next_question(
         state=updated_state,
         workflow_type=session.workflow_type,
@@ -225,7 +237,8 @@ async def process_intake_answer_core(
         db=db
     )
 
-    # If action is ASK, persist QuestionEvent
+    # 7. Persist QuestionEvent if action is ASK, and assign returned ID
+    new_q_event_id = None
     if decision.action == "ASK" and decision.question:
         q_event = QuestionEvent(
             intake_session_id=session.id,
@@ -236,16 +249,26 @@ async def process_intake_answer_core(
             reason=decision.reason
         )
         db.add(q_event)
+        db.flush()
+        new_q_event_id = q_event.id
+        decision.question_event_id = new_q_event_id
     elif decision.action == "STOP":
         session.status = "READY_TO_SUBMIT"
 
-    # Persist the final updated state (including resolved dimensions, explored areas & canonical tracking)
-    new_state_model.state_json = updated_state.model_dump(mode="json")
+    # 8. Save final post-evaluation ClinicalState version (authoritative state persistence)
+    new_version = (latest_state_model.version + 1) if latest_state_model else 1
+    new_state_model = ClinicalStateModel(
+        intake_session_id=session.id,
+        version=new_version,
+        state_json=updated_state.model_dump(mode="json")
+    )
+    db.add(new_state_model)
     db.commit()
 
     return AnswerSubmitResponse(
         answer_id=answer.id,
         intake_session_id=session.id,
+        question_event_id=new_q_event_id,
         extracted_facts=extracted_facts,
         clinical_state=updated_state,
         decision=decision
@@ -321,6 +344,7 @@ async def submit_voice_answer(
     return VoiceAnswerSubmitResponse(
         answer_id=core_res.answer_id,
         intake_session_id=core_res.intake_session_id,
+        question_event_id=core_res.question_event_id,
         transcript_text=transcript,
         detected_language=detected_lang,
         audio_base64=audio_base64,

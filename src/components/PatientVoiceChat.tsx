@@ -121,6 +121,7 @@ export function PatientVoiceChat({
   const [finishReason, setFinishReason] = useState<string>('');
 
   const [intakeSessionId, setIntakeSessionId] = useState<string | null>(null);
+  const [currentQuestionEventId, setCurrentQuestionEventId] = useState<string | null>(null);
   const [redFlags, setRedFlags] = useState<string[]>([]);
 
   // History of completed Q&A pairs
@@ -525,6 +526,7 @@ export function PatientVoiceChat({
             input_mode: 'VOICE',
             language_code: langCode,
             audio_duration_seconds: 4.0,
+            question_event_id: currentQuestionEventId || undefined,
           }),
         });
 
@@ -532,6 +534,8 @@ export function PatientVoiceChat({
           const data = await res.json();
           const decision = data.decision;
           const updatedState = data.clinical_state;
+          const nextQEventId = data.question_event_id || decision?.question_event_id || null;
+          setCurrentQuestionEventId(nextQEventId);
 
           if (updatedState?.red_flags?.length > 0) {
             setRedFlags(updatedState.red_flags);
