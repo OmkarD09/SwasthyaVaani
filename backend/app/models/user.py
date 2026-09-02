@@ -64,6 +64,8 @@ class Doctor(Base):
     display_name = Column(String, nullable=False)
     specialization = Column(String, nullable=False)
     license_identifier = Column(String, nullable=True)
+    contact = Column(String, nullable=True)
+    working_hours = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
