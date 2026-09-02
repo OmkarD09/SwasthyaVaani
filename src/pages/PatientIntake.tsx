@@ -59,6 +59,8 @@ export function PatientIntake() {
   const [patientAge, setPatientAge] = useState('34');
   const [consentGiven, setConsentGiven] = useState(false);
   const [consentError, setConsentError] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReviewingStory, setIsReviewingStory] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -538,6 +540,12 @@ export function PatientIntake() {
                       <span>Please check the confirmation box above to proceed with submission.</span>
                     </div>
                   )}
+                  {submissionError && (
+                    <div className="kiosk-consent-error" role="alert">
+                      <AlertCircle size={14} />
+                      <span>{submissionError}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="kiosk-form-actions">
@@ -552,59 +560,70 @@ export function PatientIntake() {
                   <AppButton
                     variant="amber"
                     onClick={async () => {
+                      if (isSubmitting) return;
+
                       if (!consentGiven) {
                         setConsentError(true);
                         return;
                       }
 
                       const activeId = localStorage.getItem('swasthya_active_intake_id');
-                      let generatedToken = localStorage.getItem('swasthya_active_token') || '';
-                      if (activeId) {
-                        try {
-                          const res = await fetch(`/api/v1/intakes/${activeId}/submit`, {
-                            method: 'POST',
-                          });
-                          if (res.ok) {
-                            const data = await res.json();
-                            if (data.token) {
-                              generatedToken = data.token;
-                              localStorage.setItem('swasthya_active_token', data.token);
-                            }
-                          }
-                        } catch (err) {
-                          console.warn('Submit intake note:', err);
-                        }
-                      }
-                      if (!generatedToken) {
-                        generatedToken = 'A-' + Math.floor(100 + Math.random() * 900);
-                        localStorage.setItem('swasthya_active_token', generatedToken);
+                      if (!activeId) {
+                        setSubmissionError('Your intake session could not be found. Please retry the patient intake flow.');
+                        return;
                       }
 
-                      const submissionData = {
-                        patientName,
-                        patientAge,
-                        language,
-                        department: 'General Medicine',
-                        token: generatedToken,
-                        documentCount: uploaded ? 1 : 0,
-                        documentName: uploaded ? uploadedDocName : null,
-                        submittedAt: new Date().toISOString(),
-                        intakeId: activeId,
-                        chiefConcern: summary.chiefConcern,
-                        duration: summary.duration || 'Not provided',
-                        symptoms: summary.symptoms.length > 0 ? summary.symptoms : [summary.chiefConcern],
-                        medicalHistory: summary.medicalHistory || 'Not provided',
-                        interactionModes: summary.interactionModes,
-                      };
-                      localStorage.setItem(
-                        'swasthya_last_submission',
-                        JSON.stringify(submissionData)
-                      );
-                      setLocation('/patient/complete');
+                      setSubmissionError(null);
+                      setIsSubmitting(true);
+                      try {
+                        const res = await fetch(`/api/v1/intakes/${activeId}/submit`, {
+                          method: 'POST',
+                        });
+                        if (!res.ok) {
+                          throw new Error(`Submission failed with status ${res.status}`);
+                        }
+
+                        const data = await res.json();
+                        if (data.intake_session_id !== activeId) {
+                          throw new Error('Submission response did not match the active intake session');
+                        }
+
+                        const backendToken = typeof data.token === 'string' ? data.token : '';
+                        if (backendToken) {
+                          localStorage.setItem('swasthya_active_token', backendToken);
+                        }
+
+                        const submissionData = {
+                          patientName,
+                          patientAge,
+                          language,
+                          department: 'General Medicine',
+                          token: backendToken,
+                          documentCount: uploaded ? 1 : 0,
+                          documentName: uploaded ? uploadedDocName : null,
+                          submittedAt: new Date().toISOString(),
+                          intakeId: data.intake_session_id,
+                          chiefConcern: summary.chiefConcern,
+                          duration: summary.duration || 'Not provided',
+                          symptoms: summary.symptoms.length > 0 ? summary.symptoms : [summary.chiefConcern],
+                          medicalHistory: summary.medicalHistory || 'Not provided',
+                          interactionModes: summary.interactionModes,
+                        };
+                        localStorage.setItem(
+                          'swasthya_last_submission',
+                          JSON.stringify(submissionData)
+                        );
+                        setLocation('/patient/complete');
+                      } catch (err) {
+                        console.error('Failed to submit intake:', err);
+                        setSubmissionError('We could not submit your intake. Please check your connection and try again.');
+                      } finally {
+                        setIsSubmitting(false);
+                      }
                     }}
                     className="kiosk-submit-btn"
                   >
-                    {t.btnFinishNotify} <ArrowRight size={17} />
+                    {isSubmitting ? 'Submitting...' : t.btnFinishNotify} <ArrowRight size={17} />
                   </AppButton>
                 </div>
               </div>
