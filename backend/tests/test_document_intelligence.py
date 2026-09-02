@@ -208,8 +208,10 @@ def test_duplicate_hash_within_intake_is_rejected(client, patient, intake):
     "filename", ["synthetic_prescription.pdf", "low_confidence_prescription.pdf"]
 )
 def test_all_extractions_require_review_and_retain_provenance(
-    client, db, patient, filename
+    client, db, patient, filename, monkeypatch
 ):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "PROVIDER_OCR", "mock")
     content = (FIXTURES / "synthetic_prescription.pdf").read_bytes() + filename.encode()
     uploaded = upload(client, patient, filename, content, "application/pdf").json()
     response = client.post(f"/api/v1/documents/{uploaded['document_id']}/process")

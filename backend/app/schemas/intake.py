@@ -32,6 +32,7 @@ class AnswerSubmitRequest(BaseModel):
 class AnswerSubmitResponse(BaseModel):
     answer_id: str
     intake_session_id: str
+    question_event_id: str | None = None
     extracted_facts: dict[str, Any]
     clinical_state: ClinicalState
     decision: QuestionDecision
@@ -41,6 +42,7 @@ class AnswerSubmitResponse(BaseModel):
 class VoiceAnswerSubmitResponse(BaseModel):
     answer_id: str
     intake_session_id: str
+    question_event_id: str | None = None
     transcript_text: str
     detected_language: str
     audio_base64: str | None = None

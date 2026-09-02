@@ -198,6 +198,7 @@ export function PatientTextChat({
   const [isFinished, setIsFinished] = useState(false);
   const [intakeSessionId, setIntakeSessionId] = useState<string | null>(null);
   const [currentQuestionEventId, setCurrentQuestionEventId] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     async function initSession() {
@@ -251,6 +252,7 @@ export function PatientTextChat({
     setMessages((prev) => [...prev, userMessage]);
     setInputText('');
     setIsThinking(true);
+    setApiError(null);
 
     const activeId = intakeSessionId || localStorage.getItem('swasthya_active_intake_id');
     const langCode = currentLang === 'हिन्दी' ? 'hi' : currentLang === 'मराठी' ? 'mr' : 'en';
@@ -264,7 +266,7 @@ export function PatientTextChat({
             raw_text: trimmedAnswer,
             input_mode: 'TEXT',
             language_code: langCode,
-            question_event_id: currentQuestionEventId,
+            question_event_id: currentQuestionEventId || undefined,
           }),
         });
 
@@ -272,7 +274,12 @@ export function PatientTextChat({
           const data = await res.json();
           const decision = data.decision;
           const targetField = decision?.target_field || 'symptom';
-          setCurrentQuestionEventId(data.next_question_event_id ?? null);
+          const nextQEventId =
+            data.next_question_event_id ??
+            data.question_event_id ??
+            decision?.question_event_id ??
+            null;
+          setCurrentQuestionEventId(nextQEventId);
 
           // Record in unified conversation store
           recordIntakeAnswer(
@@ -315,27 +322,17 @@ export function PatientTextChat({
             setIsThinking(false);
             return;
           }
+
+          throw new Error('The intake service returned no next action.');
         }
+
+        throw new Error(`The intake service returned status ${res.status}.`);
       }
+      throw new Error('No active intake session is available.');
     } catch (err) {
       console.warn('[PatientTextChat] Backend intake response error:', err);
-    }
-
-    // Fallback if offline
-    const nextIndex = currentStepIndex + 1;
-    if (nextIndex < INTAKE_QUESTIONS.length) {
-      const nextQ = INTAKE_QUESTIONS[nextIndex];
-      const nextAiMessage: ChatMessage = {
-        id: `msg-ai-${Date.now()}`,
-        sender: 'ai',
-        text: getLocalizedText(nextQ.question),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        chips: getLocalizedChips(nextQ.chips),
-      };
-      setMessages((prev) => [...prev, nextAiMessage]);
-      setCurrentStepIndex(nextIndex);
-    } else {
-      setIsFinished(true);
+      setApiError(err instanceof Error ? err.message : 'Unable to submit this answer. Please retry.');
+      setInputText(trimmedAnswer);
     }
     setIsThinking(false);
   };
@@ -501,6 +498,7 @@ export function PatientTextChat({
       )}
 
       {/* Text Input Bottom Bar */}
+      {apiError && <p className="mx-4 mb-2 text-sm text-red-700" role="alert">{apiError} Please retry.</p>}
       <div className="chat-input-bar">
         <input
           type="text"

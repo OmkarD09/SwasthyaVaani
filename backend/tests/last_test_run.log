@@ -1,0 +1,43 @@
+============================= test session starts =============================
+collecting ... collected 33 items / 1 deselected / 32 selected
+
+backend/tests/test_abdm_fhir.py::test_abha_verification_endpoint PASSED  [  3%]
+backend/tests/test_abdm_fhir.py::test_nrces_bundle_validation_success PASSED [  6%]
+backend/tests/test_abdm_fhir.py::test_nrces_validator_catches_invalid_bundle PASSED [  9%]
+backend/tests/test_abdm_fhir.py::test_abdm_hip_push PASSED               [ 12%]
+backend/tests/test_adaptive_engine.py::test_gap_analysis_identifies_unresolved_fields PASSED [ 15%]
+backend/tests/test_adaptive_engine.py::test_gap_analysis_resolves_populated_fields PASSED [ 18%]
+backend/tests/test_adaptive_engine.py::test_gap_analysis_ayush_workflow PASSED [ 21%]
+backend/tests/test_adaptive_engine.py::test_semantic_duplicate_detection PASSED [ 25%]
+backend/tests/test_adaptive_engine.py::test_adaptive_engine_asks_question_for_open_gaps PASSED [ 28%]
+backend/tests/test_adaptive_engine.py::test_adaptive_engine_hindi_support PASSED [ 31%]
+backend/tests/test_adaptive_engine.py::test_adaptive_engine_consecutive_low_progress_guardrail PASSED [ 34%]
+backend/tests/test_adaptive_engine.py::test_adaptive_engine_emergency_limit_guardrail PASSED [ 37%]
+backend/tests/test_adaptive_engine.py::test_adaptive_engine_sufficient_information_stop PASSED [ 40%]
+backend/tests/test_admin_api.py::test_admin_dashboard_stats PASSED       [ 43%]
+backend/tests/test_admin_api.py::test_admin_ai_monitoring_oversight PASSED [ 46%]
+backend/tests/test_admin_api.py::test_admin_emergency_cases PASSED       [ 50%]
+backend/tests/test_admin_api.py::test_admin_audit_trail_filtering PASSED [ 53%]
+backend/tests/test_admin_api.py::test_doctor_and_department_onboarding PASSED [ 56%]
+backend/tests/test_admin_api.py::test_staff_rbac_management PASSED       [ 59%]
+backend/tests/test_admin_api.py::test_demo_scenario_loading PASSED       [ 62%]
+backend/tests/test_admin_api.py::test_service_status_probe PASSED        [ 65%]
+backend/tests/test_api_endpoints.py::test_health_check_endpoint PASSED   [ 68%]
+backend/tests/test_api_endpoints.py::test_full_intake_to_doctor_confirmation_slice PASSED [ 71%]
+backend/tests/test_api_endpoints.py::test_doctor_websocket_realtime_broadcast PASSED [ 75%]
+backend/tests/test_providers.py::test_llm_provider_extraction PASSED     [ 78%]
+backend/tests/test_providers.py::test_speech_provider_transcription PASSED [ 81%]
+backend/tests/test_providers.py::test_ocr_provider_processing PASSED     [ 84%]
+backend/tests/test_providers.py::test_provider_factory_override PASSED   [ 87%]
+backend/tests/test_safety_rules.py::test_red_flag_triggers_on_cardiac_signals PASSED [ 90%]
+backend/tests/test_safety_rules.py::test_red_flag_triggers_on_high_severity PASSED [ 93%]
+backend/tests/test_safety_rules.py::test_red_flag_not_triggered_on_mild_symptom PASSED [ 96%]
+backend/tests/test_safety_rules.py::test_contradiction_detection_preserves_both_sources PASSED [100%]
+
+============================== warnings summary ===============================
+..\..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\testclient.py:1
+  C:\Users\Rohan\AppData\Roaming\Python\Python314\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 32 passed, 1 deselected, 1 warning in 1.05s =================

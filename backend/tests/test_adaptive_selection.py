@@ -24,8 +24,8 @@ async def test_headache_path_vs_gi_path_divergence():
     assert decision_a.target_field != decision_b.target_field
     # Headache prioritizes open exploration, distribution, or onset/duration
     assert decision_a.target_field in ["open_headache_exploration", "distribution", "onset", "duration", "photophobia"]
-    # GI with loose motions prioritizes open exploration, stool frequency, duration, or food exposure
-    assert decision_b.target_field in ["open_gi_exploration", "stool_frequency", "duration", "food_exposure", "onset"]
+    # GI with loose motions prioritizes open exploration, stool frequency, hydration, duration, or food exposure
+    assert decision_b.target_field in ["open_gi_exploration", "stool_frequency", "duration", "food_exposure", "onset", "hydration_status", "stool_consistency"]
 
 
 @pytest.mark.asyncio

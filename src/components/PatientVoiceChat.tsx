@@ -119,6 +119,7 @@ export function PatientVoiceChat({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [finishReason, setFinishReason] = useState<string>('');
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const [intakeSessionId, setIntakeSessionId] = useState<string | null>(null);
   const [currentQuestionEventId, setCurrentQuestionEventId] = useState<string | null>(null);
@@ -132,6 +133,8 @@ export function PatientVoiceChat({
   const liveTranscriptRef = useRef<string>('');
   const recognitionRef = useRef<any>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const silenceTimerRef = useRef<any>(null);
   const silenceIntervalRef = useRef<any>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -139,6 +142,7 @@ export function PatientVoiceChat({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const currentAudioElementRef = useRef<HTMLAudioElement | null>(null);
+  const pendingAudioBase64Ref = useRef<string | null>(null);
   const isComponentMounted = useRef<boolean>(true);
   const isSubmittingRef = useRef<boolean>(false);
 
@@ -185,17 +189,33 @@ export function PatientVoiceChat({
   // 2. Automatically Speak initial or updated question
   useEffect(() => {
     if (!isFinished && activeQuestionText) {
-      speakQuestionText(activeQuestionText);
+      const backendAudio = pendingAudioBase64Ref.current;
+      pendingAudioBase64Ref.current = null;
+      speakQuestionText(activeQuestionText, backendAudio);
     }
   }, [activeQuestionText, isFinished]);
 
   // 3. Spoken Audio Synthesis (Sarvam AI Bulbul v3 with Web Speech fallback)
-  const speakQuestionText = async (text: string) => {
+  const speakQuestionText = async (text: string, providedAudioBase64?: string | null) => {
     stopSpeaking();
     stopListening();
     setIsSpeakingAi(true);
 
     try {
+      if (providedAudioBase64) {
+        const audio = new Audio(`data:audio/wav;base64,${providedAudioBase64}`);
+        currentAudioElementRef.current = audio;
+        audio.onended = () => {
+          if (isComponentMounted.current && !isFinished) {
+            setIsSpeakingAi(false);
+            startListening();
+          }
+        };
+        audio.onerror = () => fallbackWebSpeechTTS(text);
+        await audio.play();
+        return;
+      }
+
       // Try Sarvam AI TTS Endpoint
       const formData = new FormData();
       formData.append('text', text);
@@ -427,6 +447,13 @@ export function PatientVoiceChat({
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaStreamRef.current = stream;
+        audioChunksRef.current = [];
+        const recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) audioChunksRef.current.push(event.data);
+        };
+        recorder.start();
+        mediaRecorderRef.current = recorder;
 
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioContextClass) {
@@ -477,11 +504,30 @@ export function PatientVoiceChat({
     setIsListening(false);
   };
 
-  // 7. Submit Answer to Backend Adaptive Engine & Determine Next Dynamic Question
+  const finishAudioRecording = async (): Promise<Blob | null> => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return null;
+    if (recorder.state === 'inactive') {
+      return audioChunksRef.current.length
+        ? new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        : null;
+    }
+    return await new Promise<Blob | null>((resolve) => {
+      recorder.addEventListener('stop', () => {
+        resolve(audioChunksRef.current.length
+          ? new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+          : null);
+      }, { once: true });
+      recorder.stop();
+    });
+  };
+
+  // 7. Submit recorded audio to Backend ASR + Shared Adaptive Engine
   const handleAnswerSubmit = async (overrideAnswer?: string) => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
 
+    const recordedAudio = await finishAudioRecording();
     stopListening();
     stopSpeaking();
 
@@ -492,25 +538,7 @@ export function PatientVoiceChat({
     }
 
     setIsProcessing(true);
-
-    // Save to conversation history
-    setConversationHistory((prev) => [
-      ...prev,
-      {
-        category: activeCategory,
-        questionText: activeQuestionText,
-        answerText: answerToSubmit,
-      },
-    ]);
-
-    // Record into unified conversation store (for Doctor Review & Patient Summary pages)
-    recordIntakeAnswer(
-      `q_${questionCount}`,
-      answerToSubmit,
-      'voice',
-      activeCategory,
-      activeQuestionText
-    );
+    setApiError(null);
 
     setLiveTranscript('');
     liveTranscriptRef.current = '';
@@ -518,24 +546,40 @@ export function PatientVoiceChat({
     try {
       const activeId = intakeSessionId || localStorage.getItem('swasthya_active_intake_id');
 
-      if (activeId) {
-        const res = await fetch(`/api/v1/intakes/${activeId}/answers`, {
+      if (activeId && recordedAudio) {
+        const formData = new FormData();
+        formData.append('file', recordedAudio, `intake-${Date.now()}.webm`);
+        formData.append('language_code', langCode);
+        if (currentQuestionEventId) formData.append('question_event_id', currentQuestionEventId);
+
+        const res = await fetch(`/api/v1/intakes/${activeId}/voice-answer`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            raw_text: answerToSubmit,
-            input_mode: 'VOICE',
-            language_code: langCode,
-            audio_duration_seconds: 4.0,
-            question_event_id: currentQuestionEventId,
-          }),
+          body: formData,
         });
 
         if (res.ok) {
           const data = await res.json();
           const decision = data.decision;
           const updatedState = data.clinical_state;
-          setCurrentQuestionEventId(data.next_question_event_id ?? null);
+          const backendTranscript = data.transcript_text || answerToSubmit;
+          if (data.detected_language) {
+            localStorage.setItem('swasthya_detected_language', data.detected_language);
+          }
+          const nextQEventId = data.next_question_event_id ?? data.question_event_id ?? decision?.question_event_id ?? null;
+          setCurrentQuestionEventId(nextQEventId);
+
+          setConversationHistory((prev) => [...prev, {
+            category: activeCategory,
+            questionText: activeQuestionText,
+            answerText: backendTranscript,
+          }]);
+          recordIntakeAnswer(
+            `q_${questionCount}`,
+            backendTranscript,
+            'voice',
+            activeCategory,
+            activeQuestionText,
+          );
 
           if (updatedState?.red_flags?.length > 0) {
             setRedFlags(updatedState.red_flags);
@@ -566,17 +610,26 @@ export function PatientVoiceChat({
           if (decision?.action === 'ASK' && decision?.question) {
             const nextText = decision.question;
             const nextTarget = decision.target_field || 'Clinical Detail';
+            pendingAudioBase64Ref.current = data.audio_base64 || null;
             setActiveCategory(nextTarget.toUpperCase().replace('_', ' '));
             setActiveQuestionText(nextText);
             setIsProcessing(false);
             isSubmittingRef.current = false;
             return;
           }
+          throw new Error('The voice intake service returned no next action.');
         }
+        throw new Error(`The voice intake service returned status ${res.status}.`);
       }
+      throw new Error(activeId ? 'No recorded audio was available.' : 'No active intake session is available.');
     } catch (err) {
       console.warn('Backend adaptive answer processing note:', err);
+      setApiError(err instanceof Error ? err.message : 'Unable to process the voice answer.');
     }
+
+    setIsProcessing(false);
+    isSubmittingRef.current = false;
+    return;
 
     // Fallback: If offline or rate-limited, advance question count
     const nextQCount = questionCount + 1;
@@ -634,6 +687,11 @@ export function PatientVoiceChat({
       </div>
 
       {/* Red Flag Alert Banner if Emergency Signals Detected */}
+      {apiError && (
+        <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" role="alert">
+          {apiError} Please retry your recording.
+        </div>
+      )}
       {redFlags.length > 0 && (
         <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between text-rose-800">
           <div className="flex items-center gap-2">

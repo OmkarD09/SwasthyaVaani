@@ -171,7 +171,8 @@ def get_patient_clinical_detail(
         ClinicalStateModel.intake_session_id == session.id
     ).order_by(ClinicalStateModel.version.desc()).first()
 
-    state = ClinicalState(**(latest_state_model.state_json if latest_state_model else {}))
+    state_data = latest_state_model.state_json if (latest_state_model and isinstance(latest_state_model.state_json, dict)) else {}
+    state = ClinicalState(**state_data)
     review = db.query(PhysicianReviewModel).filter(PhysicianReviewModel.intake_session_id == session.id).first()
 
     review_status = "PHYSICIAN_CONFIRMED" if (review and review.status == "CONFIRMED") else "AI_DRAFT"
@@ -266,7 +267,8 @@ async def confirm_patient_history(
     latest_state_model = db.query(ClinicalStateModel).filter(
         ClinicalStateModel.intake_session_id == session.id
     ).order_by(ClinicalStateModel.version.desc()).first()
-    state = ClinicalState(**(latest_state_model.state_json if latest_state_model else {}))
+    state_data = latest_state_model.state_json if (latest_state_model and isinstance(latest_state_model.state_json, dict)) else {}
+    state = ClinicalState(**state_data)
 
     # Persist or update PhysicianReview
     review = db.query(PhysicianReviewModel).filter(PhysicianReviewModel.intake_session_id == session.id).first()

@@ -7,6 +7,7 @@ class QuestionDecision(BaseModel):
     action: Literal["ASK", "STOP", "ESCALATE"]
     question: Optional[str] = Field(default=None, description="The clinical question to present to the patient")
     target_field: Optional[str] = Field(default=None, description="The clinical state field targeted by this question")
+    question_event_id: Optional[str] = Field(default=None, description="The ID of the persisted QuestionEvent record")
     reason: Optional[str] = Field(default=None, description="Machine-readable rationale for question selection or stop")
     reasoning_mode: Optional[Literal["SAFETY_REQUIRED", "TARGETED_FOLLOW_UP", "OPEN_EXPLORATION"]] = Field(
         default=None, description="Reasoning mode that motivated the question"

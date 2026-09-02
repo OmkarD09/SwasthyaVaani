@@ -60,5 +60,5 @@ def require_role(allowed_roles: list[str]):
     return role_checker
 
 
-require_doctor = require_role(["DOCTOR", "ADMIN"])
-require_admin = require_role(["ADMIN"])
+require_doctor = require_role(["DOCTOR", "ADMIN", "SUPER_ADMIN", "HOSPITAL_ADMIN"])
+require_admin = require_role(["ADMIN", "SUPER_ADMIN", "HOSPITAL_ADMIN"])

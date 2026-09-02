@@ -224,10 +224,56 @@ export function HomePage() {
             <span className="tag-number tag-green">03</span> Doctor reviews
           </div>
           <svg className="connector connector-one" viewBox="0 0 150 110" fill="none">
-            <path d="M4 104C65 103 52 8 147 7" stroke="rgba(110,213,200,.6)" strokeDasharray="4 6" />
+            <defs>
+              <filter id="glow-dot-1" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#78ded0" floodOpacity="0.9" />
+              </filter>
+            </defs>
+            <path className="connector-path" d="M4 104C65 103 52 8 147 7" stroke="rgba(110,213,200,.6)" strokeDasharray="4 6" />
+            <circle r="3" fill="#78ded0" filter="url(#glow-dot-1)">
+              <animateMotion
+                dur="6s"
+                repeatCount="indefinite"
+                path="M4 104C65 103 52 8 147 7"
+                keyPoints="0;0.05;0.95;1;1"
+                keyTimes="0;0.05;0.42;0.45;1"
+                calcMode="spline"
+                keySplines="0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1"
+              />
+              <animate
+                attributeName="opacity"
+                values="0;0.95;0.95;0;0"
+                keyTimes="0;0.05;0.40;0.44;1"
+                dur="6s"
+                repeatCount="indefinite"
+              />
+            </circle>
           </svg>
           <svg className="connector connector-two" viewBox="0 0 150 110" fill="none">
-            <path d="M2 5C72 3 53 104 148 103" stroke="rgba(110,213,200,.6)" strokeDasharray="4 6" />
+            <defs>
+              <filter id="glow-dot-2" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#78ded0" floodOpacity="0.9" />
+              </filter>
+            </defs>
+            <path className="connector-path" d="M2 5C72 3 53 104 148 103" stroke="rgba(110,213,200,.6)" strokeDasharray="4 6" />
+            <circle r="3" fill="#78ded0" filter="url(#glow-dot-2)">
+              <animateMotion
+                dur="6s"
+                repeatCount="indefinite"
+                path="M2 5C72 3 53 104 148 103"
+                keyPoints="0;0;0.05;0.95;1"
+                keyTimes="0;0.48;0.53;0.90;1"
+                calcMode="spline"
+                keySplines="0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1; 0.4 0 0.2 1"
+              />
+              <animate
+                attributeName="opacity"
+                values="0;0;0.95;0.95;0"
+                keyTimes="0;0.48;0.53;0.88;0.92"
+                dur="6s"
+                repeatCount="indefinite"
+              />
+            </circle>
           </svg>
         </div>
         <div className="hero-footnote">
@@ -435,5 +481,4 @@ export function HomePage() {
     </main>
   );
 }
-
 export default HomePage;

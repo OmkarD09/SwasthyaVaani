@@ -62,7 +62,9 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
     # Initialize empty ClinicalState
     init_state = ClinicalState()
     state_model = ClinicalStateModel(
-        intake_session_id=session.id, version=1, state_json=init_state.model_dump()
+        intake_session_id=session.id,
+        version=1,
+        state_json=init_state.model_dump(mode="json")
     )
     db.add(state_model)
     db.commit()
@@ -140,7 +142,7 @@ async def process_intake_answer_core(
     Ingest patient answer, extract structured facts dynamically using LLM (Gemini 2.5 Flash),
     evaluate safety rules, and compute next QuestionDecision.
     """
-    # Load current ClinicalState
+    # 1. Load current ClinicalState
     latest_state_model = (
         db.query(ClinicalStateModel)
         .filter(ClinicalStateModel.intake_session_id == session.id)
@@ -167,8 +169,15 @@ async def process_intake_answer_core(
                 status_code=400,
                 detail="Question event does not belong to this intake session",
             )
+    else:
+        question_event = (
+            db.query(QuestionEvent)
+            .filter(QuestionEvent.intake_session_id == session.id)
+            .order_by(QuestionEvent.sequence_number.desc())
+            .first()
+        )
 
-    # Save the answer record
+    # 3. Save the answer record with modality provenance and linked QuestionEvent
     answer = Answer(
         question_event_id=question_event.id if question_event else None,
         intake_session_id=session.id,
@@ -180,10 +189,8 @@ async def process_intake_answer_core(
     db.add(answer)
     db.flush()
 
-    # Determine target field from previous question event if available
     target_field = question_event.target_field if question_event else ""
-
-    # Extract structured clinical updates dynamically via LLM (Gemini 2.5 Flash / Mock)
+    # 4. Extract structured clinical updates dynamically via LLM / Rule Provider against resolved target_field
     llm = get_llm_service()
     extraction_res = await llm.extract_clinical_facts(
         raw_text=raw_text,
@@ -195,7 +202,7 @@ async def process_intake_answer_core(
     extracted_facts = extraction_res.extracted_facts
     has_progress = len(extracted_facts) > 0
 
-    # Merge extracted facts into current clinical state
+    # 5. Merge extracted facts into current clinical state
     updated_dict = current_state.model_dump()
     for k, v in extracted_facts.items():
         if v is not None:
@@ -227,7 +234,7 @@ async def process_intake_answer_core(
         .all()
     ]
 
-    # Evaluate Adaptive Next Question Decision
+    # 6. Evaluate Adaptive Next Question Decision
     decision = await evaluate_next_question(
         state=updated_state,
         workflow_type=session.workflow_type,
@@ -238,7 +245,7 @@ async def process_intake_answer_core(
         db=db,
     )
 
-    # If action is ASK, persist QuestionEvent
+    # Persist QuestionEvent if action is ASK and return its ID for chaining.
     next_question_event_id = None
     if decision.action == "ASK" and decision.question:
         q_event = QuestionEvent(
@@ -265,11 +272,13 @@ async def process_intake_answer_core(
         )
     )
 
+    decision.question_event_id = next_question_event_id
     db.commit()
 
     return AnswerSubmitResponse(
         answer_id=answer.id,
         intake_session_id=session.id,
+        question_event_id=next_question_event_id,
         extracted_facts=extracted_facts,
         clinical_state=updated_state,
         decision=decision,
@@ -351,6 +360,7 @@ async def submit_voice_answer(
     return VoiceAnswerSubmitResponse(
         answer_id=result.answer_id,
         intake_session_id=result.intake_session_id,
+        question_event_id=result.question_event_id,
         transcript_text=transcript,
         detected_language=detected_language,
         audio_base64=audio_base64,
