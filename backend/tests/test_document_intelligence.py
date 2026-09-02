@@ -459,6 +459,47 @@ def test_paddle_provider_rejects_malformed_engine_output():
         asyncio.run(provider.process_document(b"image", "report.jpg", "image/jpeg"))
 
 
+@pytest.mark.parametrize(
+    "confidence",
+    [float("nan"), float("inf"), float("-inf"), -0.01, 1.01],
+)
+def test_paddle_provider_rejects_invalid_modern_confidence(confidence):
+    class FakeEngine:
+        def predict(self, image):
+            return [
+                {
+                    "res": {
+                        "rec_texts": ["Paracetamol 500 mg"],
+                        "rec_scores": [confidence],
+                        "rec_polys": [[[10, 20], [210, 20], [210, 45], [10, 45]]],
+                    }
+                }
+            ]
+
+    provider = PaddleOCRProvider(
+        engine_factory=FakeEngine, image_decoder=lambda *_: object()
+    )
+    import asyncio
+
+    with pytest.raises(OCRNormalizationError, match="finite 0..1 range"):
+        asyncio.run(provider.process_document(b"image", "report.jpg", "image/jpeg"))
+
+
+def test_paddle_provider_rejects_non_numeric_confidence():
+    result = [
+        {
+            "res": {
+                "rec_texts": ["Paracetamol 500 mg"],
+                "rec_scores": ["0.9"],
+                "rec_polys": [[[10, 20], [210, 20], [210, 45], [10, 45]]],
+            }
+        }
+    ]
+
+    with pytest.raises(OCRNormalizationError, match="non-numeric"):
+        PaddleOCRProvider._normalize_result(result)
+
+
 def test_provider_factory_selects_mock_explicitly(monkeypatch):
     monkeypatch.setattr(settings, "PROVIDER_OCR", "mock")
     assert isinstance(ProviderRegistry().get_ocr(), MockOCRProvider)
@@ -750,6 +791,7 @@ def test_unsupported_candidate_returns_no_partial_review_response(
     assert "review_candidates" not in response.json()
     assert db.query(DocumentCandidateModel).count() == 0
     assert db.query(DocumentCandidateEvidenceLinkModel).count() == 0
+    assert db.query(DocumentOCREvidenceModel).count() == 1
     assert db.query(ClinicalStateModel).count() == 0
 
 

@@ -1,5 +1,7 @@
 import logging
+import math
 from importlib.metadata import PackageNotFoundError, version
+from numbers import Real
 from typing import Any
 
 from app.core.config import settings
@@ -207,6 +209,19 @@ class PaddleOCRProvider(AbstractOCRProvider):
                 "PaddleOCR returned an invalid text bounding box"
             ) from exc
 
+    @staticmethod
+    def _normalize_confidence(value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, Real):
+            raise OCRNormalizationError(
+                "PaddleOCR returned a non-numeric text confidence"
+            )
+        confidence = float(value)
+        if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
+            raise OCRNormalizationError(
+                "PaddleOCR returned text confidence outside the finite 0..1 range"
+            )
+        return confidence
+
     @classmethod
     def _normalize_legacy(cls, result: Any) -> list[dict[str, Any]] | None:
         if not isinstance(result, list):
@@ -230,7 +245,7 @@ class PaddleOCRProvider(AbstractOCRProvider):
                         "text": str(text),
                         "page": page_number,
                         "bounding_box": cls._flatten_box(box),
-                        "confidence": float(confidence),
+                        "confidence": cls._normalize_confidence(confidence),
                     }
                 )
         return blocks
@@ -259,7 +274,7 @@ class PaddleOCRProvider(AbstractOCRProvider):
                         "text": str(text),
                         "page": page_number,
                         "bounding_box": cls._flatten_box(box),
-                        "confidence": float(confidence),
+                        "confidence": cls._normalize_confidence(confidence),
                     }
                 )
         return blocks
