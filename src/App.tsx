@@ -24,6 +24,11 @@ function Router() {
       <Route path="/doctor/patient/:id" component={DoctorPatientReview} />
       <Route path="/admin" component={HospitalOperations} />
       <Route path="/admin/dashboard" component={HospitalOperations} />
+      <Route path="/admin/ai-monitoring" component={HospitalOperations} />
+      <Route path="/admin/emergency" component={HospitalOperations} />
+      <Route path="/admin/audit" component={HospitalOperations} />
+      <Route path="/admin/onboarding" component={HospitalOperations} />
+      <Route path="/admin/qa" component={HospitalOperations} />
 
       {/* Public Landing */}
       <Route path="/" component={HomePage} />

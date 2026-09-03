@@ -1,3 +1,5 @@
+import os
+os.environ["SWASTHYAVAANI_IN_TEST"] = "1"
 import pytest
 from fastapi.testclient import TestClient
 # pyrefly: ignore [missing-import]
