@@ -21,7 +21,7 @@ class LoginRequest(BaseModel):
 
     username: str = Field(min_length=1)
     password: str = Field(min_length=1)
-    role: str = "DOCTOR"  # DOCTOR, ADMIN, PATIENT
+    role: str | None = None  # DOCTOR, ADMIN, or inferred from account
 
 
 class TokenResponse(BaseModel):
@@ -35,13 +35,16 @@ class TokenResponse(BaseModel):
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate an active clinician before issuing a signed JWT."""
-    requested_role = req.role.upper()
-    if requested_role == "DOCTOR":
-        allowed_roles = {"DOCTOR"}
-    elif requested_role == "ADMIN":
-        allowed_roles = {"ADMIN", "HOSPITAL_ADMIN", "SUPER_ADMIN"}
+    if req.role:
+        requested_role = req.role.upper()
+        if requested_role == "DOCTOR":
+            allowed_roles = {"DOCTOR"}
+        elif requested_role == "ADMIN":
+            allowed_roles = {"ADMIN", "HOSPITAL_ADMIN", "SUPER_ADMIN"}
+        else:
+            allowed_roles = set()
     else:
-        allowed_roles = set()
+        allowed_roles = {"DOCTOR", "ADMIN", "HOSPITAL_ADMIN", "SUPER_ADMIN"}
 
     normalized_username = req.username.casefold()
     user = db.query(User).filter(

@@ -1,11 +1,19 @@
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
+logger = logging.getLogger(__name__)
+
 from app.core.database import get_db
 from app.core.events import ws_manager
 from app.core.security import require_doctor
+from app.models.document import (
+    DocumentCandidateModel,
+    DocumentExtractionModel,
+    DocumentModel,
+)
 from app.models.intake import Answer, ClinicalStateModel, IntakeSession, QuestionEvent
 from app.models.review import AuditEventModel, PhysicianEditModel, PhysicianReviewModel
 from app.models.user import Doctor, Hospital, Patient
@@ -172,27 +180,174 @@ def get_patient_clinical_detail(
     ).order_by(ClinicalStateModel.version.desc()).first()
 
     state_data = latest_state_model.state_json if (latest_state_model and isinstance(latest_state_model.state_json, dict)) else {}
-    state = ClinicalState(**state_data)
-    review = db.query(PhysicianReviewModel).filter(PhysicianReviewModel.intake_session_id == session.id).first()
+    try:
+        state = ClinicalState(**state_data)
+    except Exception as st_err:
+        logger.warning(f"Error parsing ClinicalState for session {session.id}: {st_err}")
+        state = ClinicalState()
+
+    review = (
+        db.query(PhysicianReviewModel)
+        .filter(PhysicianReviewModel.intake_session_id == session.id)
+        .order_by(PhysicianReviewModel.created_at.desc())
+        .first()
+    )
 
     review_status = "PHYSICIAN_CONFIRMED" if (review and review.status == "CONFIRMED") else "AI_DRAFT"
 
+    # Retrieve medical records / attachments uploaded by or for this patient
+    docs_query = (
+        db.query(DocumentModel)
+        .filter(
+            (DocumentModel.intake_session_id == session.id)
+            | (
+                (DocumentModel.patient_id == session.patient_id)
+                & (DocumentModel.intake_session_id.is_(None))
+            )
+        )
+        .order_by(DocumentModel.uploaded_at.desc())
+        .all()
+    )
+
+    doc_list = []
+    has_unlinked = False
+    all_medical_records = []
+
+    for doc in docs_query:
+        if not doc.intake_session_id:
+            doc.intake_session_id = session.id
+            has_unlinked = True
+
+        extractions = []
+        candidates = []
+        try:
+            extractions = (
+                db.query(DocumentExtractionModel)
+                .filter(DocumentExtractionModel.document_id == doc.id)
+                .order_by(DocumentExtractionModel.created_at.asc())
+                .all()
+            )
+            candidates = (
+                db.query(DocumentCandidateModel)
+                .filter(DocumentCandidateModel.document_id == doc.id)
+                .order_by(DocumentCandidateModel.created_at.asc())
+                .all()
+            )
+        except Exception as query_err:
+            logger.warning(f"Error querying extractions/candidates for doc {doc.id}: {query_err}")
+            db.rollback()
+            extractions = []
+            candidates = []
+
+        doc_extractions = []
+        if extractions:
+            for ext in extractions:
+                val = dict(ext.value_json) if isinstance(ext.value_json, dict) else ext.value_json
+                if isinstance(val, dict) and "strength_or_dose" in val and "strength" not in val:
+                    val["strength"] = val["strength_or_dose"]
+                rec = {
+                    "id": ext.id,
+                    "document_id": doc.id,
+                    "document_name": doc.file_name,
+                    "document_type": doc.document_type or "PRESCRIPTION",
+                    "field_type": ext.field_type,
+                    "field_name": ext.field_name,
+                    "value": val,
+                    "confidence": ext.extraction_confidence or 0.0,
+                    "ocr_confidence": ext.ocr_confidence or 0.0,
+                    "source_page": ext.source_page or 1,
+                    "source_text": ext.original_source_text or "",
+                    "status": ext.status or "EXTRACTED",
+                }
+                doc_extractions.append(rec)
+                all_medical_records.append(rec)
+        elif candidates:
+            for cand in candidates:
+                cand_val = dict(cand.value_json) if isinstance(cand.value_json, dict) else {}
+                if "strength_or_dose" in cand_val and "strength" not in cand_val:
+                    cand_val["strength"] = cand_val["strength_or_dose"]
+                cand_name = (
+                    cand_val.get("name")
+                    or cand_val.get("test_name")
+                    or cand.candidate_type
+                )
+                rec = {
+                    "id": cand.id,
+                    "document_id": doc.id,
+                    "document_name": doc.file_name,
+                    "document_type": doc.document_type or "PRESCRIPTION",
+                    "field_type": cand.candidate_type,
+                    "field_name": str(cand_name),
+                    "value": cand_val,
+                    "confidence": cand.extraction_confidence or 0.0,
+                    "ocr_confidence": 0.9,
+                    "source_page": 1,
+                    "source_text": str(cand.value_json),
+                    "status": cand.status or "EXTRACTED",
+                }
+                doc_extractions.append(rec)
+                all_medical_records.append(rec)
+
+        file_size = doc.file_size or 0
+        if file_size < 1024:
+            f_size = f"{file_size} B"
+        elif file_size < 1024 * 1024:
+            f_size = f"{file_size / 1024:.1f} KB"
+        else:
+            f_size = f"{file_size / (1024 * 1024):.1f} MB"
+
+        uploaded_str = (
+            doc.uploaded_at.strftime("%d %b %Y, %H:%M")
+            if doc.uploaded_at
+            else "Recently"
+        )
+
+        doc_list.append(
+            {
+                "id": doc.id,
+                "document_id": doc.id,
+                "name": doc.file_name,
+                "file_name": doc.file_name,
+                "size": f_size,
+                "file_size": file_size,
+                "mime_type": doc.mime_type,
+                "type": (doc.document_type or "document").lower(),
+                "document_type": doc.document_type or "PRESCRIPTION",
+                "status": doc.status or "PENDING",
+                "failure_code": doc.failure_code,
+                "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+                "uploadedAt": uploaded_str,
+                "url": f"/api/v1/documents/{doc.id}/view",
+                "storage_url": f"/api/v1/documents/{doc.id}/view",
+                "localOnly": False,
+                "extractions": doc_extractions,
+            }
+        )
+    if has_unlinked:
+        try:
+            db.commit()
+        except Exception as commit_err:
+            logger.warning(f"Error committing unlinked doc update: {commit_err}")
+            db.rollback()
+
     detail = DoctorPatientDetail(
         intake_session_id=session.id,
-        token=session.token,
-        patient_id=session.patient_id,
-        patient_name=patient.display_name if patient else "Patient",
+        token=session.token or "",
+        patient_id=session.patient_id or "",
+        patient_name=(patient.display_name if patient and patient.display_name else "Patient"),
         patient_age=patient.age if patient else None,
         patient_gender=patient.gender if patient else None,
-        hospital_name=hospital.name if hospital else "Hospital not recorded",
-        doctor_name=doctor.display_name if doctor else "Clinician not recorded",
-        workflow_type=session.workflow_type,
-        language_code=session.language_code,
-        status=session.status,
+        hospital_name=(hospital.name if hospital and hospital.name else "Hospital not recorded"),
+        doctor_name=(doctor.display_name if doctor and doctor.display_name else "Clinician not recorded"),
+        workflow_type=session.workflow_type or "GENERAL",
+        language_code=session.language_code or "en",
+        status=session.status or "WAITING",
         review_status=review_status,
         clinical_state=state,
+        documents=doc_list,
+        medical_records=all_medical_records,
         clinician_notes=review.notes if review else None,
-        submitted_at=session.submitted_at or session.started_at
+        submitted_at=session.submitted_at or session.started_at or datetime.now(timezone.utc),
     )
     
     t_elapsed = (datetime.now(timezone.utc) - t_start).total_seconds() * 1000

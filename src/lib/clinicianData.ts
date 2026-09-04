@@ -63,6 +63,40 @@ export type PatientDetail = {
   submitted_at: string;
   clinician_notes?: string;
   fhir_bundle_id?: string;
-  documents: Array<Record<string, unknown>>;
+  documents: Array<{
+    id: string;
+    document_id?: string;
+    name: string;
+    file_name: string;
+    size: string;
+    file_size?: number;
+    mime_type?: string;
+    type: string;
+    document_type?: string;
+    status?: string;
+    failure_code?: string;
+    uploaded_at?: string;
+    localOnly?: boolean;
+    url?: string;
+    extractions?: Array<MedicalRecordExtraction>;
+    [key: string]: unknown;
+  }>;
+  medical_records?: Array<MedicalRecordExtraction>;
   timeline: Array<Record<string, unknown>>;
 };
+
+export type MedicalRecordExtraction = {
+  id: string;
+  document_id: string;
+  document_name: string;
+  document_type: string;
+  field_type: string;
+  field_name: string;
+  value: Record<string, any> | string;
+  confidence: number;
+  ocr_confidence?: number;
+  source_page?: number;
+  source_text?: string;
+  status?: string;
+};
+

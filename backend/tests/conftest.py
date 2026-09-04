@@ -48,7 +48,8 @@ def deterministic_provider_settings(monkeypatch):
 
 
 @pytest.fixture(scope="function")
-def db():
+def db(monkeypatch):
+    monkeypatch.setattr("app.core.database.SessionLocal", TestingSessionLocal)
     Base.metadata.create_all(bind=engine)
     session = TestingSessionLocal()
     try:

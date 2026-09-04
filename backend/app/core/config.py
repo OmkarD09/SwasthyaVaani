@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "swasthyavaani-dev-secret-key-32-chars-minimum-secure"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
-    SEED_USER_DOC_01_PASSWORD: str = ""
-    SEED_USER_ADMIN_01_PASSWORD: str = ""
+    SEED_USER_DOC_01_PASSWORD: str = "Doctor@123"
+    SEED_USER_ADMIN_01_PASSWORD: str = "Admin@123"
 
     # Database
     DATABASE_URL: str = "sqlite:///./swasthyavaani.db"
@@ -46,6 +46,7 @@ class Settings(BaseSettings):
         "image/png",
         "image/jpeg",
     ]
+    DOCUMENT_AUTO_PROCESS: bool = True
 
     # AI & Speech Providers
     PROVIDER_LLM: str = "mock"
@@ -63,7 +64,7 @@ class Settings(BaseSettings):
     # Kunal - Document Intelligence
     KUNAL_DOCUMENT_EXTRACTOR_PROVIDER: str = "groq"
     KUNAL_GROQ_API_KEY: str = ""
-    KUNAL_GROQ_DOCUMENT_MODEL: str = "openai/gpt-oss-20b"
+    KUNAL_GROQ_DOCUMENT_MODEL: str = "openai/gpt-oss-120b"
     KUNAL_GEMINI_API_KEY: str = ""
     KUNAL_GEMINI_DOCUMENT_MODEL: str = "gemini-2.5-flash-lite"
 

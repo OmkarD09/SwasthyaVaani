@@ -84,6 +84,7 @@ def private_storage(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "DOCUMENT_STORAGE_DIR", str(tmp_path / "private"))
     monkeypatch.setattr(settings, "DOCUMENT_MAX_FILE_SIZE_BYTES", 10 * 1024 * 1024)
     monkeypatch.setattr(settings, "DOCUMENT_MAX_PAGE_COUNT", 20)
+    monkeypatch.setattr(settings, "DOCUMENT_AUTO_PROCESS", False)
     monkeypatch.setattr(
         documents_api,
         "get_configured_document_extractor",

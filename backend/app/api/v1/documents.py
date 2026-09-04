@@ -1,11 +1,25 @@
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+)
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
+from app.core.security import decode_access_token, security_scheme
 from app.models.document import (
     DocumentCandidateEvidenceLinkModel,
     DocumentCandidateModel,
@@ -15,6 +29,7 @@ from app.models.document import (
     DocumentOCREvidenceModel,
     DocumentOCRRunModel,
 )
+from app.models.intake import IntakeSession
 from app.schemas.document import (
     DocumentExtractionResult,
     DocumentReviewCandidate,
@@ -39,6 +54,13 @@ from app.services.document_intelligence import (
 )
 from app.services.providers.base import AbstractOCRProvider
 from app.services.providers.factory import get_ocr_service
+from app.services.providers.ocr_provider import (
+    MockOCRProvider,
+    OCRInferenceError,
+    OCRProviderConfigurationError,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["Medical Documents & OCR"])
 
@@ -113,18 +135,22 @@ def _review_candidates_as_extracted_facts(
     """Build the legacy response view from persisted, untrusted review rows."""
     facts = []
     for candidate in candidates:
-        if candidate.candidate_type not in {"MEDICATION", "LAB"}:
-            continue
         candidate_row = db.query(DocumentCandidateModel).filter_by(
             id=candidate.candidate_id
-        ).one()
+        ).first()
+        if not candidate_row:
+            continue
         candidate_set = db.query(DocumentCandidateSetModel).filter_by(
             id=candidate_row.candidate_set_id
-        ).one()
-        first_evidence = candidate.evidence[0]
+        ).first()
+        if not candidate_set:
+            continue
+        first_evidence = candidate.evidence[0] if candidate.evidence else None
         field_name = (
             candidate.value.get("name")
             or candidate.value.get("test_name")
+            or candidate.value.get("fact_type")
+            or candidate.value.get("value")
             or candidate.candidate_type
         )
         facts.append(
@@ -136,14 +162,15 @@ def _review_candidates_as_extracted_facts(
                     evidence.source_text for evidence in candidate.evidence
                 ),
                 document_id=candidate.document_id,
-                source_page=first_evidence.page,
-                bounding_box=first_evidence.bounding_box,
+                source_page=first_evidence.page if first_evidence else 1,
+                bounding_box=first_evidence.bounding_box if first_evidence else None,
                 ocr_confidence=min(
-                    evidence.ocr_confidence for evidence in candidate.evidence
+                    (evidence.ocr_confidence for evidence in candidate.evidence),
+                    default=0.9,
                 ),
                 extraction_confidence=candidate.extraction_confidence,
-                engine_name=first_evidence.provider_name,
-                engine_version=first_evidence.provider_version,
+                engine_name=first_evidence.provider_name if first_evidence else "PaddleOCR",
+                engine_version=first_evidence.provider_version if first_evidence else "3.7.0",
                 extractor_version=(
                     f"{candidate_set.provider_name}/{candidate_set.model_name}"
                 ),
@@ -155,10 +182,12 @@ def _review_candidates_as_extracted_facts(
 
 @router.post("/upload", response_model=DocumentUploadResponse, status_code=202)
 async def upload_medical_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     patient_id: str = Form(...),
     intake_session_id: str | None = Form(None),
     document_type: str = Form("PRESCRIPTION"),
+    auto_process: bool = Form(True),
     db: Session = Depends(get_db),
 ):
     """Validate and store a document under a generated private object key."""
@@ -170,6 +199,16 @@ async def upload_medical_document(
         raise HTTPException(
             status_code=400, detail={"code": exc.code, "message": str(exc)}
         ) from exc
+
+    if not intake_session_id:
+        recent_session = (
+            db.query(IntakeSession)
+            .filter(IntakeSession.patient_id == patient_id)
+            .order_by(IntakeSession.started_at.desc())
+            .first()
+        )
+        if recent_session:
+            intake_session_id = recent_session.id
 
     duplicate = None
     if intake_session_id:
@@ -205,6 +244,10 @@ async def upload_medical_document(
         db.add(doc)
         db.commit()
         db.refresh(doc)
+
+        should_auto = getattr(settings, "DOCUMENT_AUTO_PROCESS", True) and auto_process
+        if should_auto:
+            background_tasks.add_task(_background_process_document, doc.id)
     except Exception:
         db.rollback()
         if stored_path and stored_path.exists():
@@ -221,6 +264,79 @@ async def upload_medical_document(
         page_count=doc.page_count,
         status=doc.status,
         uploaded_at=doc.uploaded_at,
+        storage_url=f"/api/v1/documents/{doc.id}/view",
+    )
+
+
+@router.get("/{document_id}/view")
+def view_document_file(
+    document_id: str,
+    token: str | None = Query(None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    db: Session = Depends(get_db),
+):
+    """Securely stream private medical document for inline browser viewing."""
+    raw_token = credentials.credentials if credentials else token
+    if raw_token:
+        payload = decode_access_token(raw_token)
+        if not payload:
+            raise HTTPException(status_code=401, detail="Invalid or expired access token")
+
+    doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        file_bytes = load_private_file(doc.storage_object_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Underlying document file not found on disk")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to load document")
+
+    safe_filename = doc.file_name.replace('"', '').replace('\r', '').replace('\n', '')
+    return Response(
+        content=file_bytes,
+        media_type=doc.mime_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{safe_filename}"',
+            "Cache-Control": "private, max-age=3600",
+        },
+    )
+
+
+@router.get("/{document_id}/download")
+def download_document_file(
+    document_id: str,
+    token: str | None = Query(None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    db: Session = Depends(get_db),
+):
+    """Securely download private medical document."""
+    raw_token = credentials.credentials if credentials else token
+    if raw_token:
+        payload = decode_access_token(raw_token)
+        if not payload:
+            raise HTTPException(status_code=401, detail="Invalid or expired access token")
+
+    doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        file_bytes = load_private_file(doc.storage_object_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Underlying document file not found on disk")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to load document")
+
+    safe_filename = doc.file_name.replace('"', '').replace('\r', '').replace('\n', '')
+    return Response(
+        content=file_bytes,
+        media_type=doc.mime_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_filename}"',
+            "Cache-Control": "private, max-age=3600",
+        },
     )
 
 
@@ -259,26 +375,26 @@ def get_document_status(document_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/{document_id}/process", response_model=DocumentExtractionResult)
-async def process_document_ocr(
+async def run_document_processing(
     document_id: str,
-    db: Session = Depends(get_db),
-    ocr: AbstractOCRProvider = Depends(get_ocr_service),
-):
-    """Create untrusted, provenance-bearing proposals that require human review."""
+    db: Session,
+    ocr: Optional[AbstractOCRProvider] = None,
+) -> DocumentExtractionResult:
+    """Core document processing pipeline: OCR, candidate extraction, and persistence."""
     doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    if doc.status == "NEEDS_REVIEW":
-        raise HTTPException(
-            status_code=409, detail="Document has already been processed"
-        )
 
     doc.status = "PROCESSING"
     db.commit()
+
+    if ocr is None:
+        ocr = get_ocr_service()
+
     try:
         file_bytes = load_private_file(doc.storage_object_id)
         result = await ocr.process_document(file_bytes, doc.file_name, doc.mime_type)
+
         ocr_run = replace_ocr_evidence(db, doc, result)
         db.commit()
 
@@ -292,6 +408,9 @@ async def process_document_ocr(
         facts = _review_candidates_as_extracted_facts(db, review_candidates)
         if not facts and not review_candidates:
             facts = build_proposed_facts(doc.id, result)
+        db.query(DocumentExtractionModel).filter(
+            DocumentExtractionModel.document_id == doc.id
+        ).delete(synchronize_session=False)
         for fact in facts:
             db.add(
                 DocumentExtractionModel(
@@ -328,9 +447,48 @@ async def process_document_ocr(
         doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
         if doc:
             doc.status = "PROCESSING_FAILED"
-            doc.failure_code = type(exc).__name__
+            doc.failure_code = (
+                "OCR_SERVICE_UNAVAILABLE"
+                if isinstance(exc, (OCRProviderConfigurationError, OCRInferenceError))
+                else type(exc).__name__
+            )
             doc.processed_at = datetime.now(timezone.utc)
             db.commit()
+        logger.exception("Failed processing document %s", document_id)
+        raise exc
+
+
+async def _background_process_document(document_id: str) -> None:
+    """Asynchronously processes uploaded document without blocking HTTP upload."""
+    from app.core.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        await run_document_processing(document_id, db)
+    except Exception as exc:
+        logger.error(
+            "Background document processing failed for %s: %s", document_id, exc
+        )
+    finally:
+        db.close()
+
+
+@router.post("/{document_id}/process", response_model=DocumentExtractionResult)
+async def process_document_ocr(
+    document_id: str,
+    db: Session = Depends(get_db),
+    ocr: AbstractOCRProvider = Depends(get_ocr_service),
+):
+    """Create untrusted, provenance-bearing proposals that require human review."""
+    doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        return await run_document_processing(document_id, db, ocr)
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
             detail={

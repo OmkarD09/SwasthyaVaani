@@ -28,10 +28,11 @@ class DocumentUploadResponse(BaseModel):
     page_count: int
     status: DocumentStatus = "PENDING"
     uploaded_at: datetime
+    storage_url: str | None = None
 
 
 class ExtractedFact(BaseModel):
-    field_type: Literal["MEDICATION", "LAB"]
+    field_type: str
     field_name: str
     proposed_value: Any
     original_source_text: str

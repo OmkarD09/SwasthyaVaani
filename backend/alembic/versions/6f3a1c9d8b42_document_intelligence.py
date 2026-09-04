@@ -51,10 +51,9 @@ def upgrade() -> None:
         sa.Column("ocr_engine_version", sa.String(), nullable=True),
         sa.Column("extractor_version", sa.String(), nullable=True),
     )
-    with op.batch_alter_table("document_extractions") as batch_op:
-        for column in additions:
-            if column.name not in extraction_columns:
-                batch_op.add_column(column)
+    for column in additions:
+        if column.name not in extraction_columns:
+            op.add_column("document_extractions", column)
 
 
 def downgrade() -> None:

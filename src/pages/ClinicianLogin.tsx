@@ -37,9 +37,10 @@ export function ClinicianLogin() {
       return;
     }
 
-    setBusy(true);
-    const role = trimmedId.toUpperCase().startsWith('ADMIN') ? 'ADMIN' : 'DOCTOR';
+    const upperId = trimmedId.toUpperCase();
+    const role = upperId.includes('ADMIN') || upperId.includes('SUPER') ? 'ADMIN' : 'DOCTOR';
 
+    setBusy(true);
     try {
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST',

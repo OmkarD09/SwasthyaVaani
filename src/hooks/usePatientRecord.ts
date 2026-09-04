@@ -11,6 +11,7 @@ export interface PatientRecordState {
   note: string;
   setNote: (note: string) => void;
   confirmPatient: (edits?: Record<string, string>) => Promise<boolean>;
+  refresh: () => Promise<void>;
 }
 
 export function usePatientRecord(patientId: string | undefined): PatientRecordState {
@@ -21,48 +22,42 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
   const [fhirId, setFhirId] = useState<string | null>(null);
   const [note, setNote] = useState('');
 
-  useEffect(() => {
+  const loadDetail = async (showLoading = true) => {
     if (!patientId) {
       setLoading(false);
       setError('Invalid patient ID');
       return;
     }
-
-    let isMounted = true;
-    setLoading(true);
+    if (showLoading) setLoading(true);
     setError(null);
 
-    const loadDetail = async () => {
-      try {
-        const res = await authorizedClinicianFetch(`/api/v1/doctor/patients/${patientId}`);
-        if (!isMounted) return;
-
-        if (res.ok) {
-          const data = await res.json();
-          setPatientDetail(data);
-          setNote(data.clinician_notes || '');
-          if (data.review_status === 'PHYSICIAN_CONFIRMED') setConfirmed(true);
-          setError(null);
-        } else if (res.status === 404) {
-          setError(`Patient record "${patientId}" was not found in database.`);
-          setPatientDetail(null);
-        } else {
-          setError(`Server returned status ${res.status} when loading patient record.`);
-          setPatientDetail(null);
-        }
-      } catch (err: any) {
-        if (!isMounted) return;
-        console.error('Error fetching patient clinical record:', err);
-        setError('Network error: Unable to connect to backend server.');
+    try {
+      const res = await authorizedClinicianFetch(`/api/v1/doctor/patients/${patientId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPatientDetail(data);
+        setNote(data.clinician_notes || '');
+        if (data.review_status === 'PHYSICIAN_CONFIRMED') setConfirmed(true);
+        setError(null);
+      } else if (res.status === 404) {
+        setError(`Patient record "${patientId}" was not found in database.`);
         setPatientDetail(null);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+      } else {
+        setError(`Server returned status ${res.status} when loading patient record.`);
+        setPatientDetail(null);
       }
-    };
+    } catch (err: any) {
+      console.error('Error fetching patient clinical record:', err);
+      setError('Network error: Unable to connect to backend server.');
+      setPatientDetail(null);
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
 
-    loadDetail();
+  useEffect(() => {
+    let isMounted = true;
+    loadDetail(true);
     return () => {
       isMounted = false;
     };
@@ -112,5 +107,6 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
     note,
     setNote,
     confirmPatient,
+    refresh: () => loadDetail(false),
   };
 }

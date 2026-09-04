@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { Paperclip, FileText, X, Eye, CircleAlert } from 'lucide-react';
+import { getClinicianAccessToken } from '../../lib/clinicianAuth';
 
 export interface DocumentAttachment {
   id?: string;
   name: string;
-  type?: 'prescription' | 'lab_report' | 'scan' | 'document';
+  type?: 'prescription' | 'lab_report' | 'scan' | 'document' | string;
   size?: string;
   uploadedAt?: string;
   url?: string;
   localOnly?: boolean;
+  status?: string;
+  failure_code?: string;
+  extractions?: Array<Record<string, any>>;
 }
 
 export interface PatientAttachmentsProps {
@@ -94,7 +98,9 @@ export function PatientAttachments({
                     type="button"
                     onClick={() => {
                       if (doc.url) {
-                        window.open(doc.url, '_blank');
+                        const token = getClinicianAccessToken();
+                        const url = token ? `${doc.url}?token=${encodeURIComponent(token)}` : doc.url;
+                        window.open(url, '_blank', 'noopener,noreferrer');
                       } else {
                         setPreviewDoc(doc);
                       }
@@ -146,6 +152,8 @@ export function PatientAttachments({
                   <span>
                     {previewDoc.localOnly
                       ? 'File selected locally; no upload has been completed'
+                      : previewDoc.url
+                      ? 'Document ready for clinical review'
                       : 'No authorized preview URL is available'}
                   </span>
                 </div>
@@ -163,13 +171,27 @@ export function PatientAttachments({
                     <strong>Status:</strong>{' '}
                     {previewDoc.localOnly
                       ? 'Upload pending; not available for clinical review'
-                      : 'Metadata available; preview unavailable'}
+                      : 'Metadata available; preview ready'}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex items-center justify-end gap-2.5">
+              {previewDoc.url && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const token = getClinicianAccessToken();
+                    const url = token ? `${previewDoc.url}?token=${encodeURIComponent(token)}` : previewDoc.url;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#1f5b4e] px-4 py-2 text-xs font-semibold text-white hover:bg-[#164339] transition cursor-pointer"
+                >
+                  <Eye size={14} />
+                  <span>Open Document</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setPreviewDoc(null)}

@@ -98,7 +98,7 @@ def validate_candidate_evidence(
         for value in _candidate_values(candidate):
             if _normalized(value) not in supporting_text:
                 raise DocumentCandidateValidationError(
-                    "Candidate contained a value unsupported by its cited OCR evidence"
+                    f"Candidate {type(candidate).__name__} field value {value!r} unsupported by its cited OCR evidence {supporting_text!r}"
                 )
 
 

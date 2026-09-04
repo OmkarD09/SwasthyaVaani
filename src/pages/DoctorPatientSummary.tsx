@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import { usePatientRecord } from '../hooks/usePatientRecord';
 import { PatientRecordShell } from '../components/doctor/PatientRecordShell';
-import { authorizedClinicianFetch } from '../lib/clinicianAuth';
+import { authorizedClinicianFetch, getClinicianAccessToken } from '../lib/clinicianAuth';
 
 export function DoctorPatientSummary() {
   const params = useParams<{ id: string }>();
@@ -54,6 +54,7 @@ export function DoctorPatientSummary() {
     note,
     setNote,
     confirmPatient,
+    refresh,
   } = usePatientRecord(patientId);
 
   const [editing, setEditing] = useState(false);
@@ -63,7 +64,25 @@ export function DoctorPatientSummary() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notesSavedNotice, setNotesSavedNotice] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+  const [processingDocId, setProcessingDocId] = useState<string | null>(null);
   const [queue, setQueue] = useState<any[]>([]);
+
+  const handleRunOcr = async (docId: string) => {
+    if (!docId) return;
+    setProcessingDocId(docId);
+    try {
+      const res = await authorizedClinicianFetch(`/api/v1/documents/${docId}/process`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        await refresh();
+      }
+    } catch (err) {
+      console.error('Failed to run OCR processing:', err);
+    } finally {
+      setProcessingDocId(null);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -275,6 +294,9 @@ export function DoctorPatientSummary() {
 
   const attachedFiles: any[] = Array.isArray(patientDetail.documents)
     ? patientDetail.documents
+    : [];
+  const allMedicalRecords: any[] = Array.isArray(patientDetail.medical_records)
+    ? patientDetail.medical_records
     : [];
   const lastUpdated = new Intl.DateTimeFormat('en-IN', {
     dateStyle: 'medium',
@@ -553,32 +575,87 @@ export function DoctorPatientSummary() {
 
               {attachedFiles.length > 0 ? (
                 <div className="space-y-2.5">
-                  {attachedFiles.map((doc, idx) => (
-                    <div
-                      key={idx}
-                      className="group flex items-center justify-between rounded-xl border border-[#c4ded0] bg-[#f9fdfa] p-3 transition hover:border-[#059669]"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#dcfce7] text-[#065f46]">
-                          <FileText size={16} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-extrabold text-[#0a2f26]">{doc.name}</p>
-                          <p className="text-[11px] font-semibold text-[#375347]">
-                            {doc.size ? `${doc.size} · ` : ''}{doc.uploadedAt}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewDoc(doc)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-[#a2d4ba] bg-[#ecfdf5] px-3 py-1 text-xs font-extrabold text-[#065f46] transition hover:bg-[#065f46] hover:text-white cursor-pointer"
+                  {attachedFiles.map((doc, idx) => {
+                    const isProcessing = processingDocId === doc.id || doc.status === 'PROCESSING';
+                    const isProcessed = doc.status === 'NEEDS_REVIEW' || doc.status === 'COMPLETED';
+                    const isFailed = doc.status === 'PROCESSING_FAILED';
+                    const isPending = doc.status === 'PENDING' || (!doc.status && !doc.localOnly);
+
+                    return (
+                      <div
+                        key={doc.id || idx}
+                        className="group flex flex-col gap-2 rounded-xl border border-[#c4ded0] bg-[#f9fdfa] p-3 transition hover:border-[#059669]"
                       >
-                        <Eye size={13} />
-                        <span>View</span>
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#dcfce7] text-[#065f46]">
+                              <FileText size={16} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-extrabold text-[#0a2f26]">{doc.name}</p>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+                                <span className="font-semibold text-[#375347]">
+                                  {doc.size ? `${doc.size} · ` : ''}{doc.uploadedAt}
+                                </span>
+                                {isProcessed && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-[#dcfce7] px-1.5 py-0.2 font-mono font-bold text-[#065f46] border border-[#bbf7d0]">
+                                    <CheckCircle2 size={10} /> OCR Extracted
+                                  </span>
+                                )}
+                                {isProcessing && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-[#dbeafe] px-1.5 py-0.2 font-mono font-bold text-[#1d4ed8] border border-[#bfdbfe]">
+                                    <RefreshCw size={10} className="animate-spin" /> Processing OCR...
+                                  </span>
+                                )}
+                                {isPending && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-[#fef3c7] px-1.5 py-0.2 font-mono font-bold text-[#92400e] border border-[#fde68a]">
+                                    <Clock size={10} /> Pending OCR
+                                  </span>
+                                )}
+                                {isFailed && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-[#fee2e2] px-1.5 py-0.2 font-mono font-bold text-[#b91c1c] border border-[#fecaca]">
+                                    <AlertTriangle size={10} /> OCR Failed
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {(isPending || isFailed) && doc.id && (
+                              <button
+                                type="button"
+                                onClick={() => handleRunOcr(doc.id)}
+                                disabled={isProcessing}
+                                className="inline-flex items-center gap-1 rounded-lg border border-[#a2d4ba] bg-[#ecfdf5] px-2 py-1 text-xs font-extrabold text-[#065f46] hover:bg-[#065f46] hover:text-white transition cursor-pointer disabled:opacity-50"
+                                title="Run OCR extraction"
+                              >
+                                <RefreshCw size={11} className={isProcessing ? 'animate-spin' : ''} />
+                                <span>{isFailed ? 'Retry' : 'Run OCR'}</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setPreviewDoc(doc)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#a2d4ba] bg-[#ecfdf5] px-3 py-1 text-xs font-extrabold text-[#065f46] transition hover:bg-[#065f46] hover:text-white cursor-pointer"
+                            >
+                              <Eye size={13} />
+                              <span>View</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {doc.extractions && doc.extractions.length > 0 && (
+                          <div className="border-t border-[#e5eae4] pt-1.5 text-[11px] text-[#274c3d] flex items-center justify-between">
+                            <span className="font-semibold flex items-center gap-1 text-[#065f46]">
+                              <Sparkles size={11} /> {doc.extractions.length} entity candidate{doc.extractions.length > 1 ? 's' : ''} found
+                            </span>
+                            <span className="text-[10px] text-[#52796f] font-mono">Click View for details</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 /* Empty state matching the Option A image */
@@ -588,6 +665,74 @@ export function DoctorPatientSummary() {
                   </div>
                   <p className="text-xs font-extrabold text-[#0a2f26]">No additional records uploaded</p>
                   <p className="text-xs font-semibold text-[#274c3d] mt-0.5">Files uploaded by the patient will appear here.</p>
+                </div>
+              )}
+
+              {/* AI-EXTRACTED FINDINGS (FROM ATTACHED RECORDS) */}
+              {allMedicalRecords.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-[#e5eae4]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles size={13} className="text-[#059669]" />
+                      <h4 className="font-mono text-[11px] font-extrabold uppercase tracking-wider text-[#0a2f26]">
+                        AI-EXTRACTED FINDINGS (FROM ATTACHED RECORDS)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-[#065f46] bg-[#dcfce7] px-2 py-0.5 rounded border border-[#bbf7d0]">
+                      {allMedicalRecords.length} finding{allMedicalRecords.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] font-semibold text-[#4b6358] mb-2.5 leading-snug">
+                    AI proposals extracted from uploaded medical records. Provenance and confidence tracked. Requires clinical physician verification.
+                  </p>
+
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {allMedicalRecords.map((record, rIdx) => {
+                      const val = record.value;
+                      const title = typeof val === 'object' && val !== null ? (val.medicine_name || val.name || val.test_name || record.field_name) : String(val || record.field_name);
+                      const details = typeof val === 'object' && val !== null ? [val.strength, val.dosage, val.frequency, val.duration, val.value ? `${val.value} ${val.unit || ''}` : null].filter(Boolean).join(' • ') : null;
+                      const confidencePct = record.confidence != null ? (record.confidence <= 1 ? Math.round(record.confidence * 100) : Math.round(record.confidence)) : null;
+
+                      return (
+                        <div
+                          key={record.id || rIdx}
+                          className="rounded-xl border border-[#c4ded0] bg-[#f9fdfa] p-2.5 text-xs text-[#0a2f26]"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="rounded bg-[#dcfce7] px-1.5 py-0.2 font-mono text-[9px] font-extrabold text-[#065f46] uppercase border border-[#bbf7d0]">
+                                  {record.field_type || 'FINDING'}
+                                </span>
+                                <span className="font-extrabold text-[#0a2f26] truncate">{title}</span>
+                              </div>
+                              {details && (
+                                <p className="mt-1 text-[11px] font-semibold text-[#274c3d]">
+                                  {details}
+                                </p>
+                              )}
+                              {record.source_text && (
+                                <p className="mt-1 text-[10px] italic text-[#4b6358] line-clamp-2">
+                                  Source: "{record.source_text}"
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0">
+                              {confidencePct !== null && (
+                                <span className={`font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${confidencePct >= 80 ? 'bg-[#dcfce7] text-[#065f46] border-[#bbf7d0]' : 'bg-[#fef3c7] text-[#92400e] border-[#fde68a]'}`}>
+                                  {confidencePct}% conf
+                                </span>
+                              )}
+                              <p className="text-[10px] font-semibold text-[#4b6358] mt-1 truncate max-w-[110px]">
+                                {record.document_name || 'Attached doc'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -932,10 +1077,16 @@ export function DoctorPatientSummary() {
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between rounded-xl bg-[#ecfdf5] p-3 border border-[#a2d4ba] text-xs font-bold text-[#065f46]">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-[#d97706]" />
+                  {previewDoc.url ? (
+                    <FileCheck2 size={16} className="text-[#059669]" />
+                  ) : (
+                    <AlertTriangle size={16} className="text-[#d97706]" />
+                  )}
                   <span>
                     {previewDoc.localOnly
                       ? 'File selected locally; no upload has been completed'
+                      : previewDoc.url
+                      ? 'Document ready for clinical review'
                       : 'No authorized preview URL is available'}
                   </span>
                 </div>
@@ -948,18 +1099,88 @@ export function DoctorPatientSummary() {
                 <p className="font-mono text-[10px] font-extrabold uppercase tracking-wider text-[#375347] mb-1.5">Document Details</p>
                 <div className="space-y-1 text-xs">
                   <p><strong>File Name:</strong> {previewDoc.name}</p>
-                  <p><strong>Attachment Type:</strong> {previewDoc.type || 'Clinical document'}</p>
+                  <p><strong>Attachment Type:</strong> {(previewDoc.type || previewDoc.document_type || 'Prescription').toUpperCase()}</p>
                   <p>
                     <strong>Status:</strong>{' '}
                     {previewDoc.localOnly
                       ? 'Upload pending; not available for clinical review'
-                      : 'Metadata available; preview unavailable'}
+                      : previewDoc.status || 'AVAILABLE'}
                   </p>
+                  {previewDoc.uploadedAt && (
+                    <p><strong>Uploaded:</strong> {previewDoc.uploadedAt}</p>
+                  )}
                 </div>
               </div>
+
+              {previewDoc.extractions && previewDoc.extractions.length > 0 && (
+                <div className="rounded-xl border border-[#c4ded0] bg-[#f0fdf4]/50 p-3.5 text-xs text-[#0a2f26] max-h-48 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#c4ded0]">
+                    <div className="flex items-center gap-1.5 font-mono text-[10px] font-extrabold uppercase tracking-wider text-[#065f46]">
+                      <Sparkles size={13} />
+                      <span>Extracted Findings ({previewDoc.extractions.length})</span>
+                    </div>
+                    <span className="text-[9px] font-mono font-bold bg-[#dcfce7] text-[#065f46] px-1.5 py-0.5 rounded border border-[#bbf7d0]">
+                      AI Draft
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {previewDoc.extractions.map((ext: any, eIdx: number) => {
+                      const val = ext.value;
+                      const title = typeof val === 'object' && val !== null ? (val.medicine_name || val.name || val.test_name || ext.field_name) : String(val || ext.field_name);
+                      const sub = typeof val === 'object' && val !== null ? [val.strength, val.dosage, val.frequency, val.duration, val.value ? `${val.value} ${val.unit || ''}` : null].filter(Boolean).join(' • ') : null;
+                      const conf = ext.confidence != null ? (ext.confidence <= 1 ? Math.round(ext.confidence * 100) : Math.round(ext.confidence)) : null;
+
+                      return (
+                        <div key={ext.id || eIdx} className="rounded-lg bg-white p-2 border border-[#d6ded5] text-xs">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-extrabold text-[#0a2f26] truncate">{title}</span>
+                            {conf !== null && (
+                              <span className="font-mono text-[9px] font-bold text-[#065f46] bg-[#dcfce7] px-1 rounded">
+                                {conf}%
+                              </span>
+                            )}
+                          </div>
+                          {sub && <p className="text-[11px] font-semibold text-[#274c3d] mt-0.5">{sub}</p>}
+                          {ext.source_text && <p className="text-[10px] text-[#4b6358] italic mt-0.5">"{ext.source_text}"</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex items-center justify-end gap-2.5">
+              {previewDoc.id && (previewDoc.status === 'PENDING' || previewDoc.status === 'PROCESSING_FAILED') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleRunOcr(previewDoc.id);
+                    setPreviewDoc(null);
+                  }}
+                  disabled={processingDocId === previewDoc.id}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#a2d4ba] bg-[#ecfdf5] px-3.5 py-2 text-xs font-extrabold text-[#065f46] hover:bg-[#065f46] hover:text-white transition cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw size={13} className={processingDocId === previewDoc.id ? 'animate-spin' : ''} />
+                  <span>Run OCR</span>
+                </button>
+              )}
+              {previewDoc.url && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const token = getClinicianAccessToken();
+                    const viewUrl = token
+                      ? `${previewDoc.url}?token=${encodeURIComponent(token)}`
+                      : previewDoc.url;
+                    window.open(viewUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#065f46] px-4 py-2 text-xs font-extrabold text-white hover:bg-[#044e39] transition cursor-pointer"
+                >
+                  <Eye size={14} />
+                  <span>Open Document</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setPreviewDoc(null)}

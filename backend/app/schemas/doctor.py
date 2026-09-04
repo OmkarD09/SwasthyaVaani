@@ -24,22 +24,23 @@ class DoctorQueueItem(BaseModel):
 
 class DoctorPatientDetail(BaseModel):
     intake_session_id: str
-    token: str
-    patient_id: str
-    patient_name: str
+    token: Optional[str] = ""
+    patient_id: Optional[str] = ""
+    patient_name: Optional[str] = "Patient"
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None
-    hospital_name: str
-    doctor_name: str
-    workflow_type: str
-    language_code: str
-    status: str
+    hospital_name: Optional[str] = "Hospital not recorded"
+    doctor_name: Optional[str] = "Clinician not recorded"
+    workflow_type: Optional[str] = "GENERAL"
+    language_code: Optional[str] = "en"
+    status: Optional[str] = "WAITING"
     review_status: Literal["AI_DRAFT", "NEEDS_VERIFICATION", "PHYSICIAN_CONFIRMED"] = "AI_DRAFT"
     clinical_state: ClinicalState
     documents: List[Dict[str, Any]] = Field(default_factory=list)
+    medical_records: List[Dict[str, Any]] = Field(default_factory=list)
     timeline: List[Dict[str, Any]] = Field(default_factory=list)
     clinician_notes: Optional[str] = None
-    submitted_at: datetime
+    submitted_at: Optional[datetime] = None
 
 
 class PhysicianEditPayload(BaseModel):

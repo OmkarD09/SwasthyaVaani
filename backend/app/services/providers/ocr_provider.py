@@ -37,7 +37,7 @@ class MockOCRProvider(AbstractOCRProvider):
         self, file_bytes: bytes, filename: str, mime_type: str
     ) -> OCRExtractionResult:
         lowered = filename.lower()
-        doc_type = "PRESCRIPTION" if "presc" in lowered else "LAB_REPORT"
+        doc_type = "LAB_REPORT" if "lab" in lowered else "PRESCRIPTION"
         low_confidence = "low_confidence" in lowered
         confidence = 0.42 if low_confidence else 0.94
         if doc_type == "PRESCRIPTION":
