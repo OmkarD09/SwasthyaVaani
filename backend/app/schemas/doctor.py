@@ -20,6 +20,9 @@ class DoctorQueueItem(BaseModel):
     has_red_flags: bool = False
     submitted_at: datetime
     wait_time_minutes: int = 0
+    abha_id: Optional[str] = None
+    abha_status: Optional[str] = None
+    documents_count: Optional[int] = 0
 
 
 class DoctorPatientDetail(BaseModel):
@@ -29,6 +32,12 @@ class DoctorPatientDetail(BaseModel):
     patient_name: Optional[str] = "Patient"
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None
+    phone: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    abha_id: Optional[str] = None
+    abha_address: Optional[str] = None
+    abha_status: Optional[str] = "UNVERIFIED"
+    consent_recorded: bool = False
     hospital_name: Optional[str] = "Hospital not recorded"
     doctor_name: Optional[str] = "Clinician not recorded"
     workflow_type: Optional[str] = "GENERAL"

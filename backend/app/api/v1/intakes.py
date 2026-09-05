@@ -1,7 +1,9 @@
+import re
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -28,26 +30,116 @@ def generate_token():
     return f"A-{uuid.uuid4().hex[:6].upper()}"
 
 
+def normalize_abha_id(val: str | None) -> str | None:
+    if not val:
+        return None
+    raw = re.sub(r"[\s-]", "", str(val).strip())
+    if len(raw) == 14 and raw.isdigit():
+        return f"{raw[0:2]}-{raw[2:6]}-{raw[6:10]}-{raw[10:14]}"
+    cleaned = str(val).strip()
+    return cleaned if cleaned else None
+
+
+def normalize_abha_address(val: str | None) -> str | None:
+    if not val:
+        return None
+    cleaned = str(val).strip().lower()
+    return cleaned if cleaned else None
+
+
+def normalize_phone(val: str | None) -> str | None:
+    if not val:
+        return None
+    digits = re.sub(r"\D", "", str(val).strip())
+    if len(digits) == 10:
+        return digits
+    if len(digits) == 12 and digits.startswith("91"):
+        return digits[2:]
+    if len(digits) == 11 and digits.startswith("0"):
+        return digits[1:]
+    cleaned = str(val).strip()
+    return cleaned if cleaned else None
+
+
 @router.post("", response_model=IntakeSessionDetail)
 def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db)):
     """Initialize a new patient pre-consultation clinical intake session."""
-    # Ensure patient exists or create anonymous patient profile
-    patient_id = req.patient_id
-    if not patient_id:
-        new_patient = Patient(
-            display_name=req.patient_name,
+    patient: Patient | None = None
+
+    normalized_abha = normalize_abha_id(req.abha_id)
+    raw_digits_abha = re.sub(r"[\s-]", "", req.abha_id.strip()) if req.abha_id else None
+    normalized_address = normalize_abha_address(req.abha_address)
+    normalized_ph = normalize_phone(req.phone)
+    dob = req.date_of_birth.strip() if req.date_of_birth and req.date_of_birth.strip() else None
+    clean_name = req.patient_name.strip() if req.patient_name and req.patient_name.strip() else "Patient"
+    clean_gender = req.patient_gender.strip() if req.patient_gender and req.patient_gender.strip() else None
+
+    # 1. Lookup existing patient by patient_id if provided
+    if req.patient_id:
+        patient = db.query(Patient).filter(Patient.id == req.patient_id).first()
+
+    # 2. Lookup existing patient by ABHA ID if not found yet (prevent duplicates)
+    if not patient and (normalized_abha or raw_digits_abha):
+        abha_conditions = []
+        if normalized_abha:
+            abha_conditions.append(Patient.abha_id == normalized_abha)
+        if raw_digits_abha and raw_digits_abha != normalized_abha:
+            abha_conditions.append(Patient.abha_id == raw_digits_abha)
+        patient = db.query(Patient).filter(or_(*abha_conditions)).first()
+
+    if patient:
+        # Update existing demographics without overwriting existing data with empty/null values
+        if clean_name and clean_name != "Patient":
+            patient.display_name = clean_name
+        elif not patient.display_name:
+            patient.display_name = clean_name
+
+        if req.patient_age is not None:
+            patient.age = req.patient_age
+
+        if clean_gender:
+            patient.gender = clean_gender
+
+        if normalized_ph:
+            patient.phone = normalized_ph
+
+        if dob:
+            patient.date_of_birth = dob
+
+        if normalized_address:
+            patient.abha_address = normalized_address
+
+        if normalized_abha and not patient.abha_id:
+            patient.abha_id = normalized_abha
+
+        # Safety rule: ABHA QR data is IMPORTED only, NOT ABDM verified.
+        # abha_status must NOT become "VERIFIED" merely because QR was scanned.
+        if not patient.abha_status:
+            patient.abha_status = "UNVERIFIED"
+
+        if req.consent_given:
+            patient.consent_recorded = True
+    else:
+        # Create new patient record
+        patient = Patient(
+            display_name=clean_name,
             age=req.patient_age,
-            gender=req.patient_gender,
-            abha_id=req.abha_id,
+            gender=clean_gender,
+            phone=normalized_ph,
+            date_of_birth=dob,
+            abha_id=normalized_abha,
+            abha_address=normalized_address,
+            abha_status="UNVERIFIED",
+            verification_timestamp=None,
+            consent_recorded=bool(req.consent_given),
         )
-        db.add(new_patient)
+        db.add(patient)
         db.flush()
-        patient_id = new_patient.id
 
     token = generate_token()
     session = IntakeSession(
         token=token,
-        patient_id=patient_id,
+        patient_id=patient.id,
         hospital_id=req.hospital_id,
         doctor_id=req.doctor_id,
         workflow_type=req.workflow_type,
@@ -73,9 +165,15 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
         id=session.id,
         token=session.token,
         patient_id=session.patient_id,
-        patient_name=req.patient_name,
-        patient_age=req.patient_age,
-        patient_gender=req.patient_gender,
+        patient_name=patient.display_name,
+        patient_age=patient.age,
+        patient_gender=patient.gender,
+        phone=patient.phone,
+        date_of_birth=patient.date_of_birth,
+        abha_id=patient.abha_id,
+        abha_address=patient.abha_address,
+        abha_status=patient.abha_status or "UNVERIFIED",
+        consent_recorded=bool(patient.consent_recorded),
         hospital_id=session.hospital_id,
         doctor_id=session.doctor_id,
         workflow_type=session.workflow_type,
@@ -115,6 +213,12 @@ def get_intake_session(intake_id: str, db: Session = Depends(get_db)):
         patient_name=patient.display_name if patient else "Patient",
         patient_age=patient.age if patient else None,
         patient_gender=patient.gender if patient else None,
+        phone=patient.phone if patient else None,
+        date_of_birth=patient.date_of_birth if patient else None,
+        abha_id=patient.abha_id if patient else None,
+        abha_address=patient.abha_address if patient else None,
+        abha_status=patient.abha_status if patient else "UNVERIFIED",
+        consent_recorded=bool(patient.consent_recorded) if patient else False,
         hospital_id=session.hospital_id,
         doctor_id=session.doctor_id,
         workflow_type=session.workflow_type,

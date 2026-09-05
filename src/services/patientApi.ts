@@ -5,8 +5,11 @@ export interface PatientProfileData {
   age: string;
   gender: string;
   abhaNumber?: string;
+  abhaAddress?: string;
+  dateOfBirth?: string;
   phone?: string;
   preferredLanguage: LanguageCode;
+  isAbhaFromQr?: boolean;
 }
 
 const DEFAULT_PATIENT_PROFILE: PatientProfileData = {
@@ -16,9 +19,22 @@ const DEFAULT_PATIENT_PROFILE: PatientProfileData = {
   abhaNumber: '91-4521-8890-1234',
   phone: '9876543210',
   preferredLanguage: 'en',
+  isAbhaFromQr: false,
 };
 
 const PATIENT_STORAGE_KEY = 'sv_patient_profile';
+
+export function getStoredPatientProfile(): PatientProfileData | null {
+  try {
+    const stored = localStorage.getItem(PATIENT_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return null;
+}
 
 export const patientApi = {
   getProfile: async (): Promise<PatientProfileData> => {

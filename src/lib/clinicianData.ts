@@ -14,6 +14,8 @@ export type DoctorQueueItem = {
   has_red_flags: boolean;
   submitted_at: string;
   wait_time_minutes: number;
+  abha_id?: string | null;
+  abha_status?: string | null;
 };
 
 export type PatientDetail = {
@@ -23,6 +25,12 @@ export type PatientDetail = {
   patient_name: string;
   patient_age: number | null;
   patient_gender: string | null;
+  phone?: string | null;
+  date_of_birth?: string | null;
+  abha_id?: string | null;
+  abha_address?: string | null;
+  abha_status?: string | null;
+  consent_recorded?: boolean;
   hospital_name: string;
   doctor_name: string;
   workflow_type: string;

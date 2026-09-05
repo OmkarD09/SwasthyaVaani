@@ -143,7 +143,9 @@ def get_doctor_queue(
                 priority=priority,
                 has_red_flags=has_red_flags,
                 submitted_at=timestamp_to_use or now_utc,
-                wait_time_minutes=wait_mins
+                wait_time_minutes=wait_mins,
+                abha_id=patient.abha_id if patient else None,
+                abha_status=patient.abha_status if patient else None,
             )
         )
 
@@ -337,6 +339,12 @@ def get_patient_clinical_detail(
         patient_name=(patient.display_name if patient and patient.display_name else "Patient"),
         patient_age=patient.age if patient else None,
         patient_gender=patient.gender if patient else None,
+        phone=patient.phone if patient else None,
+        date_of_birth=patient.date_of_birth if patient else None,
+        abha_id=patient.abha_id if patient else None,
+        abha_address=patient.abha_address if patient else None,
+        abha_status=patient.abha_status if patient else "UNVERIFIED",
+        consent_recorded=bool(patient.consent_recorded) if patient else False,
         hospital_name=(hospital.name if hospital and hospital.name else "Hospital not recorded"),
         doctor_name=(doctor.display_name if doctor and doctor.display_name else "Clinician not recorded"),
         workflow_type=session.workflow_type or "GENERAL",
