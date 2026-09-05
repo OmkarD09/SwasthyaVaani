@@ -8,6 +8,7 @@ env/
 # Environment Variables & Secrets (NEVER COMMIT)
 .env
 backend/.env
+backend/env
 *.env
 *.env.local
 
@@ -18,6 +19,11 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Private medical document storage and generated document test output
+private_uploads/
+backend/private_uploads/
+backend/tests/generated/
 
 # Build artifacts
 dist/

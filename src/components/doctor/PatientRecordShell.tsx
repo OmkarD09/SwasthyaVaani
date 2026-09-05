@@ -1,0 +1,267 @@
+import { type ReactNode, useState, useRef, useEffect } from 'react';
+import { Link, useLocation } from 'wouter';
+import {
+  LayoutDashboard,
+  MessageSquare,
+  FileText,
+  Leaf,
+  Menu,
+  BellRing,
+  ArrowLeft,
+  Hospital,
+  ChevronDown,
+  CircleHelp,
+  LockKeyhole,
+  UsersRound,
+} from 'lucide-react';
+import { Brand } from '../Brand';
+import {
+  clearClinicianSession,
+  getClinicianSession,
+} from '../../lib/clinicianAuth';
+
+export interface PatientRecordShellProps {
+  patientId: string;
+  children: ReactNode;
+}
+
+export function PatientRecordShell({ patientId, children }: PatientRecordShellProps) {
+  const [location, setLocation] = useLocation();
+  const [mobile, setMobile] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const clinicianSession = getClinicianSession();
+  const clinicianName = clinicianSession?.display_name || 'Authorized clinician';
+  const clinicianInitials =
+    clinicianName
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'CL';
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setProfileOpen(false);
+    };
+    if (profileOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [profileOpen]);
+
+  const isConversation = location.includes('/conversation');
+  const isAyush = location.includes('/ayush');
+  const isSummary = location.includes('/summary') || (!isConversation && !isAyush);
+
+  return (
+    <div className="portal-page">
+      {/* Patient Specific Sidebar matching /doctor sidebar orientation and color */}
+      <aside className={`portal-sidebar ${mobile ? 'mobile-open' : ''}`}>
+        <div className="portal-brand" onClick={() => setLocation('/')}>
+          <Brand />
+        </div>
+
+        <div className="portal-context">
+          <span className="context-icon">
+            <Hospital size={16} />
+          </span>
+          <div>
+            <b>Clinical Workspace</b>
+            <span>Patient record</span>
+          </div>
+          <ChevronDown size={14} />
+        </div>
+
+        {/* Section 1: Doctor Workspace */}
+        <div className="side-label">DOCTOR WORKSPACE</div>
+        <nav className="portal-nav">
+          <button
+            type="button"
+            onClick={() => {
+              setMobile(false);
+              setLocation('/doctor');
+            }}
+          >
+            <LayoutDashboard size={18} />
+            <span>Doctor Dashboard</span>
+          </button>
+        </nav>
+
+        {/* Section 2: Patient Record Navigation */}
+        <div className="side-label side-label-spaced">PATIENT RECORD</div>
+        <nav className="portal-nav">
+          <button
+            type="button"
+            className={isSummary ? 'active' : ''}
+            onClick={() => {
+              setMobile(false);
+              setLocation(`/doctor/patient/${patientId}/summary`);
+            }}
+          >
+            <FileText size={18} />
+            <span>Clinical Summary</span>
+          </button>
+
+          <button
+            type="button"
+            className={isConversation ? 'active' : ''}
+            onClick={() => {
+              setMobile(false);
+              setLocation(`/doctor/patient/${patientId}/conversation`);
+            }}
+          >
+            <MessageSquare size={18} />
+            <span>Patient Conversation</span>
+          </button>
+
+          <button
+            type="button"
+            className={isAyush ? 'active' : ''}
+            onClick={() => {
+              setMobile(false);
+              setLocation(`/doctor/patient/${patientId}/ayush`);
+            }}
+          >
+            <Leaf size={18} />
+            <span>AYUSH Assessment</span>
+          </button>
+        </nav>
+
+        {/* Section 3: System */}
+        <div className="side-label side-label-spaced">SYSTEM</div>
+        <nav className="portal-nav">
+          <button type="button" onClick={() => alert('Support workflow is not connected in this prototype.')}>
+            <CircleHelp size={18} />
+            <span>Help & support</span>
+          </button>
+        </nav>
+
+        {/* Bottom Profile Info and Secure Badge */}
+        <div className="sidebar-bottom">
+          <div className="relative mb-2.5" ref={menuRef}>
+            {profileOpen && (
+              <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-[#264552] bg-[#0d222b] p-2.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-white">
+                <div className="px-3 py-2.5 border-b border-[#1b3945] mb-1.5 bg-[#122e3a] rounded-xl">
+                  <p className="font-bold text-xs text-[#6bdbca]">{clinicianName}</p>
+                  <p className="font-mono text-[10px] text-[#91b3bf] mt-0.5">
+                    {clinicianSession?.role || 'CLINICIAN'}
+                  </p>
+                  <p className="text-[10px] text-[#6d8d99] mt-0.5">Authenticated prototype session</p>
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      alert('Profile management is not connected in this prototype.');
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#a8cbdb] hover:bg-[#193845] hover:text-[#76ddcd] transition cursor-pointer font-medium"
+                  >
+                    <UsersRound size={14} className="text-[#76ddcd]" /> Profile details
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      alert('Workspace configuration is not connected in this prototype.');
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#a8cbdb] hover:bg-[#193845] hover:text-[#76ddcd] transition cursor-pointer font-medium"
+                  >
+                    <Hospital size={14} className="text-[#76ddcd]" /> Workspace details
+                  </button>
+                </div>
+
+                <div className="border-t border-[#1b3945] mt-1.5 pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      clearClinicianSession();
+                      setLocation('/');
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[#f59e97] hover:bg-[#331c1e] transition cursor-pointer font-medium text-xs"
+                  >
+                    <ArrowLeft size={14} /> Exit portal
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setProfileOpen(!profileOpen)}
+              aria-expanded={profileOpen}
+              aria-haspopup="true"
+              className="flex items-center gap-2.5 w-full p-2 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.09)] transition cursor-pointer text-left"
+              title={`${clinicianName} · Click for profile options`}
+            >
+              <div className="grid place-items-center w-8 h-8 rounded-full bg-[#1e4e46] text-[#78decb] font-bold text-xs shrink-0 border border-[#2b6d61]">
+                {clinicianInitials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <b className="block text-xs font-bold text-white truncate">{clinicianName}</b>
+                <span className="block text-[10px] text-[#86a2ab] truncate">
+                  {clinicianSession?.role || 'Clinician'} session
+                </span>
+              </div>
+              <ChevronDown
+                size={14}
+                className={`text-[#7f98a2] transition-transform duration-200 shrink-0 ${profileOpen ? 'rotate-180 text-[#76ddcd]' : ''}`}
+              />
+            </button>
+          </div>
+
+          <div className="secure-badge">
+            <LockKeyhole size={16} />
+            <span>
+              <b>Secure clinician workspace</b>
+              <small>Authenticated session active</small>
+            </span>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="portal-content bg-[#f5f8f5]">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-[#e2e8e0] bg-[#f5f8f5]/95 px-5 backdrop-blur md:px-7">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobile(true)}
+              data-testid="button-open-menu"
+              className="text-[#476b5e] lg:hidden cursor-pointer"
+            >
+              <Menu size={20} />
+            </button>
+            <Link
+              href="/doctor"
+              className="hover:text-[#143d34] flex items-center gap-1.5 text-xs font-bold text-[#44685c] transition"
+            >
+              <ArrowLeft size={14} /> Back to Dashboard
+            </Link>
+          </div>
+          <div className="ml-auto flex items-center gap-3.5">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] font-bold text-[#467364] tracking-wide">
+              <span className="h-2 w-2 rounded-full bg-[#27ae60]" /> CLINICIAN API RECORD
+            </span>
+            <BellRing size={17} className="text-[#597e71]" />
+          </div>
+        </header>
+
+        <main className="p-4 sm:p-6 lg:p-7">{children}</main>
+      </div>
+    </div>
+  );
+}

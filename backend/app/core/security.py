@@ -1,3 +1,7 @@
+import base64
+import hashlib
+import hmac
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 import jwt
@@ -6,6 +10,42 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import settings
 
 security_scheme = HTTPBearer(auto_error=False)
+
+PASSWORD_HASH_ITERATIONS = 600_000
+
+
+def hash_password(password: str) -> str:
+    """Hash a password using salted PBKDF2-SHA256."""
+    salt = os.urandom(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt, PASSWORD_HASH_ITERATIONS
+    )
+    return "pbkdf2_sha256${}${}${}".format(
+        PASSWORD_HASH_ITERATIONS,
+        base64.b64encode(salt).decode("ascii"),
+        base64.b64encode(digest).decode("ascii"),
+    )
+
+
+def verify_password(password: str, encoded_hash: str | None) -> bool:
+    """Verify a password without leaking comparison timing."""
+    if not encoded_hash:
+        return False
+    try:
+        algorithm, iterations, salt_value, digest_value = encoded_hash.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        salt = base64.b64decode(salt_value, validate=True)
+        expected = base64.b64decode(digest_value, validate=True)
+        actual = hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), salt, int(iterations)
+        )
+    except (ValueError, TypeError):
+        return False
+    return hmac.compare_digest(actual, expected)
+
+
+DUMMY_PASSWORD_HASH = hash_password("non-account timing sentinel")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

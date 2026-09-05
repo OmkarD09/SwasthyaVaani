@@ -17,9 +17,8 @@ import {
   RotateCcw,
   Paperclip,
   Activity,
-  AlertCircle,
-  HelpCircle,
 } from 'lucide-react';
+import { clearStoredDocumentUpload } from '../lib/documentUploadState';
 import { patientApi } from '../services/patientApi';
 
 interface SubmissionData {
@@ -166,18 +165,18 @@ function getSuccessText(lang: string) {
 export function PatientComplete() {
   const [, setLocation] = useLocation();
   const [submission, setSubmission] = useState<SubmissionData>({
-    patientName: 'Ananya Sharma',
-    patientAge: '34',
-    patientGender: 'Female',
+    patientName: 'Patient',
+    patientAge: '',
+    patientGender: undefined,
     language: 'English',
     department: 'General Medicine',
-    token: 'A-204',
-    documentCount: 1,
-    documentName: 'Prescription_May2026.pdf',
+    token: 'Pending',
+    documentCount: 0,
+    documentName: null,
     submittedAt: new Date().toISOString(),
-    chiefConcern: 'Persistent dry cough and mild throat irritation',
-    duration: '2 weeks',
-    symptoms: ['Dry cough', 'Throat irritation', 'No high fever reported', 'Worse during night'],
+    chiefConcern: 'Not provided',
+    duration: 'Not provided',
+    symptoms: [],
   });
 
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -189,9 +188,12 @@ export function PatientComplete() {
   const clearTemporaryPatientState = useCallback(() => {
     try {
       localStorage.removeItem('swasthya_active_intake_id');
+      localStorage.removeItem('swasthya_active_patient_id');
       localStorage.removeItem('swasthya_active_token');
       localStorage.removeItem('swasthya_last_submission');
       localStorage.removeItem('swasthya_chat_history');
+      localStorage.removeItem('swasthya_uploaded_doc_name');
+      clearStoredDocumentUpload();
     } catch {
       // ignore storage clear errors
     }
@@ -219,7 +221,7 @@ export function PatientComplete() {
       } else {
         // Fallback: check profile and active token
         patientApi.getProfile().then((p) => {
-          const activeToken = localStorage.getItem('swasthya_active_token') || 'A-' + Math.floor(100 + Math.random() * 900);
+          const activeToken = localStorage.getItem('swasthya_active_token') || 'Pending';
           const lang = localStorage.getItem('sv_selected_language') || 'English';
           setSubmission((prev) => ({
             ...prev,
@@ -384,8 +386,8 @@ export function PatientComplete() {
                   <span>{t.docsLabel}</span>
                 </div>
                 <div className="text-sm font-bold text-[#173e35] truncate" title={submission.documentName || ''}>
-                  {submission.documentCount > 0
-                    ? `${submission.documentCount} ${submission.documentCount === 1 ? 'Record' : 'Records'} (${submission.documentName || 'Attached'})`
+                  {submission.documentCount > 0 && submission.documentName
+                    ? `${submission.documentCount} ${submission.documentCount === 1 ? 'Record' : 'Records'} (${submission.documentName})`
                     : 'None attached'}
                 </div>
               </div>
@@ -559,7 +561,7 @@ export function PatientComplete() {
                 <ul className="space-y-1.5 text-xs text-[#2b4c42]">
                   {(submission.symptoms && submission.symptoms.length > 0
                     ? submission.symptoms
-                    : ['Dry cough', 'Throat irritation', 'No chest pain', 'No shortness of breath']
+                    : ['Not provided']
                   ).map((sym, idx) => (
                     <li key={idx} className="flex items-center gap-2">
                       <Check size={13} className="text-emerald-600" />
@@ -575,8 +577,8 @@ export function PatientComplete() {
                   <span>{t.docsLabel}</span>
                 </div>
                 <div className="text-xs text-[#3d5e54]">
-                  {submission.documentCount > 0
-                    ? `✓ ${submission.documentName || 'Prescription_May2026.pdf'} (Scanned for physician review)`
+                  {submission.documentCount > 0 && submission.documentName
+                    ? `✓ ${submission.documentName} (Uploaded for physician review)`
                     : 'No prior documents uploaded.'}
                 </div>
               </div>

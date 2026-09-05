@@ -144,5 +144,3 @@ def test_qa_run_tests_endpoint(client, db):
     assert "suites" in result
     assert len(result["suites"]) > 0
     assert result["success"] is True
-
-

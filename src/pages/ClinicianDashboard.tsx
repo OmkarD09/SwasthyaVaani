@@ -11,5 +11,4 @@ export {
 export {
   type DoctorQueueItem,
   type PatientDetail,
-  fallbackQueue,
 } from '../lib/clinicianData';

@@ -170,7 +170,7 @@ def get_ai_monitoring_oversight(db: Session = Depends(get_db)):
     for s in sessions:
         pat = db.query(Patient).filter(Patient.id == s.patient_id).first()
         cs = db.query(ClinicalStateModel).filter(ClinicalStateModel.intake_session_id == s.id).order_by(ClinicalStateModel.version.desc()).first()
-        
+
         state_dict = cs.state_json if cs else {}
         chief_complaint = state_dict.get("chief_complaint", "General consultation")
         symptoms = state_dict.get("symptoms", [])
@@ -280,7 +280,7 @@ def get_emergency_cases(
         session = db.query(IntakeSession).filter(IntakeSession.id == rf.intake_session_id).first()
         if not session:
             continue
-        
+
         pat = db.query(Patient).filter(Patient.id == session.patient_id).first()
         doc = db.query(Doctor).filter(Doctor.id == session.doctor_id).first()
         dept = doc.department.name if doc and doc.department else "Emergency & Triage"

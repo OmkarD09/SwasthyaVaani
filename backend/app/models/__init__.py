@@ -1,13 +1,27 @@
-from app.models.user import Hospital, Department, Doctor, Patient, User
-from app.models.intake import IntakeSession, QuestionEvent, Answer, ClinicalStateModel
-from app.models.document import DocumentModel, DocumentExtractionModel
-from app.models.safety import RedFlagModel, ContradictionModel
-from app.models.review import PhysicianReviewModel, PhysicianEditModel, AuditEventModel
+from app.models.document import DocumentExtractionModel, DocumentModel
+from app.models.intake import Answer, ClinicalStateModel, IntakeSession, QuestionEvent
+from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
+from app.models.review import AuditEventModel, PhysicianEditModel, PhysicianReviewModel
+from app.models.safety import ContradictionModel, RedFlagModel
+from app.models.user import Department, Doctor, Hospital, Patient, User
 
 __all__ = [
-    "Hospital", "Department", "Doctor", "Patient", "User",
-    "IntakeSession", "QuestionEvent", "Answer", "ClinicalStateModel",
-    "DocumentModel", "DocumentExtractionModel",
-    "RedFlagModel", "ContradictionModel",
-    "PhysicianReviewModel", "PhysicianEditModel", "AuditEventModel"
+    "Answer",
+    "AuditEventModel",
+    "ClinicalStateModel",
+    "ContradictionModel",
+    "Department",
+    "Doctor",
+    "DocumentExtractionModel",
+    "DocumentModel",
+    "Hospital",
+    "IntakeSession",
+    "KnowledgeChunk",
+    "KnowledgeDocument",
+    "Patient",
+    "PhysicianEditModel",
+    "PhysicianReviewModel",
+    "QuestionEvent",
+    "RedFlagModel",
+    "User"
 ]

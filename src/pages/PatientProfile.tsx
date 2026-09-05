@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { ArrowLeft, UserRound, Check, ShieldCheck, Phone, Hash, Globe, Stethoscope } from 'lucide-react';
+import { ArrowLeft, UserRound, Check, ShieldCheck, Stethoscope } from 'lucide-react';
 import { getTranslation, type LanguageCode } from '../i18n';
 import { patientApi, type PatientProfileData } from '../services/patientApi';
 import { LanguageSelector } from '../components/patient/LanguageSelector';

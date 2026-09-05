@@ -49,6 +49,7 @@ class User(Base):
     display_name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=True, index=True)
     phone = Column(String, nullable=True)
+    password_hash = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

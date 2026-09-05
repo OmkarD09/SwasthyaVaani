@@ -1,5 +1,6 @@
+
 import httpx
-from typing import Optional
+
 from app.services.providers.base import AbstractSpeechProvider, TranscriptionResult
 
 
@@ -9,7 +10,7 @@ class MockSpeechProvider(AbstractSpeechProvider):
     async def transcribe_audio(
         self,
         audio_bytes: bytes,
-        language_code: Optional[str] = None
+        language_code: str | None = None
     ) -> TranscriptionResult:
         lang = language_code or "en"
         text = "मुझे 3 दिनों से तेज बुखार और खांसी है" if lang == "hi" else "I have had persistent chest pain and mild fever for 2 days"
@@ -23,8 +24,8 @@ class MockSpeechProvider(AbstractSpeechProvider):
     async def text_to_speech(
         self,
         text: str,
-        language_code: Optional[str] = None
-    ) -> Optional[str]:
+        language_code: str | None = None
+    ) -> str | None:
         return None
 
 
@@ -34,13 +35,13 @@ class SarvamSpeechProvider(AbstractSpeechProvider):
     Supports 10+ Indic languages: Hindi, Marathi, Bengali, Tamil, Telugu, Gujarati, Kannada, Odia, Punjabi, Malayalam, English.
     """
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         self.api_key = api_key
         self.fallback = MockSpeechProvider()
         self.asr_url = "https://api.sarvam.ai/speech-to-text"
         self.tts_url = "https://api.sarvam.ai/text-to-speech"
 
-    def _map_language_code(self, code: Optional[str]) -> str:
+    def _map_language_code(self, code: str | None) -> str:
         mapping = {
             "hi": "hi-IN",
             "en": "en-IN",
@@ -60,7 +61,7 @@ class SarvamSpeechProvider(AbstractSpeechProvider):
     async def transcribe_audio(
         self,
         audio_bytes: bytes,
-        language_code: Optional[str] = None
+        language_code: str | None = None
     ) -> TranscriptionResult:
         """Transcribe incoming audio using Sarvam Saaras Indic ASR."""
         if not self.api_key:
@@ -90,14 +91,14 @@ class SarvamSpeechProvider(AbstractSpeechProvider):
                     )
                 else:
                     return await self.fallback.transcribe_audio(audio_bytes, language_code)
-        except Exception:
+        except Exception:  # noqa: BLE001 - external Sarvam boundary
             return await self.fallback.transcribe_audio(audio_bytes, language_code)
 
     async def text_to_speech(
         self,
         text: str,
-        language_code: Optional[str] = None
-    ) -> Optional[str]:
+        language_code: str | None = None
+    ) -> str | None:
         """Convert clinical question text to spoken Base64 audio using Sarvam Bulbul TTS."""
         if not self.api_key or not text.strip():
             return None
@@ -121,14 +122,14 @@ class SarvamSpeechProvider(AbstractSpeechProvider):
                     audios = data.get("audios", [])
                     return audios[0] if audios else None
                 return None
-        except Exception:
+        except Exception:  # noqa: BLE001 - external Sarvam boundary
             return None
 
 
 class BhashiniSpeechProvider(AbstractSpeechProvider):
     """Digital India BHASHINI ASR Provider Adapter."""
 
-    def __init__(self, api_key: Optional[str] = None, user_id: Optional[str] = None):
+    def __init__(self, api_key: str | None = None, user_id: str | None = None):
         self.api_key = api_key
         self.user_id = user_id
         self.fallback = MockSpeechProvider()
@@ -136,8 +137,13 @@ class BhashiniSpeechProvider(AbstractSpeechProvider):
     async def transcribe_audio(
         self,
         audio_bytes: bytes,
-        language_code: Optional[str] = None
+        language_code: str | None = None
     ) -> TranscriptionResult:
         if not self.api_key:
             return await self.fallback.transcribe_audio(audio_bytes, language_code)
         return await self.fallback.transcribe_audio(audio_bytes, language_code)
+
+    async def text_to_speech(
+        self, text: str, language_code: str | None = None
+    ) -> str | None:
+        return await self.fallback.text_to_speech(text, language_code)
