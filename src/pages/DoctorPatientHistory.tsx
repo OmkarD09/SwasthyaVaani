@@ -460,11 +460,6 @@ export function DoctorPatientHistory() {
               <span className="inline-flex items-center gap-1 rounded-full border border-[#86efac] bg-[#ecfdf5] px-3 py-1 font-mono text-xs font-extrabold text-[#065f46]">
                 <FileText size={12} className="text-[#059669]" /> {attachedFiles.length} {attachedFiles.length === 1 ? 'file' : 'files'} in history
               </span>
-              {allMedicalRecords.length > 0 && (
-                <span className="rounded-full bg-[#dcfce7] px-2.5 py-1 font-mono text-xs font-extrabold text-[#14532d] border border-[#bbf7d0]">
-                  {allMedicalRecords.length} clinical finding{allMedicalRecords.length > 1 ? 's' : ''}
-                </span>
-              )}
             </div>
           </div>
 
@@ -628,64 +623,6 @@ export function DoctorPatientHistory() {
                 })}
               </div>
 
-              {/* Aggregated AI Extracted Findings from Documents */}
-              {allMedicalRecords.length > 0 && (
-                <div className="mt-4 rounded-xl border border-[#c4ded0] bg-[#f0fdf4]/50 p-4">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#c4ded0]">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-[#059669]" />
-                      <h4 className="font-mono text-xs font-extrabold uppercase tracking-wider text-[#0a2f26]">
-                        Historical Clinical Findings Extracted from Uploaded Records
-                      </h4>
-                    </div>
-                    <span className="font-mono text-[10px] font-bold bg-[#dcfce7] text-[#065f46] px-2 py-0.5 rounded border border-[#bbf7d0]">
-                      {allMedicalRecords.length} findings
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-1">
-                    {allMedicalRecords.map((record, rIdx) => {
-                      const val = record.value;
-                      const title = typeof val === 'object' && val !== null
-                        ? (val.medicine_name || val.name || val.test_name || record.field_name)
-                        : String(val || record.field_name);
-                      const details = typeof val === 'object' && val !== null
-                        ? [val.strength, val.dosage, val.frequency, val.duration, val.value ? `${val.value} ${val.unit || ''}` : null].filter(Boolean).join(' • ')
-                        : null;
-                      const confidencePct = record.confidence != null
-                        ? (record.confidence <= 1 ? Math.round(record.confidence * 100) : Math.round(record.confidence))
-                        : null;
-
-                      return (
-                        <div
-                          key={record.id || rIdx}
-                          className="rounded-lg border border-[#c4ded0] bg-white p-2.5 text-xs text-[#0a2f26]"
-                        >
-                          <div className="flex items-center justify-between gap-1 mb-1">
-                            <span className="rounded bg-[#dcfce7] px-1.5 py-0.2 font-mono text-[9px] font-extrabold text-[#065f46] uppercase border border-[#bbf7d0]">
-                              {record.field_type || 'FINDING'}
-                            </span>
-                            {confidencePct !== null && (
-                              <span className={`font-mono text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${confidencePct >= 80 ? 'bg-[#dcfce7] text-[#065f46] border-[#bbf7d0]' : 'bg-[#fef3c7] text-[#92400e] border-[#fde68a]'}`}>
-                                {confidencePct}%
-                              </span>
-                            )}
-                          </div>
-                          <p className="font-extrabold text-[#0a2f26] truncate">{title}</p>
-                          {details && (
-                            <p className="mt-0.5 text-[10px] font-semibold text-[#274c3d] truncate">{details}</p>
-                          )}
-                          {record.source_text && (
-                            <p className="mt-0.5 text-[9px] italic text-[#4b6358] line-clamp-1">
-                              &ldquo;{record.source_text}&rdquo;
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-[#d6ded5] bg-[#f9fdfa] p-6 text-center flex flex-col items-center justify-center my-3">

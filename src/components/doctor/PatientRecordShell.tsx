@@ -423,9 +423,6 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
             </Link>
           </div>
           <div className="ml-auto flex items-center gap-3.5">
-            <span className="flex items-center gap-1.5 font-mono text-[10px] font-bold text-[#467364] tracking-wide">
-              <span className="h-2 w-2 rounded-full bg-[#27ae60]" /> CLINICIAN API RECORD
-            </span>
             <BellRing size={17} className="text-[#597e71]" />
           </div>
         </header>
