@@ -33,8 +33,13 @@ import {
   TriangleAlert,
   User,
   Users,
+  Download,
+  ExternalLink,
+  RotateCw,
   X,
   Zap,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { usePatientRecord } from '../hooks/usePatientRecord';
 import { PatientRecordShell } from '../components/doctor/PatientRecordShell';
@@ -66,6 +71,47 @@ export function DoctorPatientSummary() {
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const [processingDocId, setProcessingDocId] = useState<string | null>(null);
   const [queue, setQueue] = useState<any[]>([]);
+  const [modalImageScale, setModalImageScale] = useState<number>(1);
+  const [modalImageRotation, setModalImageRotation] = useState<number>(0);
+  const [modalImageLoading, setModalImageLoading] = useState<boolean>(true);
+  const [modalImageError, setModalImageError] = useState<boolean>(false);
+
+  const getDocViewUrl = (doc: any) => {
+    if (!doc) return '';
+    const token = getClinicianAccessToken();
+    const base = doc.url || (doc.id ? `/api/v1/documents/${doc.id}/view` : '');
+    if (!base) return '';
+    if (token && !base.includes('token=')) {
+      return `${base}${base.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+    }
+    return base;
+  };
+
+  const getDocDownloadUrl = (doc: any) => {
+    if (!doc) return '';
+    const token = getClinicianAccessToken();
+    const base = doc.id ? `/api/v1/documents/${doc.id}/download` : '';
+    if (!base) return '';
+    if (token && !base.includes('token=')) {
+      return `${base}${base.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+    }
+    return base;
+  };
+
+  const isImageDoc = (doc: any) => {
+    if (!doc) return false;
+    const mime = (doc.mime_type || '').toLowerCase();
+    const name = (doc.name || doc.file_name || '').toLowerCase();
+    return (
+      mime.startsWith('image/') ||
+      name.endsWith('.jpg') ||
+      name.endsWith('.jpeg') ||
+      name.endsWith('.png') ||
+      name.endsWith('.webp') ||
+      name.endsWith('.bmp') ||
+      name.endsWith('.gif')
+    );
+  };
 
   const handleRunOcr = async (docId: string) => {
     if (!docId) return;
@@ -1075,97 +1121,216 @@ export function DoctorPatientSummary() {
       )}
 
 
-      {/* Document Attachment Preview Modal */}
+      {/* Document Attachment Preview & Image Viewer Modal */}
       {previewDoc && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-[#0a2f26]/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-[#d6ded5] bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between border-b border-[#e5eae4] pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#dcfce7] text-[#065f46]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a2f26]/75 p-3 sm:p-5 backdrop-blur-xs overflow-y-auto">
+          <div className="relative w-full max-w-4xl rounded-2xl border border-[#d6ded5] bg-white shadow-2xl my-auto flex flex-col max-h-[92vh]">
+            <div className="flex items-center justify-between border-b border-[#e5eae4] px-5 py-4 shrink-0 bg-[#f9fdfa] rounded-t-2xl">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#dcfce7] text-[#065f46] shrink-0 border border-[#bbf7d0]">
                   <FileText size={18} />
                 </div>
-                <div>
-                  <p className="font-mono text-[10px] font-extrabold uppercase tracking-wider text-[#375347]">Medical Attachment Preview</p>
-                  <h3 className="font-serif text-lg font-bold text-[#0a2f26] truncate max-w-sm">{previewDoc.name}</h3>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewDoc(null)}
-                className="rounded-lg p-1 text-[#4b6358] hover:bg-[#f0fdf4] hover:text-[#0a2f26] cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between rounded-xl bg-[#ecfdf5] p-3 border border-[#a2d4ba] text-xs font-bold text-[#065f46]">
-                <div className="flex items-center gap-2">
-                  {previewDoc.url ? (
-                    <FileCheck2 size={16} className="text-[#059669]" />
-                  ) : (
-                    <AlertTriangle size={16} className="text-[#d97706]" />
-                  )}
-                  <span>
-                    {previewDoc.localOnly
-                      ? 'File selected locally; no upload has been completed'
-                      : previewDoc.url
-                      ? 'Document ready for clinical review'
-                      : 'No authorized preview URL is available'}
-                  </span>
-                </div>
-                {previewDoc.size && (
-                  <span className="font-mono text-[11px] text-[#047857]">{previewDoc.size}</span>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-[#c4ded0] bg-[#f9fdfa] p-4 text-xs font-semibold text-[#274c3d]">
-                <p className="font-mono text-[10px] font-extrabold uppercase tracking-wider text-[#375347] mb-1.5">Document Details</p>
-                <div className="space-y-1 text-xs">
-                  <p><strong>File Name:</strong> {previewDoc.name}</p>
-                  <p><strong>Attachment Type:</strong> {(previewDoc.type || previewDoc.document_type || 'Prescription').toUpperCase()}</p>
-                  <p>
-                    <strong>Status:</strong>{' '}
-                    {previewDoc.localOnly
-                      ? 'Upload pending; not available for clinical review'
-                      : previewDoc.status || 'AVAILABLE'}
-                  </p>
-                  {previewDoc.uploadedAt && (
-                    <p><strong>Uploaded:</strong> {previewDoc.uploadedAt}</p>
-                  )}
-                </div>
-              </div>
-
-              {previewDoc.extractions && previewDoc.extractions.length > 0 && (
-                <div className="rounded-xl border border-[#c4ded0] bg-[#f0fdf4]/50 p-3.5 text-xs text-[#0a2f26] max-h-48 overflow-y-auto">
-                  <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#c4ded0]">
-                    <div className="flex items-center gap-1.5 font-mono text-[10px] font-extrabold uppercase tracking-wider text-[#065f46]">
-                      <Sparkles size={13} />
-                      <span>Extracted Findings ({previewDoc.extractions.length})</span>
-                    </div>
-                    <span className="text-[9px] font-mono font-bold bg-[#dcfce7] text-[#065f46] px-1.5 py-0.5 rounded border border-[#bbf7d0]">
-                      AI Draft
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] font-extrabold uppercase tracking-wider text-[#047857] bg-[#dcfce7] px-2 py-0.5 rounded border border-[#bbf7d0]">
+                      {previewDoc.type || previewDoc.document_type || 'Prescription'}
+                    </span>
+                    <span className="text-xs text-[#688176]">
+                      {previewDoc.size ? `${previewDoc.size} · ` : ''}{previewDoc.uploadedAt || previewDoc.uploaded_at || 'Attached'}
                     </span>
                   </div>
-                  <div className="space-y-1.5">
+                  <h3 className="font-serif text-lg font-bold text-[#0a2f26] truncate max-w-lg mt-0.5">
+                    {previewDoc.name}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {getDocDownloadUrl(previewDoc) && (
+                  <a
+                    href={getDocDownloadUrl(previewDoc)}
+                    download={previewDoc.name}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#c4ded0] bg-white px-2.5 py-1.5 text-xs font-bold text-[#0a2f26] hover:bg-[#f0fdf4] transition"
+                    title="Download original file"
+                  >
+                    <Download size={13} />
+                    <span className="hidden sm:inline">Download</span>
+                  </a>
+                )}
+                {getDocViewUrl(previewDoc) && (
+                  <a
+                    href={getDocViewUrl(previewDoc)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#c4ded0] bg-white px-2.5 py-1.5 text-xs font-bold text-[#0a2f26] hover:bg-[#f0fdf4] transition"
+                    title="Open in new window"
+                  >
+                    <ExternalLink size={13} />
+                    <span className="hidden sm:inline">New Tab</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="rounded-lg p-1.5 text-[#4b6358] hover:bg-[#fee2e2] hover:text-[#991b1b] cursor-pointer transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              {isImageDoc(previewDoc) ? (
+                <div className="rounded-xl border border-[#c4ded0] bg-[#0c1f19] overflow-hidden flex flex-col items-center">
+                  <div className="w-full flex items-center justify-between border-b border-[#1f4236] bg-[#071712] px-4 py-2 text-white">
+                    <span className="font-mono text-xs font-semibold text-[#86efac] flex items-center gap-1.5">
+                      <FileCheck2 size={13} /> Uploaded Medical Image
+                    </span>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setModalImageScale((s) => Math.max(0.5, s - 0.25))}
+                        className="rounded p-1 text-[#a7f3d0] hover:bg-[#143d31] hover:text-white transition cursor-pointer"
+                        title="Zoom out"
+                      >
+                        <ZoomOut size={15} />
+                      </button>
+                      <span className="font-mono text-xs text-[#a7f3d0] px-1">
+                        {Math.round(modalImageScale * 100)}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setModalImageScale((s) => Math.min(3, s + 0.25))}
+                        className="rounded p-1 text-[#a7f3d0] hover:bg-[#143d31] hover:text-white transition cursor-pointer"
+                        title="Zoom in"
+                      >
+                        <ZoomIn size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setModalImageRotation((r) => (r + 90) % 360)}
+                        className="rounded p-1 text-[#a7f3d0] hover:bg-[#143d31] hover:text-white transition cursor-pointer ml-1"
+                        title="Rotate 90 degrees"
+                      >
+                        <RotateCw size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModalImageScale(1);
+                          setModalImageRotation(0);
+                        }}
+                        className="rounded px-2 py-0.5 text-[10px] font-mono text-[#a7f3d0] hover:bg-[#143d31] hover:text-white transition cursor-pointer"
+                        title="Reset zoom and rotation"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative w-full min-h-[360px] max-h-[580px] overflow-auto flex items-center justify-center p-4 bg-[#0a1612]">
+                    {modalImageLoading && !modalImageError && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-[#0a1612]/70 text-[#86efac] gap-2 font-mono text-xs">
+                        <RefreshCw size={18} className="animate-spin" /> Loading document image…
+                      </div>
+                    )}
+
+                    {modalImageError ? (
+                      <div className="p-8 text-center text-[#fca5a5]">
+                        <AlertTriangle size={32} className="mx-auto mb-2 text-[#f87171]" />
+                        <p className="text-sm font-bold">Failed to render image directly</p>
+                        <p className="text-xs mt-1 text-[#fecaca]">
+                          You can download or open the file in a new tab using the buttons above.
+                        </p>
+                      </div>
+                    ) : (
+                      <img
+                        src={getDocViewUrl(previewDoc)}
+                        alt={previewDoc.name}
+                        onLoad={() => setModalImageLoading(false)}
+                        onError={() => {
+                          setModalImageLoading(false);
+                          setModalImageError(true);
+                        }}
+                        style={{
+                          transform: `scale(${modalImageScale}) rotate(${modalImageRotation}deg)`,
+                          transformOrigin: 'center center',
+                          transition: 'transform 0.15s ease-out',
+                        }}
+                        className="max-h-[540px] max-w-full object-contain rounded shadow-lg select-none"
+                      />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-[#c4ded0] bg-[#f9fdfa] p-8 text-center">
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#dcfce7] text-[#065f46] mx-auto mb-3 border border-[#bbf7d0]">
+                    <FileText size={28} />
+                  </div>
+                  <h4 className="text-sm font-bold text-[#0a2f26]">{previewDoc.name}</h4>
+                  <p className="text-xs text-[#4b6358] mt-1 max-w-md mx-auto">
+                    This document is stored as{' '}
+                    <span className="font-mono font-bold uppercase">{previewDoc.mime_type || previewDoc.type || 'PDF/DOCUMENT'}</span>.
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-2">
+                    {getDocViewUrl(previewDoc) && (
+                      <a
+                        href={getDocViewUrl(previewDoc)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#065f46] px-4 py-2 text-xs font-extrabold text-white hover:bg-[#044e39] transition"
+                      >
+                        <ExternalLink size={14} /> Open Document in Viewer
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {previewDoc.extractions && previewDoc.extractions.length > 0 && (
+                <div className="rounded-xl border border-[#c4ded0] bg-[#f0fdf4]/60 p-4">
+                  <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[#c4ded0]">
+                    <div className="flex items-center gap-1.5 font-mono text-xs font-extrabold uppercase tracking-wider text-[#065f46]">
+                      <Sparkles size={14} />
+                      <span>Extracted Clinical Findings ({previewDoc.extractions.length})</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-1">
                     {previewDoc.extractions.map((ext: any, eIdx: number) => {
                       const val = ext.value;
-                      const title = typeof val === 'object' && val !== null ? (val.medicine_name || val.name || val.test_name || ext.field_name) : String(val || ext.field_name);
-                      const sub = typeof val === 'object' && val !== null ? [val.strength, val.dosage, val.frequency, val.duration, val.value ? `${val.value} ${val.unit || ''}` : null].filter(Boolean).join(' • ') : null;
-                      const conf = ext.confidence != null ? (ext.confidence <= 1 ? Math.round(ext.confidence * 100) : Math.round(ext.confidence)) : null;
+                      const title = typeof val === 'object' && val !== null
+                        ? (val.medicine_name || val.name || val.test_name || ext.field_name)
+                        : String(val || ext.field_name);
+                      const details = typeof val === 'object' && val !== null
+                        ? [val.strength, val.dosage, val.frequency, val.duration, val.value ? `${val.value} ${val.unit || ''}` : null].filter(Boolean).join(' • ')
+                        : null;
+                      const conf = ext.confidence != null
+                        ? (ext.confidence <= 1 ? Math.round(ext.confidence * 100) : Math.round(ext.confidence))
+                        : null;
 
                       return (
-                        <div key={ext.id || eIdx} className="rounded-lg bg-white p-2 border border-[#d6ded5] text-xs">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-extrabold text-[#0a2f26] truncate">{title}</span>
+                        <div key={eIdx} className="rounded-lg border border-[#c4ded0] bg-white p-2.5 shadow-2xs">
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span className="rounded bg-[#dcfce7] px-1.5 py-0.2 font-mono text-[9px] font-bold text-[#065f46] uppercase border border-[#bbf7d0]">
+                              {ext.field_type || 'FINDING'}
+                            </span>
                             {conf !== null && (
-                              <span className="font-mono text-[9px] font-bold text-[#065f46] bg-[#dcfce7] px-1 rounded">
-                                {conf}%
+                              <span className="font-mono text-[9px] font-bold text-[#047857]">
+                                {conf}% conf
                               </span>
                             )}
                           </div>
-                          {sub && <p className="text-[11px] font-semibold text-[#274c3d] mt-0.5">{sub}</p>}
-                          {ext.source_text && <p className="text-[10px] text-[#4b6358] italic mt-0.5">"{ext.source_text}"</p>}
+                          <p className="font-bold text-xs text-[#0a2f26]">{title}</p>
+                          {details && (
+                            <p className="mt-0.5 text-[11px] font-semibold text-[#274c3d]">{details}</p>
+                          )}
+                          {ext.source_text && (
+                            <p className="text-[10px] italic text-[#4b6358] mt-1 bg-[#f9fdfa] p-1 rounded border border-[#e5eae4]">
+                              &ldquo;{ext.source_text}&rdquo;
+                            </p>
+                          )}
                         </div>
                       );
                     })}
@@ -1174,43 +1339,16 @@ export function DoctorPatientSummary() {
               )}
             </div>
 
-            <div className="mt-5 flex items-center justify-end gap-2.5">
-              {previewDoc.id && (previewDoc.status === 'PENDING' || previewDoc.status === 'PROCESSING_FAILED') && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleRunOcr(previewDoc.id);
-                    setPreviewDoc(null);
-                  }}
-                  disabled={processingDocId === previewDoc.id}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#a2d4ba] bg-[#ecfdf5] px-3.5 py-2 text-xs font-extrabold text-[#065f46] hover:bg-[#065f46] hover:text-white transition cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw size={13} className={processingDocId === previewDoc.id ? 'animate-spin' : ''} />
-                  <span>Run OCR</span>
-                </button>
-              )}
-              {previewDoc.url && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const token = getClinicianAccessToken();
-                    const viewUrl = token
-                      ? `${previewDoc.url}?token=${encodeURIComponent(token)}`
-                      : previewDoc.url;
-                    window.open(viewUrl, '_blank', 'noopener,noreferrer');
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#065f46] px-4 py-2 text-xs font-extrabold text-white hover:bg-[#044e39] transition cursor-pointer"
-                >
-                  <Eye size={14} />
-                  <span>Open Document</span>
-                </button>
-              )}
+            <div className="flex items-center justify-between border-t border-[#e5eae4] px-5 py-3 shrink-0 bg-[#f9fdfa] rounded-b-2xl text-xs">
+              <span className="text-[#4b6358] font-medium">
+                Verified private medical record • Hospital Clinician Review
+              </span>
               <button
                 type="button"
                 onClick={() => setPreviewDoc(null)}
-                className="rounded-xl border border-[#c4ded0] bg-white px-4 py-2 text-xs font-extrabold text-[#274c3d] hover:bg-[#f0fdf4] cursor-pointer"
+                className="rounded-xl bg-[#065f46] px-4 py-2 text-xs font-extrabold text-white hover:bg-[#044e39] transition cursor-pointer"
               >
-                Close Preview
+                Close Viewer
               </button>
             </div>
           </div>

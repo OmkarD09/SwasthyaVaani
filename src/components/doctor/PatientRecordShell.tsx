@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   FileText,
+  History,
   Leaf,
   Menu,
   BellRing,
@@ -82,7 +83,8 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
 
   const isConversation = location.includes('/conversation');
   const isAyush = location.includes('/ayush');
-  const isSummary = location.includes('/summary') || (!isConversation && !isAyush);
+  const isHistory = location.includes('/history');
+  const isSummary = location.includes('/summary') || (!isConversation && !isAyush && !isHistory);
 
   return (
     <div className={`portal-page ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -176,6 +178,28 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
             {sidebarCollapsed && (
               <div className="hidden lg:group-hover:flex absolute left-full ml-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-[#0d222b] text-white text-xs font-semibold shadow-xl border border-[#264552] pointer-events-none items-center gap-2">
                 <span>Clinical Summary</span>
+              </div>
+            )}
+          </div>
+
+          <div className="relative group">
+            <button
+              type="button"
+              className={`w-full flex items-center rounded-lg transition-all relative cursor-pointer ${isHistory ? 'active' : ''} ${sidebarCollapsed ? 'justify-center p-2.5' : ''}`}
+              onClick={() => {
+                setMobile(false);
+                setLocation(`/doctor/patient/${patientId}/history`);
+              }}
+            >
+              <History size={18} />
+              {!sidebarCollapsed && <span>Clinical History</span>}
+              {sidebarCollapsed && isHistory && (
+                <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#eaba61]" />
+              )}
+            </button>
+            {sidebarCollapsed && (
+              <div className="hidden lg:group-hover:flex absolute left-full ml-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-[#0d222b] text-white text-xs font-semibold shadow-xl border border-[#264552] pointer-events-none items-center gap-2">
+                <span>Clinical History</span>
               </div>
             )}
           </div>

@@ -12,6 +12,7 @@ import { DoctorPatientReview } from './pages/DoctorPatientReview';
 import { DoctorPatientSummary } from './pages/DoctorPatientSummary';
 import { DoctorPatientConversation } from './pages/DoctorPatientConversation';
 import { DoctorPatientAyush } from './pages/DoctorPatientAyush';
+import { DoctorPatientHistory } from './pages/DoctorPatientHistory';
 import { DoctorPortal } from './pages/DoctorPortal';
 import { HospitalOperations } from './pages/HospitalOperations';
 import NotFound from './pages/not-found';
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/doctor/login" component={ClinicianLogin} />
       <Route path="/doctor/reviewed" component={DoctorPortal} />
       <Route path="/doctor" component={DoctorPortal} />
+      <Route path="/doctor/patient/:id/history" component={DoctorPatientHistory} />
       <Route path="/doctor/patient/:id/conversation" component={DoctorPatientConversation} />
       <Route path="/doctor/patient/:id/summary" component={DoctorPatientSummary} />
       <Route path="/doctor/patient/:id/ayush" component={DoctorPatientAyush} />

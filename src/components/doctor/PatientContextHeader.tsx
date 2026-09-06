@@ -1,5 +1,4 @@
-import { Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react';
-import { Link } from 'wouter';
+import { Sparkles, CheckCircle2 } from 'lucide-react';
 
 export interface PatientContextHeaderProps {
   token: string;
@@ -30,34 +29,33 @@ export function PatientContextHeader({
       <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Left: Patient Key Info */}
         <div>
-          <div className="mb-2">
-            <Link
-              href="/doctor"
-              data-testid="button-back-dashboard"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#668075] hover:text-[#1f5b4e] transition cursor-pointer"
-            >
-              <ArrowLeft size={14} /> Doctor Dashboard
-            </Link>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-block rounded-md bg-[#eeeade] px-2 py-0.5 font-mono text-xs font-bold text-[#8d6138]">
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <span className="inline-block rounded-md bg-[#eeeade] px-2.5 py-0.5 font-mono text-xs font-bold text-[#8d6138]">
               #{token}
             </span>
             <h1 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-[#173e35]">
               {patientName}
             </h1>
-            <div className="flex items-center gap-2 text-sm text-[#668075]">
-              {patientAge ? <span>{patientAge} yrs</span> : null}
-              {patientAge && patientGender ? <span>•</span> : null}
-              {patientGender ? <span>{patientGender}</span> : null}
-              {patientId ? (
-                <>
-                  <span>•</span>
-                  <span className="font-mono text-xs text-[#7c9086]">Patient ID: {patientId}</span>
-                </>
-              ) : null}
-            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[#446658]">
+            <span>
+              <strong className="font-bold text-[#173e35]">AGE:</strong>{' '}
+              {patientAge ? `${patientAge} yrs` : 'Not recorded'}
+            </span>
+            <span>•</span>
+            <span>
+              <strong className="font-bold text-[#173e35]">Gender:</strong>{' '}
+              {patientGender || 'Not recorded'}
+            </span>
+            {patientId ? (
+              <>
+                <span>•</span>
+                <span>
+                  <strong className="font-bold text-[#173e35]">Patient ID:</strong>{' '}
+                  <span className="font-mono text-xs text-[#2c5244]">{patientId}</span>
+                </span>
+              </>
+            ) : null}
           </div>
         </div>
 
