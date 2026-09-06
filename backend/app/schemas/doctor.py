@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field
 from app.schemas.clinical_state import ClinicalState, RedFlag, Contradiction, Medication, Investigation
+from app.schemas.ayush import AyushAssessment
 
 
 class DoctorQueueItem(BaseModel):
@@ -36,6 +37,7 @@ class DoctorPatientDetail(BaseModel):
     status: Optional[str] = "WAITING"
     review_status: Literal["AI_DRAFT", "NEEDS_VERIFICATION", "PHYSICIAN_CONFIRMED"] = "AI_DRAFT"
     clinical_state: ClinicalState
+    ayush_assessment: Optional[AyushAssessment] = None
     documents: List[Dict[str, Any]] = Field(default_factory=list)
     medical_records: List[Dict[str, Any]] = Field(default_factory=list)
     timeline: List[Dict[str, Any]] = Field(default_factory=list)

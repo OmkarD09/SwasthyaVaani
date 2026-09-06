@@ -162,6 +162,8 @@ class ClinicalState(BaseModel):
             self.dimension_status[dimension] = "RESOLVED"
         elif status == "AMBIGUOUS":
             self.dimension_status[dimension] = "AMBIGUOUS"
+            if dimension in self.resolved_dimensions:
+                self.resolved_dimensions.remove(dimension)
 
     def get_canonical_dimension(self, dimension: str) -> Optional[CanonicalDimensionState]:
         return self.canonical_dimensions.get(dimension)
@@ -171,3 +173,6 @@ class ClinicalState(BaseModel):
         if not dim_state:
             return False
         return dim_state.status in ["KNOWN_TRUE", "KNOWN_FALSE", "KNOWN_WITH_VALUE"]
+
+
+

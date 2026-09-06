@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams } from 'wouter';
 import { RefreshCw } from 'lucide-react';
 import { usePatientRecord } from '../hooks/usePatientRecord';
@@ -9,7 +10,17 @@ export function DoctorPatientAyush() {
   const params = useParams<{ id: string }>();
   const patientId = params?.id || 'pat_001';
 
-  const { patientDetail, loading, confirmed } = usePatientRecord(patientId);
+  const {
+    patientDetail,
+    loading,
+    confirmed,
+    confirmPatient,
+    note,
+    setNote,
+    refresh,
+  } = usePatientRecord(patientId);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (loading || !patientDetail) {
     return (
@@ -24,6 +35,20 @@ export function DoctorPatientAyush() {
   }
 
   const cs = patientDetail?.clinical_state || {};
+  const isConfirmed = confirmed || patientDetail.review_status === 'PHYSICIAN_CONFIRMED';
+
+  const handleConfirm = async (edits: Record<string, string>, notes?: string) => {
+    setIsSubmitting(true);
+    if (notes !== undefined) {
+      setNote(notes);
+    }
+    const success = await confirmPatient(edits);
+    setIsSubmitting(false);
+    if (success) {
+      await refresh();
+    }
+    return success;
+  };
 
   return (
     <PatientRecordShell patientId={patientId}>
@@ -36,12 +61,20 @@ export function DoctorPatientAyush() {
           patientGender={patientDetail.patient_gender}
           patientId={patientDetail.patient_id}
           reviewStatus={patientDetail.review_status}
-          confirmed={confirmed}
+          confirmed={isConfirmed}
           confidence={cs.confidence}
         />
 
-        {/* AYUSH Assessment Section / Scalable Empty State */}
-        <AyushAssessmentSection ayushData={cs.ayush} />
+        {/* AYUSH Assessment Section with Provenance, Dashavidha parameters & Sign-Off */}
+        <AyushAssessmentSection
+          ayushAssessment={patientDetail.ayush_assessment}
+          ayushData={cs.ayush}
+          confirmed={isConfirmed}
+          onConfirm={handleConfirm}
+          isSubmitting={isSubmitting}
+          clinicianNotes={note}
+          onSaveNotes={setNote}
+        />
       </div>
     </PatientRecordShell>
   );

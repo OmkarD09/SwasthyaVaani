@@ -3,12 +3,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.core.events import ws_manager
 from app.core.security import require_doctor
+from app.models.ayush import AyushAssessmentModel
 from app.models.document import (
     DocumentCandidateModel,
     DocumentExtractionModel,
@@ -17,7 +19,14 @@ from app.models.document import (
 from app.models.intake import Answer, ClinicalStateModel, IntakeSession, QuestionEvent
 from app.models.review import AuditEventModel, PhysicianEditModel, PhysicianReviewModel
 from app.models.user import Doctor, Hospital, Patient
-from app.schemas.clinical_state import ClinicalState
+from app.schemas.ayush import (
+    AyushAssessment,
+    AyushAssessmentStatus,
+    AyushDimensionValue,
+    AyushProvenanceSource,
+    ayush_state_to_assessment,
+)
+from app.schemas.clinical_state import AyushState, ClinicalState
 from app.schemas.doctor import (
     DoctorPatientDetail,
     DoctorQueueItem,
@@ -330,6 +339,21 @@ def get_patient_clinical_detail(
             logger.warning(f"Error committing unlinked doc update: {commit_err}")
             db.rollback()
 
+    ayush_record = (
+        db.query(AyushAssessmentModel)
+        .filter(AyushAssessmentModel.intake_session_id == session.id)
+        .first()
+    )
+    ayush_assessment = None
+    if ayush_record and ayush_record.assessment_json:
+        try:
+            ayush_assessment = AyushAssessment(**ayush_record.assessment_json)
+        except Exception as err:
+            logger.warning(f"Error parsing AyushAssessment for session {session.id}: {err}")
+
+    if not ayush_assessment and state.ayush:
+        ayush_assessment = ayush_state_to_assessment(state.ayush, system="AYURVEDA")
+
     detail = DoctorPatientDetail(
         intake_session_id=session.id,
         token=session.token or "",
@@ -344,6 +368,7 @@ def get_patient_clinical_detail(
         status=session.status or "WAITING",
         review_status=review_status,
         clinical_state=state,
+        ayush_assessment=ayush_assessment,
         documents=doc_list,
         medical_records=all_medical_records,
         clinician_notes=review.notes if review else None,
@@ -442,7 +467,37 @@ async def confirm_patient_history(
         review.confirmed_at = datetime.now(timezone.utc)
     db.flush()
 
-    # Record any edits
+    # Retrieve or initialize AyushAssessmentModel if this is an AYUSH session or state has AYUSH data
+    ayush_record = (
+        db.query(AyushAssessmentModel)
+        .filter(AyushAssessmentModel.intake_session_id == session.id)
+        .first()
+    )
+    assessment_obj: Optional[AyushAssessment] = None
+    if ayush_record and ayush_record.assessment_json:
+        try:
+            assessment_obj = AyushAssessment(**ayush_record.assessment_json)
+        except Exception as err:
+            logger.warning(f"Error parsing AyushAssessment in confirm: {err}")
+    elif session.workflow_type == "AYUSH" or state.ayush:
+        assessment_obj = ayush_state_to_assessment(state.ayush, system="AYURVEDA")
+        ayush_record = AyushAssessmentModel(
+            intake_session_id=session.id,
+            system="AYURVEDA",
+            status=assessment_obj.overall_status.value,
+            assessment_json=assessment_obj.model_dump(mode="json"),
+        )
+        db.add(ayush_record)
+        db.flush()
+
+    ayush_dim_keys = {
+        "prakriti", "vikriti", "agni", "koshtha", "ahara_vihara",
+        "sara", "samhanana", "pramana", "satmya", "sattva",
+        "ahara_shakti", "vyayama_shakti", "vaya"
+    }
+
+    ayush_edits_count = 0
+    # Record any edits and handle explicit physician AYUSH confirmation
     for edit in req.edits:
         edit_model = PhysicianEditModel(
             physician_review_id=review.id,
@@ -453,6 +508,50 @@ async def confirm_patient_history(
         )
         db.add(edit_model)
 
+        normalized_field = edit.field_name.lower().replace("ayush.", "")
+        if assessment_obj and normalized_field in ayush_dim_keys:
+            ayush_edits_count += 1
+            existing_dim = assessment_obj.get_dimension(normalized_field)
+            if existing_dim:
+                existing_dim.value = edit.new_value
+                existing_dim.source = AyushProvenanceSource.PHYSICIAN_CONFIRMED
+                existing_dim.status = AyushAssessmentStatus.PHYSICIAN_CONFIRMED
+                existing_dim.source_id = review.id
+            else:
+                new_dim = AyushDimensionValue(
+                    dimension=normalized_field,
+                    value=edit.new_value,
+                    source=AyushProvenanceSource.PHYSICIAN_CONFIRMED,
+                    status=AyushAssessmentStatus.PHYSICIAN_CONFIRMED,
+                    source_id=review.id,
+                )
+                assessment_obj.set_dimension(new_dim)
+
+            # Sync legacy state.ayush if applicable
+            if normalized_field in ["prakriti", "vikriti", "agni", "koshtha", "ahara_vihara"]:
+                if not state.ayush:
+                    state.ayush = AyushState()
+                setattr(state.ayush, normalized_field, str(edit.new_value))
+                if latest_state_model and isinstance(latest_state_model.state_json, dict):
+                    if "ayush" not in latest_state_model.state_json or not latest_state_model.state_json["ayush"]:
+                        latest_state_model.state_json["ayush"] = {}
+                    latest_state_model.state_json["ayush"][normalized_field] = str(edit.new_value)
+                    flag_modified(latest_state_model, "state_json")
+
+    # Update overall AYUSH assessment confirmation status
+    if assessment_obj and ayush_record:
+        assessment_obj.overall_status = AyushAssessmentStatus.PHYSICIAN_CONFIRMED
+        assessment_obj.physician_review_state = {
+            "review_id": review.id,
+            "doctor_id": session.doctor_id,
+            "confirmed_at": (review.confirmed_at or datetime.now(timezone.utc)).isoformat(),
+            "notes": req.notes,
+            "edits_count": ayush_edits_count,
+        }
+        ayush_record.status = AyushAssessmentStatus.PHYSICIAN_CONFIRMED.value
+        ayush_record.assessment_json = assessment_obj.model_dump(mode="json")
+        flag_modified(ayush_record, "assessment_json")
+
     # Log Audit Event
     audit = AuditEventModel(
         actor_user_id=current_user.get("sub", "doctor_user"),
@@ -460,7 +559,13 @@ async def confirm_patient_history(
         event_type="PHYSICIAN_CONFIRMED",
         resource_type="IntakeSession",
         resource_id=session.id,
-        metadata_json={"token": session.token, "doctor_id": session.doctor_id}
+        metadata_json={
+            "token": session.token,
+            "doctor_id": session.doctor_id,
+            "workflow_type": session.workflow_type,
+            "ayush_confirmed": assessment_obj is not None,
+            "ayush_edits_count": ayush_edits_count,
+        }
     )
     db.add(audit)
 
@@ -472,7 +577,8 @@ async def confirm_patient_history(
             patient_id=session.patient_id,
             patient_name=patient.display_name if patient else "Patient",
             doctor_name=doctor.display_name if doctor else "Attending Physician",
-            state=state
+            state=state,
+            ayush_assessment=assessment_obj,
         )
         fhir_bundle_id = bundle.id
 

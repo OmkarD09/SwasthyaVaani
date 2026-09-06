@@ -1,764 +1,740 @@
-# SwasthyaVaani — Application Flow
+# SwasthyaVaani — Engineering, AI & Clinical Safety Rules
 
+> **Status:** Updated implementation and safety source of truth
+>
 > **Audience:** AI coding agents and developers.
 >
-> **Purpose:** Define the exact application behavior, screen sequence, state transitions, branches, and data handoffs across the Patient, Doctor, and Administrator experiences.
+> **Purpose:** Define the hard rules that must be followed when implementing, modifying, testing, reviewing, or extending SwasthyaVaani.
 >
 > **Related documents:**
-> - `PRD.md` — product requirements
-> - `TRD.md` — technical requirements
-> - `architecture.md` — system architecture
-> - `backend_schema.md` — backend data model
-> - `rules.md` — hard implementation/safety rules
+> - `SwasthyaVaani_PRD.md` — product requirements
+> - `SwasthyaVaani_TRD.md` — technical requirements
+> - `SwasthyaVaani_architecture.md` — system architecture
+> - `SwasthyaVaani_backend_schema.md` — persistence/data model
+> - `SwasthyaVaani_appflow.md` — application behavior
+> - AYUSH specification — AYUSH domain behavior
 >
-> **Important:** This document describes one continuous SwasthyaVaani product. Evaluation dates are checkpoints, not separate product versions.
+> **Priority:** These rules are hard constraints. Do not bypass them for convenience, demo speed, model output, or implementation simplicity.
 
 ---
 
-# 1. Global Application Flow
+# 1. General Agent Rules
 
-```text
-                         SWASTHYAVAANI
-                              |
-          +-------------------+-------------------+
-          |                   |                   |
-       PATIENT              DOCTOR              ADMIN
-          |                   |                   |
-       Intake              Review             Management
-          |                   |                   |
-          +-------------------+-------------------+
-                              |
-                       Shared Patient Record
-                              |
-             +----------------+----------------+
-             |                |                |
-         Clinical AI      Documents         Safety
-             |                |                |
-             +----------------+----------------+
-                              |
-                      FHIR / ABDM / HIS
-```
-
-The product has three roles but two primary clinical journeys:
-
-```text
-Patient → Doctor
-```
-
-and:
-
-```text
-Administrator → platform configuration
-```
+1. Read the PRD, TRD, Architecture, Backend Schema, and relevant domain specification before making significant changes.
+2. Inspect the existing repository before creating, replacing, or refactoring files.
+3. Reuse existing components, services, schemas, utilities, providers, and patterns whenever possible.
+4. Make the smallest coherent change that satisfies the requirement.
+5. Do not introduce unrelated refactors.
+6. Do not add features merely because an AI coding tool suggests them.
+7. Preserve existing working functionality unless the requested change requires otherwise.
+8. Keep domain/clinical logic out of UI components.
+9. Keep provider integrations behind interfaces/adapters.
+10. Keep safety, authorization, persistence, and termination deterministic where required.
+11. Run relevant tests after significant changes.
+12. Never claim an implementation works unless it has actually been tested.
+13. Prefer additive migration over destructive rewrites.
+14. Do not silently change the product boundary.
+15. Do not change a working clinical workflow merely to make the implementation look more sophisticated.
 
 ---
 
-# 2. Patient Flow — Master Sequence
+# 2. Product Boundary Rules
 
-```text
-/PATIENT START
-      ↓
-Greeting
-      ↓
-Hospital Selection / Confirmation
-      ↓
-Doctor Selection
-      ↓
-Language Selection
-      ↓
-Interaction Mode
-      ↓
-Consent
-      ↓
-ABHA / Health ID (optional/integration-ready)
-      ↓
-Chief Complaint
-      ↓
-Adaptive Clinical Interview
-      ↓
-Core AYUSH Questions When Relevant
-      ↓
-Basic Document Upload / Scan
-      ↓
-Clinical Summary
-      ↓
-Patient Review
-      ↓
-Confirm?
-   ┌──┴──┐
-  NO    YES
-  ↓      ↓
-Edit   Submit
-  ↓      ↓
-Review  Doctor Queue
-```
+SwasthyaVaani is:
+
+> **An AI-assisted pre-consultation clinical intake and patient-to-doctor handoff platform.**
+
+It is NOT:
+
+- an autonomous doctor;
+- an autonomous diagnostic system;
+- an autonomous prescription engine;
+- a replacement for a physician;
+- a generic conversational chatbot;
+- an autonomous Ayurvedic treatment system.
+
+The product boundary must remain consistent across:
+
+- code;
+- prompts;
+- UI;
+- demo data;
+- documentation;
+- error messages;
+- presentations.
 
 ---
 
-# 3. Patient Start
+# 3. Physician Authority
 
-## Route
-
-```text
-/patient/start
-```
-
-## UI
-
-Show:
-
-- SwasthyaVaani branding;
-- tagline;
-- simple introduction;
-- Start button;
-- accessibility option;
-- language/help option if needed.
-
-Recommended copy:
-
-> **Welcome to SwasthyaVaani**  
-> Let’s collect your health history before your consultation.
-
-Primary action:
+The fundamental product rule is:
 
 ```text
-START
-```
-
-## On Start
-
-Transition to:
-
-```text
-PATIENT_HOSPITAL_SELECTION
-```
-
----
-
-# 4. Hospital Selection
-
-## Route
-
-```text
-/patient/hospital
-```
-
-## Behavior
-
-Provide:
-
-```text
-Search hospital
-+
-Hospital list
-```
-
-Patient selects one hospital.
-
-### Deployment mode
-
-If the device is configured for a specific hospital:
-
-```text
-hospital = preconfigured
-→ skip selection
-→ go to doctor selection
-```
-
-## Output
-
-```text
-hospital_id
-```
-
-Then transition:
-
-```text
-PATIENT_DOCTOR_SELECTION
-```
-
----
-
-# 5. Doctor Selection
-
-## Route
-
-```text
-/patient/doctor
-```
-
-## Display
-
-For each doctor:
-
-- name;
-- specialty/department;
-- optional availability/status.
-
-Example:
-
-```text
-Dr. A
-General Medicine
-
-Dr. B
-Ayurveda
-
-Dr. C
-General Medicine
-```
-
-Patient selects doctor.
-
-## Output
-
-```text
-doctor_id
-```
-
-Then transition:
-
-```text
-PATIENT_LANGUAGE_SELECTION
-```
-
----
-
-# 6. Language Selection
-
-## Route
-
-```text
-/patient/language
-```
-
-## Initial language options
-
-```text
-हिन्दी
-English
-```
-
-Architecture must support:
-
-```text
-Marathi
-Tamil
-Other supported languages
-```
-
-## Output
-
-```text
-language_code
-```
-
-Then transition:
-
-```text
-PATIENT_INTERACTION_MODE
-```
-
----
-
-# 7. Interaction Mode
-
-## Route
-
-```text
-/patient/mode
-```
-
-Display two major choices:
-
-```text
-🎙 VOICE
-Speak naturally
-
-⌨ TEXT / TOUCH
-Type or select options
-```
-
-The mode can be changed later where appropriate.
-
-## Output
-
-```text
-interaction_mode
-```
-
-Possible values:
-
-```text
-VOICE
-TEXT
-TOUCH
-MIXED
-```
-
-Then transition:
-
-```text
-PATIENT_CONSENT
-```
-
----
-
-# 8. Consent
-
-## Route
-
-```text
-/patient/consent
-```
-
-## Display
-
-Explain:
-
-- why information is collected;
-- who uses it;
-- AI assists information organization;
-- doctor makes clinical decisions.
-
-Actions:
-
-```text
-I AGREE
-NEED HELP
-```
-
-## Branch
-
-### I Agree
-
-```text
-consent = true
-→ continue
-```
-
-### Need Help
-
-Show simple explanation/help.
-
-Return to consent.
-
-### Decline
-
-```text
-status = PATIENT_ABORTED
-```
-
-End the session safely.
-
----
-
-# 9. ABHA / Health ID Check-In
-
-## Route / Component
-
-Can be part of:
-
-```text
-/patient/consent
-```
-
-or a separate check-in step.
-
-## UI
-
-```text
-ABHA / Health ID
-
-[ Enter ID ]
-
-or
-
-[ Scan QR ]
-```
-
-This functionality is integration-ready and must not block the demo/local workflow if live ABDM connectivity is unavailable.
-
-## Branch
-
-### Available and verified
-
-Store verified health-ID reference according to integration requirements.
-
-### Unavailable
-
-Continue with a local patient/session identifier.
-
-Never collect Aadhaar unless an explicitly verified requirement and lawful workflow requires it.
-
----
-
-# 10. Intake Session Creation
-
-Before clinical questioning begins:
-
-```text
-POST /api/intakes
-```
-
-Create:
-
-```text
-IntakeSession
-ClinicalState
-session preferences
-```
-
-Initial state:
-
-```text
-ACTIVE
-```
-
-Store:
-
-```text
-patient_id
-hospital_id
-doctor_id
-workflow_id
-language_code
-interaction_mode
-```
-
----
-
-# 11. Chief Complaint
-
-## Route
-
-```text
-/patient/intake
-```
-
-## Initial state
-
-Prompt:
-
-> **What is troubling you today?**
-
-Available interaction:
-
-```text
-🎙 Speak
-⌨ Type
-👆 Touch / Options
-```
-
-Example:
-
-> “Mujhe teen din se pet mein dard hai.”
-
----
-
-# 12. Speech Input Flow
-
-```text
-Tap microphone
-      ↓
-LISTENING
-      ↓
-Capture audio
-      ↓
-TRANSCRIBING
-      ↓
-Speech provider
-      ↓
-Transcript
-      ↓
-Patient sees transcript
-      ↓
-Correct?
-```
-
-### Branch
-
-```text
-Correct
-→ continue
-
-Incorrect
-→ retry / text edit
-```
-
-Provider order can be:
-
-```text
-BHASHINI
-→ Sarvam
-→ Whisper
-→ text/touch fallback
-```
-
-Provider selection must happen through `SpeechService`.
-
----
-
-# 13. Initial Clinical Extraction
-
-After the first complaint:
-
-```text
-Patient text
+AI assists
    ↓
-Clinical AI extraction
+Doctor verifies
    ↓
-schema validation
-   ↓
-ClinicalState update
+Doctor decides
 ```
 
-Example:
+The system may:
 
-```json
-{
-  "chiefComplaint": "abdominal pain",
-  "duration": "3 days"
-}
-```
+- collect information;
+- structure patient answers;
+- identify configured safety signals;
+- organize supporting evidence;
+- draft summaries;
+- prepare FHIR-compatible structures.
 
-The application must not treat the complaint as a diagnosis.
+The system must not make the final clinical decision.
 
 ---
 
-# 14. Adaptive Interview State
+# 4. Clinical Safety Rules
 
-The system now enters:
+## 4.1 No Autonomous Diagnosis
 
-```text
-ASKING
-```
+The system MUST NOT produce a final diagnosis as an autonomous clinical decision.
 
-Core loop:
+Do not create interfaces such as:
 
 ```text
-ClinicalState
-      ↓
-Required/relevant fields
-      ↓
-Resolved fields
-      ↓
-Missing information
-      ↓
-Candidate questions
-      ↓
-Duplicate check
-      ↓
-Information-gain check
-      ↓
-Safety check
-      ↓
-Decision
+Diagnosis: Heart Attack
+Confidence: 97%
 ```
-
-Decision:
-
-```text
-ASK
-STOP
-ESCALATE
-```
-
-Exactly one question is shown to the patient at a time.
-
----
-
-# 15. Adaptive Question Screen
-
-## UI
-
-```text
-SwasthyaVaani
-
-[Current Question]
-
-🎙 Tap to speak
-
-or
-
-[Touch / Type]
-
-[Change language]
-[Change mode]
-```
-
-Show a lightweight progress indication.
-
-Do not show a fixed questionnaire count.
 
 Prefer:
 
 ```text
-History progress
+Priority review signal detected.
+Physician evaluation required.
 ```
 
-rather than:
+## 4.2 No Autonomous Prescribing
+
+The system MUST NOT decide:
+
+- medication;
+- medication dosage;
+- treatment;
+- prescription changes;
+- treatment duration.
+
+Medication information may be extracted or displayed with source/provenance.
+
+## 4.3 Red Flags Are Alerts
+
+Red flags generate:
 
 ```text
-Question 4 of 10
+PRIORITY_REVIEW
 ```
 
-when the final count is dynamic.
+or another explicitly configured alert state.
+
+They do not automatically generate a diagnosis.
+
+## 4.4 Safety Has Priority
+
+If a safety-required candidate exists:
+
+```text
+SAFETY
+    >
+AYUSH preference
+    >
+general informational preference
+```
+
+Neither the LLM nor an AYUSH candidate may suppress or bypass a deterministic safety rule.
+
+## 4.5 Contradictions Are Surfaced
+
+If two trusted sources disagree:
+
+```text
+Source A
+   vs.
+Source B
+```
+
+create a contradiction/review state.
+
+Never silently choose one.
+
+## 4.6 Uncertainty Must Remain Visible
+
+Do not convert:
+
+```text
+UNKNOWN
+```
+
+into:
+
+```text
+KNOWN
+```
+
+or:
+
+```text
+AMBIGUOUS
+```
+
+into:
+
+```text
+CONFIRMED
+```
+
+without valid evidence or physician confirmation.
 
 ---
 
-# 16. Adaptive Question Branch
+# 5. LLM Rules
 
-After every answer:
+## 5.1 LLM Output Is Untrusted
+
+Every structured model result passes through:
 
 ```text
-Answer received
-      ↓
-Update state
-      ↓
-Check safety
-      ↓
-Check information gaps
-      ↓
-Check termination
+LLM output
+   ↓
+Schema validation
+   ↓
+Domain/business validation
+   ↓
+Safety checks
+   ↓
+Application use
 ```
 
-### If more information is required
+Never treat raw LLM JSON as trusted application state.
+
+## 5.2 LLM Cannot Control Clinical Dimension Selection
+
+The LLM must not independently decide which clinical dimension wins the adaptive interview.
+
+The application determines the target using:
+
+```text
+workflow
++
+domain
++
+clinical state
++
+information gaps
++
+candidate scoring
++
+safety
++
+deduplication
+```
+
+The LLM may phrase the already-selected question.
+
+## 5.3 LLM Cannot Control Termination
+
+The application decides:
 
 ```text
 ASK
-→ show next question
-```
-
-### If sufficient
-
-```text
 STOP
-→ proceed to post-interview processing
+ESCALATE
+LIMITED_HISTORY
 ```
 
-### If possible safety escalation
+The LLM cannot independently terminate or extend the interview.
+
+## 5.4 LLM Cannot Bypass Safety
+
+Model output conflicting with deterministic safety rules must be rejected or constrained by the application.
+
+## 5.5 LLM Cannot Directly Write Arbitrary Database Fields
+
+Use:
 
 ```text
-ESCALATE
-→ create safety event
-→ continue or stop according to configured workflow
+LLM
+ ↓
+typed schema
+ ↓
+validation
+ ↓
+domain service
+ ↓
+database
 ```
+
+Do not use:
+
+```text
+LLM → arbitrary JSON → database
+```
+
+## 5.6 No Chain-of-Thought Exposure
+
+Never expose internal model reasoning to patients or physicians.
+
+Allowed:
+
+- question text;
+- structured facts;
+- concise reason labels;
+- source/provenance;
+- confidence/status.
+
+## 5.7 No Unsupported Invention
+
+The model must not invent:
+
+- symptoms;
+- medications;
+- dates;
+- laboratory values;
+- patient history;
+- AYUSH assessment findings.
+
+Unavailable information remains:
+
+```text
+UNKNOWN
+```
+
+or:
+
+```text
+NEEDS_REVIEW
+```
+
+as appropriate.
 
 ---
 
-# 17. Anti-Loop Flow
+# 6. Adaptive Interview Rules
 
-Before asking a question:
+## 6.1 One Question at a Time
 
-```text
-Candidate question
-      ↓
-Already asked?
-   YES → reject
-   NO
-      ↓
-Target field already resolved?
-   YES → reject
-   NO
-      ↓
-Expected information gain sufficient?
-   NO → stop / alternative
-   YES
-      ↓
-ASK
-```
+The patient receives one primary question at a time.
 
-After each answer:
+Do not expose a long generated questionnaire.
+
+## 6.2 Dynamic Questioning
+
+The next question must depend on the current structured state.
+
+Do not implement one rigid sequence for every patient.
+
+## 6.3 Minimum Sufficient History
+
+Optimize for:
 
 ```text
-state_before
-     ↓
-state_after
-     ↓
-meaningful progress?
+minimum unnecessary questions
++
+maximum relevant information
 ```
 
-If no meaningful progress for:
+The question count is dynamic.
+
+## 6.4 Targeted Questioning
+
+Each generated question should map to a validated:
+
+```text
+targetField
+```
+
+or clinical objective.
+
+## 6.5 Canonical Dimensions
+
+Equivalent concepts must resolve to the same canonical dimension.
+
+Example:
+
+```text
+"How long?"
+"Since when?"
+"For three days?"
+       ↓
+symptom_duration
+```
+
+Do not allow aliases to create duplicate information gaps.
+
+## 6.6 Resolved Information Must Not Be Re-asked
+
+If a dimension is sufficiently known:
+
+```text
+Candidate
+   ↓
+resolved check
+   ↓
+REJECT
+```
+
+unless a genuine clarification is required.
+
+## 6.7 Semantic Duplicate Protection
+
+Before asking:
+
+```text
+Candidate
+   ↓
+semantic duplicate check
+   ↓
+asked previously?
+```
+
+If yes:
+
+```text
+REJECT / REPLACE
+```
+
+## 6.8 Non-Informative Answers
+
+Examples:
+
+```text
+"wtf"
+"idk"
+"what?"
+"not sure"
+```
+
+must not corrupt state.
+
+The engine should:
+
+```text
+rephrase
+or
+pivot to another viable candidate
+or
+safely stop if no useful continuation exists
+```
+
+## 6.9 Ambiguous Answers
+
+For compound questions, a broad response such as:
+
+```text
+"Yes"
+```
+
+must not automatically mark every proposition as true.
+
+Preserve:
+
+```text
+AMBIGUOUS
+```
+
+until clarified or supported.
+
+## 6.10 Open Exploration
+
+Open exploration is allowed when it is clinically useful.
+
+It must:
+
+- remain relevant to the active complaint/domain;
+- be recorded as an explored area;
+- allow newly volunteered symptoms to trigger targeted follow-up;
+- not become random checklist questioning.
+
+## 6.11 Targeted Follow-Up
+
+A newly volunteered relevant finding may trigger:
+
+```text
+TARGETED_FOLLOW_UP
+```
+
+The follow-up should focus on the newly relevant dimension.
+
+---
+
+# 7. Adaptive Termination Rules
+
+The system MUST have independent termination protections.
+
+## Primary
+
+```text
+relevant information sufficiently complete
+→ STOP
+```
+
+## Information Gain
+
+```text
+expected information gain too low
+→ STOP
+```
+
+## No Candidate
+
+```text
+no viable useful candidates
+→ STOP
+```
+
+## Safety
+
+```text
+safety-required candidate
+→ cannot be blocked by normal termination logic
+```
+
+## Low Progress
+
+Use deterministic low-progress protection.
+
+Current prototype configuration may use:
 
 ```text
 MAX_CONSECUTIVE_LOW_PROGRESS = 2
 ```
 
-then:
+## Hard Question Limit
+
+Current prototype:
 
 ```text
-STOP
+MAX_QUESTIONS = 10
 ```
+
+This is a safety ceiling, not a target.
+
+If the interview reaches the limit without adequate information:
+
+```text
+LIMITED_HISTORY
+```
+
+Do not falsely label it complete.
 
 ---
 
-# 18. Maximum Question Safety Brake
+# 8. Deterministic Fallback Rules
 
-Default prototype configuration:
-
-```text
-MAX_QUESTIONS = 15
-```
-
-This is NOT the normal completion rule.
-
-If reached:
+If the adaptive engine cannot converge reliably:
 
 ```text
-status = LIMITED_HISTORY
+1. Load configured relevant required fields.
+2. Determine unresolved fields.
+3. Select validated questions mapped to unresolved fields.
+4. Apply canonical/resolved/duplicate checks.
+5. Apply safety rules.
+6. Continue only while useful.
+7. Stop at the hard limit.
+8. Mark LIMITED_HISTORY if necessary.
 ```
 
-Then:
+Fallback behavior must exist in executable code.
 
-```text
-Stop questioning
-→ generate best validated summary
-→ clearly mark limited history
-→ physician review required
-```
-
-Never treat the hard limit as proof that the history is complete.
+It must not exist only in documentation.
 
 ---
 
-# 19. Adaptive Interview Fallback
+# 9. ClinicalState Rules
 
-If adaptive gap analysis is unreliable:
+## 9.1 Structured State Is Primary
+
+Maintain:
 
 ```text
-Load workflow required fields
-       ↓
-Find unresolved fields
-       ↓
-Ask validated mapped questions
-       ↓
-Deduplicate
-       ↓
-Stop when sufficient
-OR
-MAX_QUESTIONS reached
+ClinicalState
 ```
 
-The fallback is deterministic.
+separately from:
 
-The LLM does not control the state machine.
+```text
+Raw Transcript
+```
+
+## 9.2 Preserve Evidence
+
+Important state should retain:
+
+```text
+source
+source_id where applicable
+confidence
+status
+```
+
+## 9.3 Preserve History
+
+When state changes materially, retain sufficient version/history information to support auditability.
+
+## 9.4 No Silent Overwrite
+
+When sources disagree:
+
+```text
+patient
+document
+AI
+physician
+```
+
+do not silently overwrite one with another.
+
+## 9.5 Canonical State Status
+
+Use explicit state such as:
+
+```text
+UNKNOWN
+KNOWN_TRUE
+KNOWN_FALSE
+AMBIGUOUS
+KNOWN_WITH_VALUE
+```
+
+where the current domain model supports it.
 
 ---
 
-# 20. Core AYUSH Branch
+# 10. Provenance Rules
 
-If the selected workflow is AYUSH or the validated workflow requires AYUSH fields:
+Important information should identify origin.
+
+Minimum categories:
 
 ```text
-General Clinical Information
-        +
-Core AYUSH Question Set
+PATIENT_STATED
+AI_INFERRED
+DOCUMENT
+PHYSICIAN_CONFIRMED
 ```
 
-The adaptive engine can ask core AYUSH questions as part of the same interview.
+Example:
 
-Potential areas include:
+```text
+Medication: Atorvastatin 20 mg
+Source: DOCUMENT
+Evidence: Prescription document, page 1
+Status: NEEDS_REVIEW
+```
+
+Do not manufacture provenance.
+
+If source cannot be established:
+
+```text
+source = UNKNOWN
+```
+
+or use the appropriate unresolved status.
+
+---
+
+# 11. Document / OCR Rules
+
+## 11.1 Original Document Must Be Preserved
+
+OCR is derived evidence, not a replacement for the source file.
+
+## 11.2 OCR Is Not Truth
+
+OCR output must remain distinguishable from validated clinical facts.
+
+## 11.3 Evidence-Grounded Extraction
+
+A document-extracted candidate must be grounded in OCR evidence before being promoted as a valid candidate.
+
+## 11.4 Uncertain Extraction Requires Review
+
+Example:
+
+```text
+Atorvastatin ?0 mg
+Status: NEEDS_REVIEW
+```
+
+## 11.5 Document States
+
+The implementation may use states such as:
+
+```text
+PENDING
+PROCESSING
+COMPLETED
+FAILED
+NEEDS_REVIEW
+```
+
+The deployed model is authoritative.
+
+## 11.6 Patient / Session Association
+
+A document uploaded during an intake must remain correctly associated with:
+
+```text
+patient_id
+intake_session_id
+```
+
+where applicable.
+
+Doctor retrieval must use persisted associations rather than frontend-only filenames or mock records.
+
+---
+
+# 12. AYUSH Rules
+
+## 12.1 AYUSH Is Part of the Shared Engine
+
+Do not implement:
+
+```text
+Modern Engine
++
+AYUSH Chatbot
+```
+
+Implement:
+
+```text
+Unified Adaptive Engine
+      +
+Modern Clinical Dimensions
+      +
+AYUSH Assessment Dimensions
+```
+
+## 12.2 Ayurveda Is the First Detailed AYUSH System
+
+AYUSH is the umbrella.
+
+The current detailed assessment is:
+
+```text
+AYURVEDA
+```
+
+Future systems may be added independently:
+
+```text
+Yoga & Naturopathy
+Unani
+Siddha
+Homoeopathy
+```
+
+Do not force Ayurveda-specific dimensions into those systems.
+
+## 12.3 Current Core Ayurveda Parameters
 
 ```text
 Prakriti
@@ -766,1288 +742,450 @@ Vikriti
 Agni
 Koshtha
 Ahara-Vihara
-Other PS-required AYUSH parameters
+Dosha evidence
 ```
 
-The exact question set must come from validated domain requirements.
-
-Do not create unsupported medical conclusions from the answers.
-
-The early product must include the core AYUSH questioning path, but deeper AYUSH analytics/visualization can be added later.
-
----
-
-# 21. Red-Flag Branch
-
-After every relevant answer:
+## 12.4 Expanded Parameters
 
 ```text
-ClinicalState
-      ↓
-Safety Rule Engine
-      ↓
-Rule match?
+Sara
+Samhanana
+Pramana
+Satmya
+Sattva
+Ahara Shakti
+Vyayama Shakti
+Vaya
 ```
 
-### No
+These are adaptive information targets, not mandatory questions.
 
-Continue normal interview.
+## 12.5 AYUSH Must Be Relevant
 
-### Yes
-
-Create:
+A parameter may enter the candidate pool only when:
 
 ```text
-RedFlag
+AYUSH/Ayurveda workflow active
+AND
+dimension relevant
+AND
+dimension unresolved
+AND
+not duplicated
+AND
+useful information gain
+AND
+not blocked by safety
 ```
 
-Set:
+## 12.6 No AYUSH Checklist Behavior
+
+Never force:
 
 ```text
-priority = PRIORITY_REVIEW
+Prakriti
+→ Vikriti
+→ Sara
+→ Samhanana
+→ ...
 ```
 
-Patient UI:
+in a fixed sequence solely because a parameter exists.
 
-> **Your responses should be reviewed by a healthcare professional.**
+## 12.7 Patient-Stated vs AI-Inferred
 
-Do not display an autonomous diagnosis.
-
-Doctor receives:
-
-```text
-PRIORITY REVIEW
-Observed evidence
-Source
-Rule ID/reason
-```
-
----
-
-# 22. Contradiction Branch
-
-At relevant state updates:
-
-```text
-New fact
-   +
-Existing fact
-   ↓
-Conflict?
-```
-
-### No
-
-Continue.
-
-### Yes
-
-Create:
-
-```text
-Contradiction
-```
+Do not represent an AI inference as if the patient explicitly stated it.
 
 Example:
 
 ```text
-Patient:
-"I stopped Metformin."
+PATIENT_STATED:
+"my appetite is strong"
 
-Previous document:
-Metformin 500 mg
-
-→ INFORMATION CONFLICT
-```
-
-Continue the workflow.
-
-Do not automatically resolve the conflict.
-
----
-
-# 23. Interview Completion
-
-Interview ends when:
-
-```text
-Sufficient information
-OR
-Low information gain
-OR
-No progress
-OR
-No valid next question
-OR
-MAX_QUESTIONS reached
-OR
-Patient stops
-OR
-Service failure prevents safe continuation
-```
-
-Transition:
-
-```text
-INTERVIEW_COMPLETE
-```
-
-or:
-
-```text
-LIMITED_HISTORY
-```
-
----
-
-# 24. Post-Interview Summary Generation
-
-Input:
-
-```text
-Validated ClinicalState
-+
-validated facts
-+
-relevant alerts
-+
-provenance
-```
-
-Flow:
-
-```text
-ClinicalState
-      ↓
-Summary generator
-      ↓
-Schema validation
-      ↓
-Patient summary
-```
-
-Summary must NOT introduce unsupported facts.
-
----
-
-# 25. Document Flow
-
-After or during intake:
-
-```text
-/patient/documents
-```
-
-Prompt:
-
-> **Do you have any previous prescriptions or reports?**
-
-Options:
-
-```text
-📷 Take Photo
-📁 Upload File
-Skip
-```
-
----
-
-# 26. Document Upload
-
-```text
-Frontend
- ↓
-Upload API
- ↓
-Validate file
- ↓
-Supabase Storage
- ↓
-Document metadata record
-```
+AI_INFERRED:
+preliminary digestive-pattern interpretation
 
 Status:
-
-```text
-UPLOADED
-```
-
----
-
-# 27. Document Processing
-
-```text
-Document
- ↓
-OCR
- ↓
-Layout understanding
- ↓
-Medical extraction
- ↓
-Validation
- ↓
-Confidence
- ↓
-Provenance
- ↓
-ClinicalState / Timeline
-```
-
-Document states:
-
-```text
-UPLOADED
-OCR_PROCESSING
-OCR_COMPLETED
-EXTRACTING
-EXTRACTED
 NEEDS_REVIEW
-CONFIRMED
-FAILED
+```
+
+## 12.8 No Autonomous AYUSH Diagnosis
+
+Do not output:
+
+```text
+Definitive Ayurvedic diagnosis
+```
+
+from the AI alone.
+
+## 12.9 No Autonomous AYUSH Treatment
+
+Do not generate:
+
+- prescriptions;
+- treatment plans;
+- dosing;
+- therapeutic instructions
+
+as autonomous clinical decisions.
+
+## 12.10 AYUSH Safety Has No Special Override
+
+AYUSH logic cannot:
+
+```text
+override medical safety
+override red flags
+override authorization
+override physician confirmation
 ```
 
 ---
 
-# 28. Basic OCR Requirement
+# 13. AYUSH Evidence Rules
 
-The early implementation only needs to demonstrate controlled/sample documents.
-
-Example:
+For important AYUSH findings, preserve where practical:
 
 ```text
-Prescription image
-      ↓
-OCR
-      ↓
-Atorvastatin 20 mg
-      ↓
-Date
-      ↓
-Confidence
-      ↓
-Source document
+dimension
+value
+status
+source
+confidence
+evidence
+last_updated_turn
 ```
 
-If OCR fails:
+Evidence may point to:
 
 ```text
-Document retained
-→ extraction marked unavailable
-→ doctor can inspect original
+QuestionEvent
+Answer
+Document
+PhysicianEdit
 ```
+
+An AI-inferred AYUSH finding should remain:
+
+```text
+PRELIMINARY / NEEDS_REVIEW
+```
+
+until an appropriate confirmation occurs.
 
 ---
 
-# 29. Patient Review
+# 14. AYUSH RAG Rules
 
-Route:
+RAG may be used for:
 
-```text
-/patient/review
-```
+- reference-aligned terminology;
+- question framing;
+- assessment context.
 
-Show:
+RAG must not be used as authorization for:
 
-```text
-Chief complaint
-Duration
-Symptoms
-Medication
-Allergies
-Relevant history
-AYUSH fields where applicable
-```
+- diagnosis;
+- treatment;
+- prescription.
 
-Every editable field can show provenance/status where useful.
-
-Actions:
+Keep:
 
 ```text
-EDIT
-CONFIRM
+General AYUSH Knowledge
 ```
+
+logically separate from:
+
+```text
+Patient-Specific Evidence
+```
+
+Do not mix unrestricted patient data and general knowledge into one undifferentiated retrieval context.
 
 ---
 
-# 30. Patient Review Branch
+# 15. AI / Provider Failure Rules
 
-### Edit
+## LLM failure
 
 ```text
-Edit field
+retry
+→ alternate provider
+→ deterministic/mock fallback
+→ limited history if necessary
+```
+
+## Speech failure
+
+```text
+alternate provider
+→ text/touch fallback
+```
+
+## OCR failure
+
+```text
+preserve original document
+→ mark failure/review state
+```
+
+## RAG failure
+
+If RAG is non-essential to the immediate operation:
+
+```text
+continue without unsupported grounding
+```
+
+Do not fabricate reference context.
+
+## WebSocket failure
+
+```text
+polling / HTTP refresh fallback
+```
+
+Never falsely report clinical completion because an auxiliary service failed.
+
+---
+
+# 16. Database Rules
+
+1. Schema changes use migrations.
+2. Do not casually rewrite applied migrations.
+3. Preserve existing records.
+4. Maintain foreign-key integrity.
+5. Keep question/answer relationships explicit.
+6. Keep ClinicalState version relationships explicit.
+7. Keep patient/document/session associations explicit.
+8. Do not use client-provided identifiers as authorization.
+9. Do not store raw secrets.
+10. Do not make the UI a substitute for persistence.
+
+---
+
+# 17. Authorization Rules
+
+Authorization must be enforced server-side.
+
+A user's frontend role, route, or local storage state is not authoritative.
+
+Protected resources include:
+
+```text
+doctor records
+medical documents
+physician notes
+audit records
+administrative data
+```
+
+Patient kiosk sessions may be intentionally lightweight, but session ownership and access boundaries still must be enforced wherever applicable.
+
+---
+
+# 18. Doctor Review Rules
+
+The doctor must be able to distinguish:
+
+```text
+Patient stated
+AI inferred
+Document derived
+Physician confirmed
+```
+
+The doctor may:
+
+```text
+edit
+reject
+confirm
+annotate
+resolve contradiction
+```
+
+Important physician changes must remain auditable.
+
+---
+
+# 19. FHIR / Interoperability Rules
+
+FHIR mapping should consume validated/appropriate structured data.
+
+Preferred flow:
+
+```text
+Patient information
  ↓
-Save
+structured state
  ↓
-Recalculate summary if needed
+physician review/confirmation
  ↓
-Return to review
-```
-
-### Confirm
-
-```text
-PATIENT_CONFIRMED
-→ proceed to submission
-```
-
----
-
-# 31. Submit to Doctor
-
-Patient clicks:
-
-```text
-SUBMIT
-```
-
-Backend:
-
-```text
-Validate patient/session
-        ↓
-Validate patient review
-        ↓
-Persist submission transaction
-        ↓
-Assign selected doctor
-        ↓
-Create queue state
-        ↓
-Commit
-        ↓
-Publish queue event
-```
-
-Only after successful persistence:
-
-```text
-SUBMITTED
-```
-
----
-
-# 32. Privacy Cleanup After Submission
-
-Optional demo interaction:
-
-```text
-Submit
+FHIR mapping
  ↓
-10-second countdown
- ↓
-clear temporary client-side state
- ↓
-"Temporary session data cleared"
+FHIR R4 Bundle
 ```
 
-Example:
+Do not treat:
 
-```ts
-setTimeout(() => {
-  sessionStorage.clear();
-}, 10_000);
+```text
+raw transcript
+unvalidated LLM output
 ```
 
-This is only temporary client-side cleanup.
+as final clinical FHIR truth.
 
-It is NOT proof of DPDP compliance.
-
-Persistent backend data follows separate retention/access policies.
+Do not claim a live ABDM/HIS connection unless it is actually connected and tested.
 
 ---
 
-# 33. Patient Completion
+# 20. Multimodal Equivalence Rules
 
-Route:
-
-```text
-/patient/complete
-```
-
-Display:
-
-> **Your health history is ready.**
-
-> Your information has been sent to the healthcare team for review.
-
-Action:
+Voice and text must converge into the same clinical reasoning engine.
 
 ```text
-DONE
+VOICE
+ → speech normalization
+ → shared engine
+
+TEXT / TOUCH
+ → shared engine
 ```
 
-Do not expose internal AI details.
+The modality must not create a separate clinical policy.
+
+Equivalent semantic answers should produce equivalent structured state transitions.
 
 ---
 
-# 34. Doctor Flow — Master Sequence
+# 21. Demo / Mock Rules
+
+Demo mode may use:
 
 ```text
-Doctor Login
-     ↓
-Dashboard
-     ↓
-Patient Queue
-     ↓
-Open Patient
-     ↓
-Structured Summary
-     ↓
-Priority / Safety Review
-     ↓
-Timeline
-     ↓
-Documents
-     ↓
-Evidence / Provenance
-     ↓
-Edit
-     ↓
-Confirm
-     ↓
-FHIR-compatible Output
+MockLLMProvider
+MockSpeechProvider
+MockOCRProvider
+synthetic database seed data
 ```
+
+but:
+
+1. Demo logic must remain isolated.
+2. Demo data must be synthetic.
+3. Demo mode must not redefine core clinical behavior.
+4. Demo mode must not replace the real doctor handoff path with frontend-only fake data.
+5. Temporary demo shortcuts must be removable without redesigning the application.
+6. Do not present mock integrations as live external integrations.
 
 ---
 
-# 35. Doctor Login
+# 22. Testing Rules
 
-Route:
+Before claiming a significant change is complete:
 
 ```text
-/doctor/login
+focused tests
+    ↓
+integration tests where relevant
+    ↓
+full regression suite
 ```
 
-Authenticate.
-
-Backend determines role.
+Tests should cover:
 
 ```text
-role != DOCTOR
-→ reject
-```
-
-Successful authentication:
-
-```text
-/doctor/dashboard
-```
-
----
-
-# 36. Doctor Dashboard
-
-Show:
-
-```text
-Patients Waiting
-History Ready
-Priority Review
-```
-
-Queue item:
-
-```text
-Token
-Patient
-Complaint
-Submitted time
-Status
-Priority
-```
-
-Example:
-
-```text
-#42
-Chest pain
-⚠ Priority
-
-#43
-Fever
-History ready
-
-#44
-Joint pain
+state
+adaptive selection
+canonical dimensions
+duplicate prevention
+termination
+safety
+voice/text equivalence
+session isolation
+documents
+provenance
 AYUSH
+doctor handoff
+FHIR
+```
+
+AYUSH additions must not regress modern clinical behavior.
+
+---
+
+# 23. No Unnecessary Complexity
+
+Do not add:
+
+```text
+microservices
+extra vector databases
+unnecessary orchestration frameworks
+duplicate adaptive engines
+duplicate patient-state stores
+```
+
+unless there is a demonstrated requirement.
+
+Prefer the current modular-monolith architecture.
+
+---
+
+# 24. Definition of Safe AI Behavior
+
+The system is considered within the intended product boundary when:
+
+```text
+AI interprets
+AI extracts
+AI phrases
+        ↓
+Application validates
+        ↓
+Deterministic rules control
+        ↓
+Evidence remains visible
+        ↓
+Physician confirms
+```
+
+The system is outside the intended boundary when:
+
+```text
+LLM decides diagnosis
+LLM decides treatment
+LLM bypasses safety
+LLM silently overwrites facts
+LLM directly controls termination
+LLM writes arbitrary database state
 ```
 
 ---
 
-# 37. Real-Time Queue Update
+# 25. Final Engineering Rule
 
-Preferred:
-
-```text
-Patient submit
-   ↓
-FastAPI
-   ↓
-persist
-   ↓
-WebSocket event
-   ↓
-Doctor dashboard
-```
-
-Fallback:
+When in doubt, choose:
 
 ```text
-polling
-```
-
-If WebSocket fails, doctor queue must still function.
-
----
-
-# 38. Open Patient
-
-Route:
-
-```text
-/doctor/patients/:patientId
-```
-
-Backend verifies:
-
-```text
-authenticated doctor
+less automation
 +
-authorized patient record
+more explicit state
++
+more evidence
++
+more deterministic control
++
+more physician visibility
 ```
 
-Then load:
+over:
 
 ```text
-Patient
-IntakeSession
-ClinicalState
-Facts
-Alerts
-Documents
-Timeline
-Review
+more autonomous AI behavior.
 ```
 
----
-
-# 39. Doctor Patient Summary
-
-Primary screen sections:
-
-```text
-Patient Header
-Chief Complaint
-History
-Associated Symptoms
-Medications
-Allergies
-Investigations
-AYUSH
-Red Flags
-Contradictions
-Timeline
-Documents
-Evidence
-Review
-```
-
-Top state:
-
-```text
-AI DRAFT — NOT YET REVIEWED
-```
-
-After confirmation:
-
-```text
-PHYSICIAN CONFIRMED
-```
-
----
-
-# 40. Evidence Flow
-
-Doctor selects:
-
-```text
-Atorvastatin 20 mg
-```
-
-Show:
-
-```text
-Confidence: High
-Source: Prescription_01.pdf
-Page: 1
-```
-
-For patient response:
-
-```text
-Duration: 3 days
-Source: Patient answer
-```
-
-Allow opening the source where available.
-
----
-
-# 41. Timeline Flow
-
-```text
-Patient History
-      +
-Documents
-      +
-Current Intake
-      +
-Confirmed events
-      ↓
-Chronological Timeline
-```
-
-Example:
-
-```text
-2024 — Diagnosis
-2025 — Prescription
-2026 — Lab Report
-Today — Current Complaint
-```
-
-Click event:
-
-```text
-→ detail + evidence
-```
-
----
-
-# 42. Document Viewer Flow
-
-Doctor selects document:
-
-```text
-Document thumbnail
-      ↓
-Document viewer
-      +
-Extracted fields
-      +
-Source highlighting where supported
-```
-
-Doctor can review extraction.
-
----
-
-# 43. Red-Flag Doctor Flow
-
-If a red flag exists:
-
-```text
-PRIORITY REVIEW
-```
-
-Show:
-
-```text
-Observed:
-Chest pain
-Breathlessness
-Left-arm radiation
-
-Source:
-Patient responses
-
-Reason:
-Configured safety rule
-```
-
-Actions:
-
-```text
-REVIEW
-```
-
-Do not present the alert as a definitive diagnosis.
-
----
-
-# 44. Contradiction Doctor Flow
-
-Show:
-
-```text
-⚠ INFORMATION CONFLICT
-
-Patient:
-"I stopped Metformin."
-
-Previous record:
-Metformin 500 mg
-
-Status:
-Needs physician confirmation
-```
-
-Actions:
-
-```text
-Review
-Edit
-Resolve by physician
-```
-
-The physician explicitly decides the final state.
-
----
-
-# 45. Doctor Edit Flow
-
-```text
-AI Draft
-   ↓
-Doctor edits
-   ↓
-Validate update
-   ↓
-Persist
-   ↓
-Create PhysicianEdit
-   ↓
-Create AuditEvent
-   ↓
-Update UI
-```
-
-Never silently overwrite important information.
-
----
-
-# 46. Doctor Confirmation Flow
-
-Doctor clicks:
-
-```text
-CONFIRM
-```
-
-Backend:
-
-```text
-authorize doctor
- ↓
-validate current state
- ↓
-persist confirmation
- ↓
-create PhysicianReview
- ↓
-create AuditEvent
- ↓
-status = PHYSICIAN_CONFIRMED
-```
-
-After confirmation:
-
-```text
-FHIR generation may run
-```
-
----
-
-# 47. FHIR Flow
-
-```text
-PHYSICIAN_CONFIRMED
-      ↓
-Validated ClinicalState
-      ↓
-FHIR mapper
-      ↓
-FHIR R4 resources
-      ↓
-FHIR validation
-      ↓
-FHIR bundle/payload
-```
-
-Potential resources:
-
-```text
-Patient
-Encounter
-Observation
-Condition
-MedicationStatement
-Composition
-```
-
-Do not generate final FHIR directly from raw LLM output.
-
----
-
-# 48. Admin Flow
-
-```text
-Admin Login
-    ↓
-Admin Dashboard
-    ↓
-+------------------+
-|                  |
-Hospitals       Doctors
-    |              |
-Departments     Assignments
-    |
-Workflows
-    |
-Languages / Providers
-    |
-System Status
-    |
-Audit
-```
-
----
-
-# 49. Admin — Hospital Flow
-
-```text
-Admin
- ↓
-Hospitals
- ↓
-List
- ↓
-Add / Edit
- ↓
-Activate / Deactivate
-```
-
-Server verifies:
-
-```text
-role = ADMIN
-```
-
----
-
-# 50. Admin — Doctor Flow
-
-```text
-Admin
- ↓
-Doctors
- ↓
-Add/Edit
- ↓
-Specialty
- ↓
-Department
- ↓
-Hospital
- ↓
-Activate/Deactivate
-```
-
----
-
-# 51. Admin — Workflow Flow
-
-Configure:
-
-```text
-GENERAL_CLINICAL
-AYUSH
-```
-
-Potential configurable values:
-
-```text
-required fields
-question priorities
-MAX_QUESTIONS
-MAX_CONSECUTIVE_LOW_PROGRESS
-language availability
-provider availability
-```
-
-Safety-critical rules must be versioned and controlled.
-
----
-
-# 52. Admin — Provider Status
-
-Display:
-
-```text
-LLM          ONLINE / ERROR
-Speech       ONLINE / ERROR
-OCR          ONLINE / ERROR
-Database     ONLINE / ERROR
-Integration  ONLINE / ERROR
-```
-
-These are operational indicators, not clinical claims.
-
----
-
-# 53. Error Flow — Universal
-
-Every async operation should have:
-
-```text
-IDLE
- ↓
-LOADING
- ↓
-SUCCESS
-```
-
-or:
-
-```text
-LOADING
- ↓
-ERROR
- ↓
-RETRY / FALLBACK
-```
-
-Never leave a user in an indefinite loading state.
-
----
-
-# 54. Speech Failure Flow
-
-```text
-Voice
- ↓
-Provider error
- ↓
-Retry once
- ↓
-Alternative provider
- ↓
-Text / Touch fallback
-```
-
-The patient session remains active where safe.
-
----
-
-# 55. LLM Failure Flow
-
-```text
-LLM request
- ↓
-Failure
- ↓
-Retry once
- ↓
-Deterministic required-field fallback
- ↓
-If unsafe/unavailable
- → LIMITED_HISTORY
-```
-
-Do not fabricate an answer.
-
----
-
-# 56. OCR Failure Flow
-
-```text
-Upload succeeds
- ↓
-OCR fails
- ↓
-Document remains stored
- ↓
-Extraction unavailable
- ↓
-Doctor can inspect original document
-```
-
-Do not delete the source document because OCR failed.
-
----
-
-# 57. Patient Cancellation Flow
-
-```text
-Patient cancels
- ↓
-PATIENT_ABORTED
- ↓
-stop AI loop
- ↓
-clean temporary client state
- ↓
-return to start / exit
-```
-
-Do not continue background questioning after cancellation.
-
----
-
-# 58. Authorization Failure Flow
-
-```text
-Request
- ↓
-Authenticate
- ↓
-Authorize role
- ↓
-Authorize resource
-```
-
-Failure:
-
-```text
-401 Unauthorized
-```
-
-or:
-
-```text
-403 Forbidden
-```
-
-Do not reveal whether an unauthorized resource exists when that would leak sensitive information.
-
----
-
-# 59. Navigation Rules
-
-## Patient
-
-The patient should generally move forward through the flow.
-
-Back navigation may be allowed for:
-
-- correcting non-submitted choices;
-- returning to previous review steps.
-
-Do not allow a back-navigation action to create duplicate intake sessions.
-
-## Doctor
-
-Doctor can navigate freely among:
-
-```text
-Queue
-Patient
-Timeline
-Documents
-Review
-```
-
-## Admin
-
-Admin can navigate freely among configuration sections.
-
----
-
-# 60. State Consistency Rules
-
-A screen is not authoritative simply because it displays a state.
-
-Backend is authoritative for:
-
-- submission;
-- doctor assignment;
-- permissions;
-- physician confirmation;
-- persisted clinical data;
-- document access.
-
-Frontend is responsible for presentation and temporary UI state.
-
----
-
-# 61. Duplicate Submission Prevention
-
-When patient clicks Submit:
-
-```text
-disable button
- ↓
-submit request
- ↓
-show processing
-```
-
-Backend must make submission idempotent or safely reject duplicate submission.
-
-Do not create two doctor queue items from double-clicks.
-
----
-
-# 62. Refresh / Resume Rules
-
-If the patient refreshes during an active session:
-
-```text
-load authorized active session
-→ restore ClinicalState
-→ restore current workflow state
-```
-
-Do not create a new session automatically.
-
-If no resumable session exists:
-
-```text
-start new session
-```
-
-Doctor refresh:
-
-```text
-reload queue / current patient
-```
-
-Admin refresh:
-
-```text
-reload current configuration page
-```
-
----
-
-# 63. Final Patient → Doctor Data Handoff
-
-The data crossing the boundary should include:
-
-```text
-Patient identity/reference
-Hospital
-Doctor
-Workflow
-Language
-Interaction mode
-Chief complaint
-Structured ClinicalState
-Patient-confirmed information
-Relevant alerts
-Contradictions
-Documents
-Provenance
-Timestamp
-```
-
-Do not send unnecessary raw data.
-
----
-
-# 64. Final System Flow
-
-```text
-                         PATIENT
-                            |
-                      Start Session
-                            |
-                  Hospital / Doctor
-                            |
-                    Language / Mode
-                            |
-                          Consent
-                            |
-                      Chief Complaint
-                            |
-                     Adaptive Engine
-                            |
-          +-----------------+-----------------+
-          |                 |                 |
-       Clinical           AYUSH           Documents
-       Questions         Questions            |
-          |                 |                 |
-          +-----------------+-----------------+
-                            |
-                     Safety / Validation
-                            |
-                       Patient Review
-                            |
-                         Submit
-                            |
-                    Selected Doctor
-                            |
-                       Doctor Queue
-                            |
-                   Structured Summary
-                            |
-             +--------------+--------------+
-             |              |              |
-          Evidence       Alerts        Timeline
-             |              |              |
-             +--------------+--------------+
-                            |
-                       Doctor Edit
-                            |
-                     Doctor Confirm
-                            |
-                       FHIR Mapping
-                            |
-                    ABDM / HIS Adapter
-```
-
----
-
-# 65. Final Flow Invariants
-
-These must always remain true:
-
-1. Patient chooses/has a validated hospital context.
-2. Patient chooses/has a validated doctor context.
-3. Consent occurs before clinical data collection.
-4. Interaction supports voice and text/touch.
-5. Questions are dynamically selected.
-6. Questions are asked one at a time.
-7. Interview termination is controlled by the application.
-8. Adaptive questioning has deterministic fallback.
-9. Core AYUSH questions can participate in the adaptive interview when relevant.
-10. Basic document OCR is part of the product flow.
-11. Red flags are alerts, not diagnoses.
-12. Contradictions are surfaced, not auto-resolved.
-13. Important facts retain provenance.
-14. Patient can review/correct before submission.
-15. Doctor receives the selected patient's intake without manual re-entry.
-16. Doctor can edit and explicitly confirm.
-17. FHIR is generated only from validated/confirmed structured data.
-18. External provider failure has a fallback.
-19. Admin configuration cannot bypass server-side authorization.
-20. Evaluation dates do not create separate product flows.
-
----
-
-# 66. Agent Navigation Rule
-
-When implementing a requested UI or backend feature, the agent should identify:
-
-```text
-1. Which role?
-2. Which route?
-3. Which state?
-4. Which data enters the screen?
-5. Which user actions are possible?
-6. What state changes?
-7. What backend operation is required?
-8. What error/fallback branches exist?
-9. What happens next?
-```
-
-Do not implement a screen as an isolated mockup if it participates in an existing flow.
-
----
-
-# 67. Final Principle
-
-> **Every screen must exist because it advances a real patient, doctor, or administrator state.**
-
-Avoid decorative screens, dead-end prototype pages, duplicate flows, and AI-generated UI that is not connected to the actual application state.
+SwasthyaVaani is strongest when AI reduces patient/doctor information burden without taking clinical authority away from the physician.

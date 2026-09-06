@@ -3,12 +3,22 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.database import get_db
 from app.core.events import ws_manager
+from app.models.ayush import AyushAssessmentModel
 from app.models.intake import Answer, ClinicalStateModel, IntakeSession, QuestionEvent
 from app.models.safety import RedFlagModel
 from app.models.user import Patient
+from app.schemas.ayush import (
+    AyushAssessment,
+    AyushAssessmentStatus,
+    AyushDimensionValue,
+    AyushProvenanceSource,
+    ayush_state_to_assessment,
+    format_vaya_from_age,
+)
 from app.schemas.clinical_state import ClinicalState
 from app.schemas.intake import (
     AnswerSubmitRequest,
@@ -33,6 +43,7 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
     """Initialize a new patient pre-consultation clinical intake session."""
     # Ensure patient exists or create anonymous patient profile
     patient_id = req.patient_id
+    resolved_age = req.patient_age
     if not patient_id:
         new_patient = Patient(
             display_name=req.patient_name,
@@ -43,6 +54,10 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
         db.add(new_patient)
         db.flush()
         patient_id = new_patient.id
+    elif resolved_age is None:
+        existing_patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        if existing_patient and existing_patient.age is not None:
+            resolved_age = existing_patient.age
 
     token = generate_token()
     session = IntakeSession(
@@ -59,14 +74,39 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
     db.add(session)
     db.flush()
 
-    # Initialize empty ClinicalState
+    # Initialize ClinicalState with known demographic vaya if age is available
     init_state = ClinicalState()
+    if resolved_age is not None:
+        init_state.set_canonical_dimension(
+            "vaya", "KNOWN_WITH_VALUE", value=format_vaya_from_age(resolved_age)
+        )
+
     state_model = ClinicalStateModel(
         intake_session_id=session.id,
         version=1,
         state_json=init_state.model_dump(mode="json")
     )
     db.add(state_model)
+
+    if req.workflow_type == "AYUSH":
+        base_assessment = ayush_state_to_assessment(None, system="AYURVEDA")
+        if resolved_age is not None:
+            base_assessment.set_dimension(
+                AyushDimensionValue(
+                    dimension="vaya",
+                    value=format_vaya_from_age(resolved_age),
+                    source=AyushProvenanceSource.PATIENT_STATED,
+                    status=AyushAssessmentStatus.PRELIMINARY,
+                )
+            )
+        ayush_model = AyushAssessmentModel(
+            intake_session_id=session.id,
+            system="AYURVEDA",
+            status=base_assessment.overall_status.value,
+            assessment_json=base_assessment.model_dump(mode="json"),
+        )
+        db.add(ayush_model)
+
     db.commit()
 
     return IntakeSessionDetail(
@@ -154,6 +194,14 @@ async def process_intake_answer_core(
         **(latest_state_model.state_json if latest_state_model else {})
     )
 
+    # Bridge patient demographic age to vaya for existing sessions if known and not yet resolved
+    if not current_state.is_dimension_sufficiently_known("vaya") and session.patient_id:
+        patient = db.query(Patient).filter(Patient.id == session.patient_id).first()
+        if patient and patient.age is not None:
+            current_state.set_canonical_dimension(
+                "vaya", "KNOWN_WITH_VALUE", value=format_vaya_from_age(patient.age)
+            )
+
     question_event = None
     if question_event_id:
         question_event = (
@@ -223,6 +271,22 @@ async def process_intake_answer_core(
     if not updated_state.chief_complaint and raw_text:
         updated_state.chief_complaint = raw_text.strip()
 
+    # Sync any extracted AYUSH core facts to updated_state.ayush and canonical tracking
+    ayush_core = ["agni", "koshtha", "ahara_vihara"]
+    for af in ayush_core:
+        if af in extracted_facts and extracted_facts[af] is not None:
+            from app.schemas.clinical_state import AyushState
+            if not updated_state.ayush:
+                updated_state.ayush = AyushState()
+            setattr(updated_state.ayush, af, str(extracted_facts[af]))
+            updated_state.set_canonical_dimension(af, "KNOWN_WITH_VALUE", value=str(extracted_facts[af]))
+
+    # Sync any extracted Dashavidha facts to canonical tracking
+    dashavidha_fields = ["sara", "samhanana", "pramana", "satmya", "sattva", "ahara_shakti", "vyayama_shakti", "vaya"]
+    for df in dashavidha_fields:
+        if df in extracted_facts and extracted_facts[df] is not None:
+            updated_state.set_canonical_dimension(df, "KNOWN_WITH_VALUE", value=str(extracted_facts[df]))
+
     # Update session metrics
     session.question_count += 1
 
@@ -271,6 +335,64 @@ async def process_intake_answer_core(
             state_json=updated_state.model_dump(mode="json"),
         )
     )
+
+    # Sync to AyushAssessmentModel if AYUSH workflow or AYUSH data present
+    has_ayush_data = bool(updated_state.ayush) or any(df in extracted_facts for df in dashavidha_fields)
+    if session.workflow_type == "AYUSH" or has_ayush_data:
+        ayush_record = (
+            db.query(AyushAssessmentModel)
+            .filter(AyushAssessmentModel.intake_session_id == session.id)
+            .first()
+        )
+        if not ayush_record:
+            base_assessment = ayush_state_to_assessment(updated_state.ayush, system="AYURVEDA")
+            ayush_record = AyushAssessmentModel(
+                intake_session_id=session.id,
+                system="AYURVEDA",
+                status=base_assessment.overall_status.value,
+                assessment_json=base_assessment.model_dump(mode="json"),
+            )
+            db.add(ayush_record)
+            db.flush()
+
+        assessment_obj = AyushAssessment(**ayush_record.assessment_json)
+        if updated_state.ayush:
+            for af in ["prakriti", "vikriti", "agni", "koshtha", "ahara_vihara"]:
+                v = getattr(updated_state.ayush, af, None)
+                if v:
+                    assessment_obj.set_dimension(
+                        AyushDimensionValue(
+                            dimension=af,
+                            value=v,
+                            source=AyushProvenanceSource.PATIENT_STATED,
+                            source_id=answer.id,
+                        )
+                    )
+        for df in dashavidha_fields:
+            if df in extracted_facts and extracted_facts[df] is not None:
+                assessment_obj.set_dimension(
+                    AyushDimensionValue(
+                        dimension=df,
+                        value=str(extracted_facts[df]),
+                        source=AyushProvenanceSource.PATIENT_STATED,
+                        source_id=answer.id,
+                    )
+                )
+
+        vaya_dim = updated_state.canonical_dimensions.get("vaya")
+        if vaya_dim and vaya_dim.value and "vaya" not in assessment_obj.get_all_dimensions():
+            assessment_obj.set_dimension(
+                AyushDimensionValue(
+                    dimension="vaya",
+                    value=str(vaya_dim.value),
+                    source=AyushProvenanceSource.PATIENT_STATED,
+                    status=AyushAssessmentStatus.PRELIMINARY,
+                )
+            )
+
+        ayush_record.status = assessment_obj.overall_status.value
+        ayush_record.assessment_json = assessment_obj.model_dump(mode="json")
+        flag_modified(ayush_record, "assessment_json")
 
     decision.question_event_id = next_question_event_id
     db.commit()

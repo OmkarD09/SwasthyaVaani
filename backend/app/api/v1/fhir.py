@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models.ayush import AyushAssessmentModel
 from app.models.intake import IntakeSession, ClinicalStateModel
 from app.models.user import Patient, Doctor
+from app.schemas.ayush import AyushAssessment
 from app.schemas.clinical_state import ClinicalState
 from app.schemas.fhir import FHIRExportResponse
 from app.services.fhir.mapper import map_clinical_state_to_fhir_r4
@@ -30,12 +32,25 @@ def export_fhir_r4_bundle(intake_id: str, db: Session = Depends(get_db)):
 
     state = ClinicalState(**(latest_state_model.state_json if latest_state_model else {}))
 
+    ayush_assessment = None
+    ayush_record = (
+        db.query(AyushAssessmentModel)
+        .filter(AyushAssessmentModel.intake_session_id == session.id)
+        .first()
+    )
+    if ayush_record and ayush_record.assessment_json:
+        try:
+            ayush_assessment = AyushAssessment(**ayush_record.assessment_json)
+        except Exception:
+            ayush_assessment = None
+
     bundle = map_clinical_state_to_fhir_r4(
         intake_session_id=session.id,
         patient_id=session.patient_id,
         patient_name=patient.display_name if patient else "Patient",
         doctor_name=doctor.display_name if doctor else "Dr. Ananya Rao",
-        state=state
+        state=state,
+        ayush_assessment=ayush_assessment,
     )
 
     return FHIRExportResponse(

@@ -1,10 +1,16 @@
 # SwasthyaVaani — Technical Requirements Document (TRD)
 
-> Audience: AI coding agents and the development team.  
-> Relationship: `PRD.md` defines WHAT to build. This document defines HOW to build it.  
-> Treat this file as the technical source of truth unless an explicit project decision changes it.
+> **Status:** Updated technical source of truth
+>
+> **Relationship:** The PRD defines **WHAT** SwasthyaVaani must do. This document defines **HOW** it should be implemented.
+>
+> **Primary references:** Final `SwasthyaVaani_architecture.md`, `SwasthyaVaani_Current_Project_State.md`, updated PRD, original TRD, Backend Schema, Rules, App Flow, and AYUSH Implementation Specification.
+>
+> **Important:** This document evolves the existing SwasthyaVaani implementation. It does not authorize a greenfield rewrite.
 
-## 1. Technical Objective
+---
+
+# 1. Technical Objective
 
 Build SwasthyaVaani as a secure, modular, testable web platform with three role-based experiences:
 
@@ -23,25 +29,27 @@ The system must support:
 - adaptive clinical intake;
 - one-question-at-a-time interaction;
 - multilingual voice/text/touch;
-- structured clinical state;
-- core AYUSH questioning when relevant;
-- document OCR and extraction;
+- structured ClinicalState;
+- integrated AYUSH assessment;
+- document OCR and evidence extraction;
 - provenance and confidence;
-- red-flag detection;
+- deterministic red-flag detection;
 - contradiction detection;
 - physician review and confirmation;
 - FHIR-compatible output;
-- future ABDM/HIS integration;
+- future/live integration boundaries for ABDM/HIS;
 - replaceable AI/speech/OCR providers;
 - deterministic fallback behavior.
 
-Prefer a **modular monolith** for the prototype. Do not create microservices unless a concrete requirement justifies them.
+Use a **modular monolith** for the current architecture.
+
+Do not create microservices without a concrete operational requirement.
 
 ---
 
-## 2. Architecture Principles
+# 2. Technical Architecture Principles
 
-### 2.1 Layering
+## 2.1 Layering
 
 ```text
 UI
@@ -57,1485 +65,1527 @@ Persistence / External Integrations
 
 Clinical logic must not live directly inside UI components.
 
-### 2.2 Provider abstraction
+## 2.2 Provider Abstraction
 
 ```text
 LLMService
- ├── PrimaryLLMProvider
- ├── SecondaryLLMProvider
- └── MockLLMProvider
+ ├── Groq provider
+ ├── Gemini provider
+ └── Mock provider
 
 SpeechService
- ├── BhashiniProvider
- ├── SarvamProvider
- ├── WhisperProvider
- └── MockSpeechProvider
+ ├── Sarvam provider
+ ├── Bhashini provider
+ └── Mock provider
 
 OCRService
- ├── PaddleOCRProvider
- └── MockOCRProvider
+ ├── PaddleOCR provider
+ └── Mock provider
+
+EmbeddingService
+ ├── Gemini provider
+ └── Mock provider
 ```
 
-### 2.3 Deterministic control around AI
+External provider selection belongs behind service/provider boundaries.
 
-LLM may:
+## 2.3 Deterministic Control Around AI
 
-- interpret patient language;
-- extract candidate facts;
-- propose a next question;
-- draft a summary.
+The LLM may:
 
-Backend/application controls:
+- understand natural language;
+- extract candidate structured facts;
+- phrase a question;
+- draft a structured summary.
+
+The application controls:
 
 - authorization;
 - schema validation;
-- required-field logic;
-- question repetition;
+- canonical state;
+- safety;
+- contradiction handling;
+- candidate selection;
+- duplicate detection;
+- sufficiency;
 - termination;
-- red-flag rules;
-- contradiction state;
 - persistence;
 - physician confirmation.
 
-### 2.4 Fail safely
-
-External provider failure must not destroy the core application.
+## 2.4 Fail Safely
 
 ```text
 Provider failure
-   ↓
+    ↓
 Retry
-   ↓
+    ↓
 Alternate provider / deterministic fallback
-   ↓
+    ↓
 Limited history if safe continuation is impossible
 ```
 
----
-
-## 3. Recommended Technology Stack
-
-### Frontend
-
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- Lucide React
-- Recharts only where useful
-- TanStack Query where useful
-
-### Backend
-
-- Python
-- FastAPI
-- Pydantic
-- SQLAlchemy
-- Alembic
-
-### Data
-
-- PostgreSQL
-- Supabase-hosted PostgreSQL
-
-### File storage
-
-- Supabase Storage
-
-### AI
-
-- LLM API with structured output
-- provider abstraction
-
-### Speech
-
-- BHASHINI
-- Sarvam fallback
-- Whisper fallback where useful
-
-### OCR
-
-- PaddleOCR
-
-### Interoperability
-
-- FHIR R4
-- `fhir.resources`
-
-### Authentication
-
-- Supabase Auth or JWT
-- server-side RBAC
-
-### Realtime
-
-- FastAPI WebSockets when useful
-- polling fallback
-
-### Optional
-
-- Redis for temporary session state, cache, rate limiting, or short-lived jobs
-
-### Deployment
-
-- Vercel
-- Render
-- Supabase
-
-### Development
-
-- Docker
-- Git
-- GitHub
+Already collected patient data must not be lost merely because an external provider fails.
 
 ---
 
-## 4. Repository Structure
+# 3. Technology Stack
 
-Preferred structure:
+## Frontend
 
-```text
-/
-├── frontend/
-│   ├── app/
-│   ├── components/
-│   ├── features/
-│   │   ├── patient/
-│   │   ├── doctor/
-│   │   ├── admin/
-│   │   ├── intake/
-│   │   ├── documents/
-│   │   └── shared/
-│   ├── hooks/
-│   ├── lib/
-│   ├── types/
-│   └── tests/
-│
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── rules/
-│   │   ├── config/
-│   │   ├── services/
-│   │   │   ├── clinical_ai/
-│   │   │   ├── speech/
-│   │   │   ├── documents/
-│   │   │   ├── safety/
-│   │   │   ├── fhir/
-│   │   │   ├── auth/
-│   │   │   └── integrations/
-│   │   └── tests/
-│   └── migrations/
-│
-├── shared/
-│   ├── schemas/
-│   └── fixtures/
-│
-├── docs/
-├── .env.example
-├── docker-compose.yml
-└── README.md
-```
-
----
-
-## 5. Frontend Application Areas
-
-### Patient
+Current implementation:
 
 ```text
-/patient/start
-/patient/hospital
-/patient/doctor
-/patient/language
-/patient/mode
-/patient/consent
-/patient/intake
-/patient/documents
-/patient/review
-/patient/complete
+React
+TypeScript
+Vite
+Wouter
+Tailwind CSS
+Radix UI
+shadcn/ui
+Framer Motion
+TanStack React Query
+React Hook Form
+Zod
+Recharts
 ```
 
-### Doctor
+## Backend
 
 ```text
-/doctor/login
-/doctor/dashboard
-/doctor/patients
-/doctor/patients/:patientId
-/doctor/patients/:patientId/timeline
-/doctor/patients/:patientId/documents
-/doctor/patients/:patientId/review
+Python
+FastAPI
+Uvicorn
+Pydantic
+SQLAlchemy 2
+Alembic
+JWT authentication
 ```
 
-### Admin
+## Data
+
+Current prototype:
 
 ```text
-/admin/login
-/admin/dashboard
-/admin/hospitals
-/admin/doctors
-/admin/workflows
-/admin/services
-/admin/audit
+SQLite
 ```
 
-Route names can change for framework conventions, but role separation must remain.
-
----
-
-## 6. Patient State Machine
-
-Use explicit state rather than route-based inference.
-
-```ts
-type IntakeStatus =
-  | "NOT_STARTED"
-  | "HOSPITAL_SELECTED"
-  | "DOCTOR_SELECTED"
-  | "LANGUAGE_SELECTED"
-  | "CONSENT_PENDING"
-  | "ASKING"
-  | "LISTENING"
-  | "TRANSCRIBING"
-  | "PROCESSING"
-  | "NEEDS_REVIEW"
-  | "READY_TO_SUBMIT"
-  | "SUBMITTED"
-  | "LIMITED_HISTORY"
-  | "PATIENT_ABORTED"
-  | "ERROR"
-  | "FALLBACK";
-```
-
-Frontend and backend should share equivalent status definitions.
-
----
-
-## 7. Core Clinical State
-
-Do not use raw transcript as the primary application state.
-
-```ts
-type ClinicalState = {
-  chiefComplaint: string | null;
-  symptoms: string[];
-  onset: string | null;
-  duration: string | null;
-  severity: number | null;
-  location: string | null;
-  associatedSymptoms: string[];
-  aggravatingFactors: string[];
-  relievingFactors: string[];
-  pastHistory: string[];
-  familyHistory: string[];
-  medications: Medication[];
-  allergies: string[];
-  investigations: Investigation[];
-  ayush: AyushState | null;
-  documents: DocumentReference[];
-  redFlags: RedFlag[];
-  contradictions: Contradiction[];
-  uncertainties: Uncertainty[];
-  missingInformation: InformationGap[];
-};
-```
-
-The schema must be extended only when validated requirements demand it.
-
----
-
-## 8. Adaptive Interview Engine
-
-### Required pipeline
+Production direction:
 
 ```text
-Patient answer
-      ↓
-Normalize speech/text
-      ↓
-Extract candidate information
-      ↓
-Validate candidate information
-      ↓
-Merge into ClinicalState
-      ↓
-Evaluate safety rules
-      ↓
-Determine information gaps
-      ↓
-Generate candidate questions
-      ↓
-Validate candidates
-      ↓
-Deduplicate candidates
-      ↓
-Rank by usefulness
-      ↓
-ASK / STOP / ESCALATE
+PostgreSQL / Supabase
 ```
 
-The engine returns exactly one decision.
-
-### Contract
-
-```ts
-type QuestionDecision = {
-  action: "ASK" | "STOP" | "ESCALATE";
-  question?: string;
-  targetField?: string;
-  reason?: string;
-  confidence?: number;
-};
-```
-
----
-
-## 9. Minimum Sufficient History
-
-The interview must be dynamic.
-
-Do not implement a universal fixed question count such as six.
-
-Normal stopping is based on:
-
-- relevant required fields being sufficiently covered;
-- low expected information gain;
-- no meaningful unresolved information;
-- no useful alternative question remaining.
-
-Different cases may require different numbers of questions.
-
----
-
-## 10. Anti-Infinite-Loop Guardrails
-
-The LLM must never control termination by itself.
-
-### Guardrail A — completeness
+## AI
 
 ```text
-relevant required information complete
-→ STOP
+Groq
+Google Gemini
 ```
 
-### Guardrail B — low information gain
+## Speech
 
 ```text
-expected value of another question too low
-→ STOP
+Sarvam
+Bhashini
+browser speech fallback where available
+Mock provider
 ```
 
-### Guardrail C — semantic duplicate
-
-```text
-candidate duplicates previous question
-→ reject
-→ regenerate
-```
-
-### Guardrail D — low progress
-
-Recommended initial configuration:
-
-```text
-MAX_CONSECUTIVE_LOW_PROGRESS = 2
-```
-
-If reached:
-
-```text
-STOP
-```
-
-### Guardrail E — hard emergency limit
-
-Recommended initial prototype configuration:
-
-```text
-MAX_QUESTIONS = 15
-```
-
-Make configurable.
-
-If reached before adequate completeness:
-
-```text
-status = LIMITED_HISTORY
-```
-
-Never mark the history fully complete solely because the limit was reached.
-
-### Guardrail F — model/service failure
-
-```text
-retry once
-→ deterministic required-field fallback
-→ limited history if safe continuation is impossible
-```
-
-### Guardrail G — patient cancellation
-
-```text
-status = PATIENT_ABORTED
-```
-
----
-
-## 11. Deterministic Question Fallback
-
-The fallback must exist in code.
-
-```text
-If adaptive gap analysis is not converging:
-
-1. Load required fields for the active workflow.
-2. Identify unresolved fields.
-3. Select a validated question mapped to an unresolved field.
-4. Prevent duplication.
-5. Repeat until required fields are sufficiently covered.
-6. Stop at MAX_QUESTIONS.
-7. Mark LIMITED_HISTORY if incomplete.
-```
-
-This is the emergency implementation path if the LLM-based gap analysis is unreliable near a checkpoint.
-
----
-
-## 12. Question Deduplication
-
-Do not rely only on exact string comparison.
-
-Pipeline:
-
-```text
-Candidate question
-      ↓
-Normalize
-      ↓
-Semantic similarity to previous questions
-      ↓
-Duplicate?
-   YES → reject
-   NO  → continue
-```
-
-Store question metadata:
-
-```ts
-type AskedQuestion = {
-  id: string;
-  text: string;
-  targetField: string;
-  askedAt: string;
-};
-```
-
----
-
-## 13. Information Progress
-
-After every answer compare:
-
-```text
-state_before
-state_after
-```
-
-Track:
-
-- newly resolved required fields;
-- newly captured facts;
-- changed confidence;
-- newly created contradictions;
-- newly created alerts.
-
-This can drive the low-progress guard.
-
----
-
-## 14. Patient Interaction
-
-The patient interface must support:
-
-- voice;
-- text;
-- touch/options.
-
-Voice flow:
-
-```text
-Microphone
- ↓
-recording
- ↓
-transcription
- ↓
-normalized text
- ↓
-clinical engine
-```
-
-TTS flow:
-
-```text
-Next question
- ↓
-speech provider
- ↓
-audio
- ↓
-patient
-```
-
-Speech provider must be replaceable.
-
----
-
-## 15. Patient Identity / ABHA
-
-Provide an ABHA/health-ID integration point where the actual integration supports it.
-
-Possible UI:
-
-```text
-ABHA / Health ID
-
-[ Enter ID ]
-
-or
-
-[ Scan QR ]
-```
-
-Do not add Aadhaar collection unless a verified requirement and lawful workflow require it.
-
-ABHA must not become a hard dependency for local/demo mode.
-
----
-
-## 16. Patient Review
-
-Before final submission:
-
-```text
-ClinicalState
-   ↓
-Validated summary
-   ↓
-Patient review
-   ↓
-Edit / Confirm
-```
-
-The patient-confirmed record becomes the input to the doctor handoff.
-
----
-
-## 17. Doctor Handoff
-
-Submission:
-
-```text
-POST /api/intakes/:id/submit
-       ↓
-database transaction
-       ↓
-queue event
-       ↓
-doctor queue
-```
-
-Possible real-time mechanism:
-
-```text
-FastAPI WebSocket
-```
-
-Fallback:
-
-```text
-polling
-```
-
-Do not claim successful handoff until persistence succeeds.
-
----
-
-## 18. Doctor Dashboard
-
-Doctor UI should support:
-
-- patient queue;
-- history-ready state;
-- priority review;
-- structured summary;
-- patient evidence;
-- documents;
-- timeline;
-- alerts;
-- edit;
-- confirm.
-
-Status:
-
-```text
-AI_DRAFT
-    ↓
-NEEDS_VERIFICATION
-    ↓
-PHYSICIAN_CONFIRMED
-```
-
----
-
-## 19. Source / Provenance
-
-Use a shared provenance schema.
-
-```ts
-type Provenance = {
-  sourceType:
-    | "PATIENT_ANSWER"
-    | "DOCUMENT"
-    | "AI_DERIVED"
-    | "PHYSICIAN";
-  sourceId: string;
-  page?: number;
-  region?: SourceRegion;
-  confidence?: number;
-};
-```
-
-Important clinical facts should have provenance where practical.
-
----
-
-## 20. Document Processing
-
-Pipeline:
-
-```text
-Upload
- ↓
-Storage
- ↓
-OCR
- ↓
-Layout understanding
- ↓
-Medical entity extraction
- ↓
-Validation
- ↓
-Confidence / provenance
- ↓
-ClinicalState / Timeline
-```
-
-Initial extraction targets:
-
-### Medication
-
-- drug;
-- dose;
-- frequency;
-- duration.
-
-### Lab
-
-- test;
-- value;
-- unit;
-- reference range;
-- date.
-
-### Historical event
-
-- diagnosis;
-- procedure;
-- hospitalization;
-- visit date.
-
----
-
-## 21. OCR Architecture
-
-```text
-DocumentService
-      ↓
-OCRService
-      ↓
-ExtractionService
-      ↓
-ValidationService
-      ↓
-DocumentFacts
-```
-
-Recommended OCR:
+## OCR
 
 ```text
 PaddleOCR
+Mock OCR
 ```
 
-Recommended extraction:
+## Interoperability
 
 ```text
-LLM structured extraction
-+
-rules/validation
-+
-regex/spaCy as supporting tools
+FHIR R4
+ABDM / NRCES India Core mapping and integration boundary
 ```
-
-OCR output is never automatically trusted clinical truth.
 
 ---
 
-## 22. Document Fact Model
+# 4. Repository / Module Architecture
+
+The current backend is a modular monolith.
+
+Logical modules include:
+
+```text
+auth
+patient
+doctor
+admin
+intake
+clinical_ai
+speech
+documents
+safety
+rag
+fhir
+abdm
+audit
+providers
+```
+
+The clinical AI domain contains:
+
+```text
+adaptive_engine
+domain_classifier
+gap_analysis
+question_scorer
+fact extraction
+```
+
+Provider adapters contain:
+
+```text
+llm_provider
+speech_provider
+ocr_provider
+embedding_provider
+```
+
+---
+
+# 5. Frontend Technical Requirements
+
+## 5.1 Patient
+
+The patient application is responsible for:
+
+```text
+language
+demographics
+interaction mode
+consent
+clinical input
+voice/text/touch
+document upload
+review
+submission
+```
+
+The frontend MUST NOT contain authoritative clinical decision logic.
+
+It may display the decision received from the backend.
+
+## 5.2 Doctor
+
+The doctor application is responsible for:
+
+```text
+queue
+patient dossier
+structured clinical information
+safety
+contradictions
+documents
+conversation
+AYUSH
+editing
+confirmation
+```
+
+## 5.3 Admin
+
+The admin application is responsible for:
+
+```text
+configuration
+hospital/doctor management
+service status
+audit
+QA
+```
+
+---
+
+# 6. API Architecture
+
+The API is versioned under:
+
+```text
+/api/v1
+```
+
+Major API domains:
+
+```text
+/auth
+/intakes
+/documents
+/doctor
+/admin
+/speech
+/rag
+/fhir
+/abdm
+```
+
+The API layer is responsible for:
+
+- request validation;
+- authentication;
+- authorization;
+- transport;
+- response contracts;
+- invoking application services.
+
+The API layer must not become the home for complex clinical reasoning.
+
+---
+
+# 7. Intake Creation
+
+The canonical intake creation operation is:
+
+```http
+POST /api/v1/intakes
+```
+
+The created `IntakeSession` must identify, as applicable:
+
+```text
+patient
+hospital
+doctor
+workflow type
+language
+interaction mode
+status
+```
+
+An initial ClinicalState is created before the adaptive interview begins.
+
+When the workflow requires AYUSH assessment, the session must also have access to the AYUSH assessment context.
+
+---
+
+# 8. Patient Answer Processing
+
+## Text / Touch
+
+```http
+POST /api/v1/intakes/{id}/answers
+```
+
+Pipeline:
+
+```text
+Request
+ ↓
+Authentication/session validation where applicable
+ ↓
+Input normalization
+ ↓
+Fact extraction
+ ↓
+Schema validation
+ ↓
+ClinicalState merge
+ ↓
+AYUSH state merge when relevant
+ ↓
+Safety
+ ↓
+Contradiction detection
+ ↓
+Adaptive candidate generation
+ ↓
+Scoring
+ ↓
+Duplicate / resolved filtering
+ ↓
+Sufficiency
+ ↓
+ASK / STOP / ESCALATE
+ ↓
+Persist QuestionEvent
+ ↓
+Response
+```
+
+## Voice
+
+```http
+POST /api/v1/intakes/{id}/voice-answer
+```
+
+Pipeline:
+
+```text
+Audio
+ ↓
+SpeechService
+ ↓
+Transcript
+ ↓
+Normalized patient text
+ ↓
+same process_intake_answer_core()
+```
+
+The voice endpoint MUST converge into the same clinical reasoning pipeline as text.
+
+---
+
+# 9. Clinical Intelligence Contract
+
+The clinical intelligence layer should expose a bounded decision contract.
+
+Conceptually:
+
+```python
+QuestionDecision:
+    action: ASK | STOP | ESCALATE
+    question: optional string
+    target_field: optional string
+    reason: optional string
+```
+
+The backend validates this contract before using it.
+
+The frontend MUST NOT consume arbitrary raw LLM JSON as a clinical decision.
+
+---
+
+# 10. Fact Extraction
+
+Fact extraction is a probabilistic step.
+
+```text
+Patient language
+ ↓
+LLM / Mock extractor
+ ↓
+typed ClinicalExtractionSchema
+ ↓
+validation
+ ↓
+domain validation
+ ↓
+state mutation
+```
+
+The extracted facts may include:
+
+```text
+chief complaint
+symptoms
+duration
+severity
+location
+associated symptoms
+medications
+allergies
+history
+AYUSH observations
+```
+
+Extraction must preserve uncertainty and must not invent unavailable facts.
+
+---
+
+# 11. ClinicalState Requirements
+
+ClinicalState is the primary structured working state.
+
+It must remain separate from:
+
+```text
+raw conversation transcript
+```
+
+The current architecture supports fields including:
+
+```text
+chief complaint
+symptoms
+onset
+duration
+severity
+location
+character
+radiation
+associated symptoms
+timing
+aggravating factors
+relieving factors
+past history
+family history
+medications
+allergies
+investigations
+AYUSH
+documents
+red flags
+contradictions
+uncertainties
+canonical dimensions
+resolved dimensions
+exploration state
+```
+
+## State lifecycle
+
+```text
+Initialize
+ ↓
+Load latest state
+ ↓
+Extract facts
+ ↓
+Merge
+ ↓
+Evaluate safety
+ ↓
+Generate candidates
+ ↓
+Persist next state/version
+```
+
+Clinical state versions should remain auditable according to the current persistence architecture.
+
+---
+
+# 12. Canonical Dimension System
+
+Equivalent concepts must map to the same canonical dimension.
 
 Example:
 
-```ts
-type ExtractedMedication = {
-  drugName: string | null;
-  dose: string | null;
-  frequency: string | null;
-  duration: string | null;
-  confidence: number;
-  sourceDocumentId: string;
-  sourceRegion?: SourceRegion;
-  status: "EXTRACTED" | "NEEDS_REVIEW" | "CONFIRMED";
-};
+```text
+"How long?"
+"Since when?"
+"For three days?"
+        ↓
+symptom_duration
 ```
-
-Equivalent structured types should exist for investigations and relevant historical facts.
-
----
-
-## 23. Red-Flag Engine
-
-Use deterministic/configurable rules for prototype safety.
 
 Example:
 
 ```text
-WHEN
-  chest_pain = true
-  AND breathlessness = true
-  AND arm_radiation = true
-
-THEN
-  create PRIORITY_REVIEW
+"blurred vision"
+"vision blur"
+"difficulty seeing"
+        ↓
+blurred_vision
 ```
 
-Example result:
+A candidate that maps to a sufficiently known canonical dimension must be rejected unless clarification is explicitly required.
 
-```ts
-type RedFlag = {
-  ruleId: string;
-  title: string;
-  reason: string;
-  severity: "PRIORITY";
-  evidenceIds: string[];
-  status: "OPEN" | "REVIEWED";
-};
-```
-
-The rule engine detects a pattern requiring review. It does not diagnose.
+This is a core anti-loop mechanism.
 
 ---
 
-## 24. Contradiction Engine
+# 13. Adaptive Question Engine
+
+The adaptive engine is deterministic in question-dimension selection.
+
+Canonical pipeline:
+
+```text
+ClinicalState
++
+AyushAssessment where relevant
+        ↓
+workflow/domain context
+        ↓
+relevant gaps
+        ↓
+candidate dimensions
+        ↓
+candidate scoring
+        ↓
+duplicate / resolved filtering
+        ↓
+sufficiency
+        ↓
+ASK / STOP / ESCALATE
+```
+
+The LLM may phrase the selected target but does not independently select the clinical dimension.
+
+---
+
+# 14. Candidate Scoring Requirements
+
+Candidate scoring should consider, as appropriate:
+
+```text
+safety priority
+clinical relevance
+workflow relevance
+information gain
+newly volunteered evidence
+target specificity
+    -
+already known
+    -
+semantic duplication
+    -
+irrelevance
+```
+
+The exact scoring weights remain implementation details and should remain deterministic/testable.
+
+---
+
+# 15. Information Sufficiency
+
+Stopping is application-controlled.
+
+The engine should stop when:
+
+- clinically relevant information is sufficiently characterized;
+- useful unresolved candidates no longer exist;
+- expected information gain is too low;
+- a configured safety workflow directs escalation/stop.
+
+The LLM cannot independently terminate an interview.
+
+---
+
+# 16. Interview Guardrails
+
+Global guardrails include:
+
+```text
+semantic duplicate detection
+resolved-field protection
+non-informative response handling
+low-progress detection
+hard maximum question limit
+deterministic fallback
+patient cancellation
+provider-failure handling
+```
+
+The current implementation uses a hard maximum of **10 questions** as a safety brake.
+
+This is a ceiling, not the target interview length.
+
+If the maximum is reached before adequate history:
+
+```text
+LIMITED_HISTORY
+```
+
+must remain distinguishable from:
+
+```text
+COMPLETE
+```
+
+---
+
+# 17. Open Exploration and Targeted Follow-Up
+
+The adaptive engine should support:
+
+```text
+OPEN_EXPLORATION
+TARGETED_FOLLOW_UP
+SAFETY_REQUIRED
+```
+
+Open exploration may discover a new relevant symptom/domain.
+
+Example:
+
+```text
+patient reports stomach discomfort
+
+→ open exploration
+
+patient adds dark stools
+
+→ map new evidence
+→ reassess safety
+→ targeted follow-up if required
+```
+
+Open exploration must not become an excuse for random checklist questioning.
+
+---
+
+# 18. Ambiguous and Non-Informative Answers
+
+The state model must preserve ambiguity.
+
+Example:
+
+```text
+Question:
+"Any blurred vision or light sensitivity?"
+
+Answer:
+"Yes."
+
+Result:
+AMBIGUOUS
+```
+
+Do not mark every proposition true.
+
+Non-informative answers such as:
+
+```text
+"wtf"
+"idk"
+"what?"
+```
+
+must not corrupt state or create infinite loops.
+
+The engine should rephrase, pivot, or use a viable alternative target.
+
+---
+
+# 19. Safety Architecture
+
+Safety checks execute independently of the LLM.
+
+```text
+patient answer
+ ↓
+deterministic safety rules
+ ↓
+red flag / contradiction state
+ ↓
+question-selection constraints
+ ↓
+doctor priority
+```
+
+Current configured safety includes rules for selected:
+
+```text
+high-risk chest-pain combinations
+critical pain severity
+febrile illness with respiratory difficulty
+gastrointestinal bleeding / melena
+```
+
+Safety outputs are alerts or priority-review signals, not autonomous diagnoses.
+
+---
+
+# 20. Contradiction Detection
+
+Contradictions must remain explicit.
 
 Example:
 
 ```text
 Patient:
-"I stopped Metformin."
+stopped medication
 
-Previous record:
-Metformin 500 mg.
+Document:
+medication listed
+
+Result:
+INFORMATION_CONFLICT
 ```
 
-Create:
+The system must not silently choose one source.
 
-```ts
-type Contradiction = {
-  field: string;
-  sourceA: Provenance;
-  valueA: unknown;
-  sourceB: Provenance;
-  valueB: unknown;
-  status:
-    | "OPEN"
-    | "REVIEWED"
-    | "RESOLVED_BY_PHYSICIAN";
-};
-```
-
-Never auto-resolve clinical contradictions.
+Physician review resolves the conflict.
 
 ---
 
-## 25. Confidence / Uncertainty
+# 21. AYUSH Technical Architecture
 
-Confidence is metadata, not proof.
+## 21.1 Core Principle
 
-Standard states:
+AYUSH is integrated into the same adaptive engine.
 
 ```text
-HIGH
-MEDIUM
-LOW
-NEEDS_REVIEW
+Unified Adaptive Engine
+        |
+        +-- Modern clinical candidates
+        |
+        +-- AYUSH candidates
 ```
 
-The UI should use consistent visual treatment for:
+There is no independent AYUSH chatbot or second unbounded interview loop.
 
-- speech uncertainty;
-- OCR uncertainty;
-- extracted-field uncertainty.
+## 21.2 Workflow Types
+
+```text
+GENERAL_CLINICAL
+AYUSH
+DUAL_SYSTEM
+```
+
+For detailed AYUSH assessment, the first concrete system is:
+
+```text
+AYURVEDA
+```
+
+The architecture remains extensible to other AYUSH systems.
 
 ---
 
-## 26. Summary Generation
+# 22. AYUSH Assessment Model
 
-Use validated structured state as input.
+The richer target model is:
 
 ```text
-ClinicalState
-+
-validated extracted facts
-+
-relevant alerts
-+
-provenance
-      ↓
-Summary LLM
-      ↓
-Structured Summary
-      ↓
-Schema validation
-      ↓
-Patient / Doctor UI
+AyushAssessment
+├── system
+├── dimensions
+├── ahara_vihara
+├── evidence
+├── confidence
+├── uncertainties
+├── overall_status
+└── physician_review
 ```
 
-Summary generation must not introduce unsupported facts.
+The existing:
+
+```text
+ClinicalState.ayush
+```
+
+remains compatible as the adaptive working representation.
+
+The richer assessment should be added additively.
 
 ---
 
-## 27. AYUSH Workflow
+# 23. Ayurveda Parameters
 
-AYUSH is part of the same clinical record.
+Current/core:
 
 ```text
-Patient
-   |
-   +-- General Clinical History
-   |
-   +-- AYUSH Clinical History
+Prakriti
+Vikriti
+Agni
+Koshtha
+Ahara-Vihara
+Dosha evidence
 ```
 
-When the relevant workflow is active, the adaptive engine can target core AYUSH fields required by PS 26047.
+Expanded adaptive targets:
 
-Potential areas:
+```text
+Sara
+Samhanana
+Pramana
+Satmya
+Sattva
+Ahara Shakti
+Vyayama Shakti
+Vaya
+```
 
-- Prakriti;
-- Vikriti;
-- Agni;
-- Koshtha;
-- Ahara-Vihara;
-- relevant validated case-taking/examination parameters.
-
-Core AYUSH questioning MUST be available early in the implementation.
-
-Do not create an unrelated AYUSH app.
-
-Do not generate unsupported clinical conclusions from AYUSH fields.
+These are not a fixed questionnaire.
 
 ---
 
-## 28. Authentication and RBAC
+# 24. AYUSH Dimension State
 
-Recommended:
-
-```text
-Supabase Auth
-+
-application RBAC
-```
-
-Roles:
+AYUSH dimensions should use the same state principles as the core adaptive engine:
 
 ```text
-PATIENT
-DOCTOR
-ADMIN
+UNKNOWN
+KNOWN_TRUE
+KNOWN_FALSE
+AMBIGUOUS
+KNOWN_WITH_VALUE
 ```
 
-Authorization MUST be enforced server-side.
-
-Examples:
+Each important dimension should support, where applicable:
 
 ```text
-PATIENT
-→ own session / own information
-
-DOCTOR
-→ authorized patient records
-
-ADMIN
-→ configuration / operational resources
+value
+status
+confidence
+source
+evidence
+last_updated_turn
 ```
+
+This avoids building a second incompatible state system.
 
 ---
 
-## 29. API Design
+# 25. AYUSH Adaptive Candidate Selection
 
-Use typed request/response schemas.
-
-Core examples:
-
-```http
-POST /api/auth/login
-
-GET  /api/hospitals
-GET  /api/hospitals/:id/doctors
-
-POST /api/intakes
-GET  /api/intakes/:id
-POST /api/intakes/:id/answers
-POST /api/intakes/:id/next-question
-POST /api/intakes/:id/review
-POST /api/intakes/:id/submit
-
-GET  /api/doctor/queue
-GET  /api/doctor/patients/:id
-PATCH /api/doctor/patients/:id/history
-POST /api/doctor/patients/:id/confirm
-
-POST /api/documents
-POST /api/documents/:id/process
-GET  /api/documents/:id
-
-GET /api/admin/hospitals
-GET /api/admin/doctors
-GET /api/admin/audit
-```
-
-Exact route names may change, but authorization and responsibility boundaries must remain.
-
----
-
-## 30. Error Contract
-
-Use consistent backend error responses.
-
-Example:
-
-```json
-{
-  "error": {
-    "code": "RESOURCE_NOT_FOUND",
-    "message": "The requested resource was not found.",
-    "requestId": "req_123"
-  }
-}
-```
-
-Do not expose stack traces to users.
-
----
-
-## 31. File Storage
-
-Use Supabase Storage for uploaded documents.
-
-Requirements:
-
-- validate file size;
-- validate/inspect MIME type;
-- normalize filenames;
-- use non-guessable object IDs;
-- protect document access server-side;
-- do not expose unrestricted public document URLs.
-
----
-
-## 32. Database Rules
-
-Persist:
-
-- structured patient/session data;
-- clinical state;
-- question/answer events;
-- document metadata;
-- extracted facts;
-- physician review;
-- audit events.
-
-Do not store raw provider responses unless needed for debugging/testing.
-
----
-
-## 33. Session and Privacy
-
-Separate:
+An AYUSH dimension may enter the candidate pool only when:
 
 ```text
-temporary client state
-active intake session
-persistent clinical record
-uploaded document
-audit record
+AYUSH/Ayurveda workflow active
+AND
+dimension relevant
+AND
+dimension unresolved
+AND
+not duplicated
+AND
+expected information gain is meaningful
+AND
+no higher-priority safety requirement blocks it
 ```
 
-A frontend cleanup action such as:
+In `DUAL_SYSTEM`, modern and AYUSH candidates compete in the same decision process.
 
-```ts
-sessionStorage.clear()
-```
-
-is only client-side cleanup.
-
-It is NOT equivalent to DPDP compliance.
-
-Backend/storage retention and deletion policies are separate requirements.
-
-Optional UI demo:
-
-```text
-Submit
- ↓
-10-second countdown
- ↓
-clear temporary browser state
- ↓
-"Temporary session data cleared"
-```
-
-Do not label the above as proof of legal compliance.
+Safety always takes precedence.
 
 ---
 
-## 34. Real-Time Architecture
+# 26. AYUSH Provenance
 
-Preferred:
-
-```text
-Patient submit
-   ↓
-FastAPI transaction
-   ↓
-Queue event
-   ↓
-WebSocket
-   ↓
-Doctor dashboard
-```
-
-Fallback:
+Supported source categories:
 
 ```text
-Periodic polling
-```
-
-The queue must remain correct even if WebSocket is unavailable.
-
----
-
-## 35. FHIR Architecture
-
-Generate FHIR from physician-confirmed structured information.
-
-```text
+PATIENT_STATED
+AI_INFERRED
+DOCUMENT
 PHYSICIAN_CONFIRMED
-        ↓
-FHIR mapper
-        ↓
-FHIR R4 resources
-        ↓
+```
+
+A physician-confirmed value must remain distinguishable from an AI inference.
+
+The system must not present an AI-inferred Prakriti/Vikriti classification as definitive clinical truth.
+
+---
+
+# 27. AYUSH Evidence
+
+Important AYUSH findings should retain supporting evidence.
+
+Possible evidence sources:
+
+```text
+QuestionEvent
+Answer
+Document
+Physician edit
+```
+
+Conceptually:
+
+```text
+AYUSH dimension
+ ↓
+assessment value
+ ↓
+evidence[]
+```
+
+This supports physician verification and auditability.
+
+---
+
+# 28. AYUSH RAG
+
+The AYUSH RAG subsystem is used for bounded knowledge grounding.
+
+```text
+Selected AYUSH target
+ ↓
+retrieve relevant reference context
+ ↓
+bounded question/extraction context
+```
+
+The RAG system must NOT autonomously produce:
+
+```text
+diagnosis
+treatment
+prescription
+```
+
+General AYUSH knowledge and patient-specific evidence must remain logically distinct.
+
+The current implementation stores embeddings relationally and performs similarity retrieval in application code. Native vector indexing remains a future optimization.
+
+---
+
+# 29. AYUSH and Documents
+
+A previous AYUSH case sheet can contribute evidence.
+
+Pipeline:
+
+```text
+Document
+ ↓
+OCR
+ ↓
+candidate extraction
+ ↓
+evidence validation
+ ↓
+AYUSH-related candidate
+ ↓
+review / confirmation
+```
+
+Document evidence must not silently overwrite patient-stated information.
+
+---
+
+# 30. AYUSH Physician Review
+
+The physician can:
+
+```text
+edit
+confirm
+reject
+annotate
+resolve contradiction
+```
+
+Important changes remain auditable through the existing physician review/edit/audit architecture.
+
+The system must never present autonomous AYUSH treatment or diagnosis as a physician-approved result.
+
+---
+
+# 31. Speech Architecture
+
+Voice flow:
+
+```text
+Patient microphone
+ ↓
+frontend audio capture
+ ↓
+FastAPI
+ ↓
+SpeechService
+ ↓
+Sarvam / Bhashini / fallback
+ ↓
+normalized text
+ ↓
+shared clinical engine
+```
+
+Response:
+
+```text
+question text
+ ↓
+SpeechService
+ ↓
+TTS provider
+ ↓
+patient audio
+```
+
+Voice and text must converge after input normalization.
+
+---
+
+# 32. Multilingual Requirements
+
+The backend must support language metadata throughout the intake:
+
+```text
+language_code
+```
+
+Current verified end-to-end support includes:
+
+```text
+English
+Hindi
+Marathi
+```
+
+Additional language UI support may exist without implying full end-to-end speech/clinical localization.
+
+The technical architecture must keep language handling separate from clinical reasoning.
+
+---
+
+# 33. Document Intelligence Architecture
+
+```text
+Upload
+ ↓
 validation
-        ↓
-FHIR Bundle / payload
+ ↓
+SHA-256 / deduplication
+ ↓
+private storage
+ ↓
+DocumentModel
+ ↓
+OCR
+ ↓
+OCR evidence blocks
+ ↓
+candidate extraction
+ ↓
+evidence validation
+ ↓
+doctor review
 ```
 
-Potential resources:
+## Current storage
 
-- Patient;
-- Encounter;
-- Observation;
-- Condition;
-- MedicationStatement;
-- Composition.
+The current prototype uses private local filesystem storage.
 
-Do not generate FHIR directly from uncontrolled raw LLM output.
+## Production direction
+
+Private cloud/Supabase object storage may replace local storage without changing the logical document workflow.
 
 ---
 
-## 36. ABDM / HIS Boundary
+# 34. OCR Requirements
 
-Create an adapter:
+OCR must produce evidence, not unquestionable truth.
+
+Persist, where supported:
 
 ```text
-IntegrationService
- ├── FHIR export
- ├── ABDM adapter
- └── HIS adapter
+raw OCR text
+bounding boxes
+confidence
+page
+provider
+run metadata
 ```
 
-The core application must not depend on implementation details of a specific external system.
+Candidate extraction must be grounded in OCR evidence.
 
-If real credentials/API access are unavailable:
+Uncertain candidates must remain reviewable.
+
+---
+
+# 35. Authentication and Authorization
+
+Authentication uses the current JWT architecture.
+
+Server-side authorization is mandatory for protected resources.
+
+Roles include current staff/admin role distinctions.
+
+Rules:
 
 ```text
-sandbox/mock adapter
+doctor access → authorized patient scope
+admin access → authorized operational scope
+document access → authenticated + authorized
 ```
 
-is allowed if explicitly labeled as mock/sandbox.
+Frontend route visibility is not a security control.
 
 ---
 
-## 37. Admin Architecture
+# 36. Doctor Queue and Review
 
-Admin configuration includes:
+The doctor queue reads from persisted intake/session data.
+
+Priority sorting is based on deterministic triage signals and operational ordering.
+
+Doctor detail must expose:
 
 ```text
-Hospitals
-Departments
-Doctors
-Workflows
-Languages
-AI/Speech/OCR services
-Audit
+clinical state
+safety
+contradictions
+documents
+AYUSH
+conversation
+physician review state
 ```
 
-Safety-critical rules must be versioned and tested.
+---
 
-Do not allow arbitrary unvalidated edits to clinical safety rules.
+# 37. Realtime Architecture
+
+Current implementation supports:
+
+```text
+WebSocket
++
+HTTP polling fallback
+```
+
+The backend may broadcast queue events.
+
+The frontend may periodically refresh as a resilience mechanism.
+
+Realtime failure must not create duplicate clinical logic or false submission states.
 
 ---
 
-## 38. Mock / Demo Mode
+# 38. FHIR / ABDM Technical Requirements
 
-A deterministic mock mode is required.
+FHIR generation should consume validated structured data.
 
-Demo cases:
+Preferred pipeline:
 
-### Case A
-Chest pain + breathlessness + left-arm radiation → priority review.
+```text
+patient input
+ ↓
+structured state
+ ↓
+physician review/confirmation
+ ↓
+FHIR mapper
+ ↓
+FHIR R4 Bundle
+ ↓
+ABDM/HIS integration boundary
+```
 
-### Case B
-Fever → shorter adaptive path.
-
-### Case C
-AYUSH chronic joint-pain path.
-
-### Case D
-Document-heavy follow-up.
-
-Mock mode should reproduce:
-
-- patient flow;
-- adaptive decisions;
-- document extraction;
-- alerts;
-- doctor queue;
-- physician confirmation.
-
-External provider availability must not determine whether the system can be demonstrated.
+ABDM simulation/testing must not be represented as live production connectivity.
 
 ---
 
-## 39. Testing
+# 39. Data Integrity
 
-### Unit tests
+Important mutations should be performed transactionally where practical.
 
-Required for:
+The system must avoid:
 
-- ClinicalState merge;
-- missing-field detection;
-- question deduplication;
-- question ranking;
-- sufficient-information stop;
-- low-information-gain stop;
-- low-progress stop;
-- maximum-question stop;
-- fallback logic;
-- red-flag rules;
-- contradiction rules;
-- FHIR mapping.
+```text
+DB state says completed
+while
+critical downstream persistence failed
+```
 
-### Integration tests
+For answer processing, maintain consistency among:
 
-Required for:
+```text
+Answer
+QuestionEvent
+ClinicalState version
+RedFlag/Contradiction state
+next QuestionEvent
+```
+
+Question/answer relational linkage must remain explicit.
+
+---
+
+# 40. Provider Failure Requirements
+
+| Failure | Required response |
+|---|---|
+| LLM timeout | Retry → alternate provider → deterministic fallback |
+| Speech failure | Alternate speech provider → text/touch fallback |
+| OCR failure | Preserve document → mark processing failure/review state |
+| RAG failure | Continue without non-essential grounding where safe |
+| WebSocket failure | Polling fallback |
+| Database failure | Explicit error; never falsely confirm |
+| Upload failure | Explicit failure; do not mark uploaded |
+| Invalid structured AI output | Reject → retry/fallback |
+
+---
+
+# 41. Mock Provider Requirements
+
+Mock providers must implement the same interface contracts as real providers.
+
+```text
+Mock
+ ↓
+same interface
+ ↓
+same validation
+ ↓
+same application logic
+```
+
+Mocks are for:
+
+- deterministic tests;
+- offline development;
+- controlled demos.
+
+Mock mode must not create a second application architecture.
+
+---
+
+# 42. Observability
+
+Log technical state transitions without exposing unnecessary sensitive information.
+
+Useful technical identifiers include:
+
+```text
+session_id
+question_event_id
+workflow
+target_field
+provider
+latency
+decision
+```
+
+Do not log:
+
+- API keys;
+- raw secrets;
+- unnecessary full medical documents;
+- model chain-of-thought.
+
+---
+
+# 43. Testing Requirements
+
+## Unit tests
+
+Cover:
+
+```text
+ClinicalState merge
+canonical dimensions
+question scoring
+duplicate detection
+sufficiency
+termination
+fallback
+safety
+contradictions
+FHIR mapping
+AYUSH state
+```
+
+## Integration tests
+
+Cover:
 
 ```text
 answer
+→ extraction
 → state
 → next question
-→ summary
-→ doctor view
-```
 
-and:
+voice
+→ transcript
+→ same clinical engine
 
-```text
 document
 → OCR
-→ extraction
-→ validation
-→ doctor view
+→ candidate
+→ evidence validation
+
+submit
+→ doctor queue
+
+confirm
+→ FHIR
 ```
 
-### End-to-end
+## AYUSH tests
 
-At minimum:
-
-1. fever;
-2. priority chest-pain;
-3. AYUSH;
-4. document-heavy;
-5. speech provider failure;
-6. LLM provider failure;
-7. OCR failure;
-8. patient cancellation;
-9. maximum-question fallback;
-10. unauthorized record access.
-
----
-
-## 40. Synthetic Data
-
-Use fictional data only.
-
-Create deterministic fixtures for:
+Cover:
 
 ```text
-case-fever
-case-chest-pain-priority
-case-ayush-joint-pain
-case-document-heavy
+AYUSH workflow
+DUAL_SYSTEM
+Prakriti
+Vikriti
+Agni
+Koshtha
+Ahara-Vihara
+expanded Dashavidha dimensions
+provenance
+confidence
+physician confirmation
+RAG grounding
 ```
 
-Each fixture should include:
+## Regression
 
-- patient;
-- hospital;
-- doctor;
-- answers;
-- expected ClinicalState;
-- expected next questions;
-- expected termination;
-- expected alerts;
-- documents;
-- expected extracted facts;
-- expected doctor summary.
+All existing modern clinical tests must remain green after AYUSH changes.
 
 ---
 
-## 41. Performance Targets
+# 44. Performance Requirements
 
-These are engineering targets, not clinical claims.
-
-Initial targets:
+The system should optimize for:
 
 ```text
-Frontend initial load: reasonable on normal broadband
-Backend non-AI API target: < 500 ms
-Queue update: near real-time when WebSocket is used
-Question generation: provide visible progress state
-OCR: asynchronous/progress state when needed
+fast question turnaround
+low provider latency
+small patient interaction burden
+efficient doctor review
 ```
 
-Measure actual values before reporting them.
+Performance claims must only be published when measured.
+
+Do not document unsupported hard latency guarantees.
 
 ---
 
-## 42. Security Requirements
+# 45. Security / Privacy Requirements
 
-MUST:
+Technical controls must include:
 
-- keep API secrets server-side;
-- validate all incoming payloads;
-- enforce RBAC server-side;
-- protect document routes;
-- use secure transport;
-- use environment variables for secrets;
-- avoid sensitive data in URLs;
-- avoid sensitive data in general logs;
-- use synthetic demo data.
+- server-side RBAC;
+- protected document endpoints;
+- secret isolation;
+- session isolation;
+- input validation;
+- AI output validation;
+- audit logging;
+- minimum necessary data exposure.
 
-Never trust:
-
-- client-side role;
-- client-side patient ID;
-- raw LLM output;
-- raw OCR output;
-- client-reported confidence.
+Development/demo data must be synthetic.
 
 ---
 
-## 43. Logging / Observability
+# 46. Database Direction
 
-Recommended events:
+PostgreSQL/Supabase is the production data direction.
+
+SQLite remains useful for local development and deterministic testing when compatible.
+
+The application should keep persistence logic sufficiently abstract to support the selected environment without changing clinical behavior.
+
+---
+
+# 47. Vector Retrieval Direction
+
+Current:
 
 ```text
-AUTH_SUCCESS
-AUTH_FAILURE
-INTAKE_STARTED
-QUESTION_ASKED
-ANSWER_RECEIVED
-STATE_UPDATED
-QUESTION_REJECTED
-INTERVIEW_STOPPED
-DOCUMENT_UPLOADED
-OCR_COMPLETED
-EXTRACTION_COMPLETED
-RED_FLAG_CREATED
-CONTRADICTION_CREATED
-PHYSICIAN_EDITED
-PHYSICIAN_CONFIRMED
-FHIR_GENERATED
-PROVIDER_ERROR
+embedding stored relationally
++
+Python/application cosine similarity
 ```
 
-Avoid logging unnecessary raw clinical text/audio.
+Target optimization:
 
-Add request IDs for backend debugging.
+```text
+PostgreSQL pgvector
++
+native vector distance
++
+HNSW/appropriate vector index
+```
 
----
-
-## 44. Development Priority
-
-This is **implementation order**, not separate product versions.
-
-### P0 — Core clinical workflow
-
-- patient onboarding;
-- hospital;
-- doctor;
-- language;
-- interaction mode;
-- consent;
-- chief complaint;
-- adaptive interview;
-- termination guardrails;
-- core AYUSH question path;
-- patient review;
-- submit;
-- doctor queue;
-- structured summary;
-- physician edit/confirm.
-
-### P1 — Multimodal + safety depth
-
-- basic OCR;
-- medication/lab/date extraction;
-- provenance;
-- timeline;
-- red flags;
-- contradiction detection;
-- uncertainty states.
-
-### P2 — Platform depth
-
-- richer AYUSH structure;
-- FHIR;
-- ABDM/HIS boundary;
-- admin;
-- audit depth;
-- additional languages;
-- advanced accessibility/analytics.
-
-The complete scope remains one product.
+This is an implementation optimization, not a reason to introduce a separate vector database.
 
 ---
 
-## 45. Evaluation Checkpoints
+# 48. Technical Definition of Done
 
-The project has two evaluation dates:
+The updated technical implementation is acceptable when:
 
-- **3 September 2026**
-- **8 September 2026**
-
-These are checkpoints only.
-
-The architecture and product scope remain continuous.
-
-The first checkpoint should have the P0 vertical slice working reliably, while development continues on P1/P2.
-
----
-
-## 46. AI Coding Agent Rules
-
-Before coding:
-
-1. Read `PRD.md`.
-2. Read `TRD.md`.
-3. Inspect the existing repository.
-4. Identify existing services/components before creating new ones.
-5. Determine the smallest implementation satisfying the requirement.
-
-While coding:
-
-1. Preserve working behavior.
-2. Keep schemas/types explicit.
-3. Keep providers abstract.
-4. Keep clinical logic out of UI.
-5. Add tests for domain logic.
-6. Do not expose secrets.
-7. Do not add unrequested features.
-8. Do not invent medical/regulatory claims.
-
-After coding:
-
-1. Run lint.
-2. Run type checks.
-3. Run unit tests.
-4. Run relevant integration tests.
-5. Run the primary end-to-end flow.
-6. Report changed files, tests, limitations, and remaining risks.
+```text
+[ ] Existing modern clinical flow still works
+[ ] Voice and text converge to the same clinical engine
+[ ] ClinicalState remains structured and persisted
+[ ] Canonical dimensions prevent repeated concepts
+[ ] Safety remains deterministic
+[ ] Termination remains application-controlled
+[ ] Provider failures have fallback behavior
+[ ] Documents remain source-verifiable
+[ ] Doctor handoff uses persisted backend data
+[ ] AYUSH remains inside the shared adaptive engine
+[ ] Ayurveda is the first detailed AYUSH assessment system
+[ ] Expanded AYUSH dimensions are adaptive, not a fixed checklist
+[ ] AYUSH provenance is explicit
+[ ] Physician confirmation remains authoritative
+[ ] Existing tests remain green
+[ ] New AYUSH tests are added
+[ ] No autonomous diagnosis or prescribing is introduced
+```
 
 ---
 
-## 47. Technical Definition of Done
+# 49. Technical Priorities
 
-A feature is done only when:
+## P0
 
-- code is implemented;
-- schema/types are defined;
-- authorization is correct;
-- error states exist;
-- relevant tests pass;
-- frontend states exist;
-- API contract is clear;
-- provider failure behavior is handled where relevant;
-- no secrets are exposed;
-- no unsupported medical/regulatory claims are introduced.
+```text
+adaptive intake
+ClinicalState
+safety
+doctor handoff
+core AYUSH
+voice/text convergence
+```
+
+## P1
+
+```text
+documents
+provenance
+contradictions
+expanded AYUSH
+doctor evidence UX
+```
+
+## P2
+
+```text
+cloud storage
+native pgvector
+additional AYUSH systems
+deeper ABDM/HIS integration
+advanced operational analytics
+```
+
+These are priorities within one product, not separate releases.
 
 ---
 
-## 48. Final Technical Principle
+# 50. Architecture-to-PRD Traceability
 
-> **Keep the AI probabilistic, but keep product control deterministic.**
+| PRD Requirement | Technical Implementation |
+|---|---|
+| Adaptive intake | `adaptive_engine` + scoring + canonical state |
+| One question at a time | QuestionDecision + QuestionEvent |
+| Multilingual | language metadata + speech/LLM provider adapters |
+| Voice/text/touch | shared `process_intake_answer_core` |
+| Structured state | ClinicalStateModel |
+| Safety | deterministic red-flag rules |
+| Contradictions | contradiction service/model |
+| Documents | DocumentModel + OCR/evidence pipeline |
+| AYUSH | shared adaptive engine + AyushAssessment direction |
+| Physician review | PhysicianReview / PhysicianEdit |
+| FHIR | mapper + validated structured state |
+| Provider resilience | adapter + fallback architecture |
+| Auditability | versioned state + audit events |
 
-The AI may interpret language and propose the next question.
+---
 
-The application decides:
+# 51. Final Engineering Principle
 
-- whether the output is valid;
-- whether the question is allowed;
-- whether it is repetitive;
-- whether required information is complete;
-- whether the interview must stop;
-- whether a safety rule fires;
-- whether information can be persisted;
-- whether the physician has confirmed it.
+> **The technical architecture should make probabilistic AI useful without allowing it to become the authority over clinical state, safety, persistence, or physician decisions.**
 
-This separation is the core technical architecture of SwasthyaVaani.
+The strongest implementation is:
+
+```text
+AI for interpretation
++
+deterministic application control
++
+structured evidence
++
+adaptive questioning
++
+physician authority
+```
+
+and for AYUSH:
+
+```text
+ONE adaptive engine
++
+Ayurveda assessment dimensions
++
+evidence/provenance
++
+physician review
+```
