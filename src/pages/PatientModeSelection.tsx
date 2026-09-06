@@ -3,21 +3,23 @@ import { useLocation } from 'wouter';
 import {
   Mic,
   Keyboard,
-  FileText,
-  Clock3,
   Check,
   ArrowRight,
   ArrowLeft,
-  CircleHelp,
   Languages,
 } from 'lucide-react';
-import { Brand, AppButton } from '../components/Brand';
+import { AppButton } from '../components/Brand';
 import { getKioskTranslation } from '../lib/kioskTranslations';
 import {
   getStoredLanguage,
   getStoredMode,
   setStoredMode,
 } from '../lib/kioskState';
+import {
+  KioskProgressSidebar,
+  KioskTopProgressBar,
+} from '../components/patient/KioskProgress';
+import { PatientFlowTransition } from '../components/patient/PatientFlowTransition';
 
 export function PatientModeSelection() {
   const [, setLocation] = useLocation();
@@ -39,104 +41,35 @@ export function PatientModeSelection() {
   return (
     <main className="kiosk-page">
       <div className="kiosk-layout">
-        <aside className="kiosk-progress">
-          <div className="kiosk-brand">
-            <button
-              className="brand-button"
-              onClick={() => setLocation('/')}
-              aria-label="SwasthyaVaani home"
-            >
-              <Brand light />
-            </button>
-          </div>
-          <div className="kiosk-welcome">
-            <span className="eyebrow">{t.intakeEyebrow}</span>
-            <h1>
-              {t.careStartsHere}
-              <br />
-              <em>{t.careStartsHereEm}</em>
-            </h1>
-            <p>{t.careDescription}</p>
-          </div>
-          <div className="step-list">
-            <div className="kiosk-step done">
-              <span className="step-icon">
-                <Check size={17} />
-              </span>
-              <span>
-                <b>{t.steps.language.title}</b>
-                <small>{t.steps.language.caption}</small>
-              </span>
-            </div>
-            <div className="kiosk-step done">
-              <span className="step-icon">
-                <Check size={17} />
-              </span>
-              <span>
-                <b>Patient Details</b>
-                <small>Personal info</small>
-              </span>
-            </div>
-            <div className="kiosk-step current">
-              <span className="step-icon">
-                <Mic size={17} />
-              </span>
-              <span>
-                <b>Interaction Mode</b>
-                <small>Voice or Text</small>
-              </span>
-            </div>
-            <div className="kiosk-step">
-              <span className="step-icon">
-                <FileText size={17} />
-              </span>
-              <span>
-                <b>{t.steps.records.title}</b>
-                <small>{t.steps.records.caption}</small>
-              </span>
-            </div>
-          </div>
-          <div className="kiosk-help">
-            <CircleHelp size={16} />
-            <span>{t.needHelp}</span>
-          </div>
-        </aside>
+        <KioskProgressSidebar currentStep={3} t={t} />
+
         <section className="kiosk-main">
           <div className="kiosk-main-inner">
-            <div className="kiosk-progress-top">
-              <span>
-                {t.stepPrefix} 03 {t.stepOf} 04
-              </span>
-              <div>
-                <i className="filled" />
-                <i className="filled" />
-                <i className="filled" />
-                <i />
-              </div>
-              <span className="time-note">
-                <Clock3 size={14} /> {t.durationNote}
-              </span>
-            </div>
-            <div className="kiosk-card mode-selection-card">
+            <KioskTopProgressBar currentStep={3} t={t} />
+
+            <PatientFlowTransition stepKey="mode">
+              <div className="kiosk-card mode-selection-card">
               <div className="kiosk-card-heading">
                 <span className="section-kicker">
                   <Languages
-                    size={13}
-                    style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }}
+                    size={14}
+                    style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }}
                   />
-                  {t.speakingIn} {language}
+                  {t.speakingIn} {language} · STEP 03 OF 05
                 </span>
                 <h2>{t.modeKicker}</h2>
-                <p>Choose how you would like to share your health concern with our AI assistant.</p>
+                <p className="text-base text-[#688680] mt-1">
+                  Choose how you would like to share your health concern with our AI clinical intake assistant.
+                </p>
               </div>
 
-              <div className="mode-options-grid grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
+              <div className="mode-options-grid grid grid-cols-1 sm:grid-cols-2 gap-6 my-8">
                 <button
                   type="button"
-                  className={`p-6 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-4 cursor-pointer ${
+                  className={`p-8 md:p-10 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-6 cursor-pointer min-h-[220px] ${
                     mode === 'voice'
-                      ? 'border-[#eaba61] bg-[#fffdfa] shadow-md ring-2 ring-[#eaba61]/30'
-                      : 'border-[#e0ebe8] bg-white hover:border-[#173e35]/30'
+                      ? 'border-[#eaba61] bg-[#fffdfa] shadow-lg ring-2 ring-[#eaba61]/40'
+                      : 'border-[#e0ebe8] bg-white hover:border-[#173e35]/40 hover:shadow-md'
                   }`}
                   onClick={() => {
                     setMode('voice');
@@ -144,31 +77,31 @@ export function PatientModeSelection() {
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 rounded-xl bg-[#eaba61]/20 text-[#173e35] flex items-center justify-center">
-                      <Mic size={24} />
+                    <div className="w-14 h-14 rounded-2xl bg-[#eaba61]/20 text-[#173e35] flex items-center justify-center shadow-inner">
+                      <Mic size={28} />
                     </div>
                     <span
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        mode === 'voice' ? 'border-[#c98e20] bg-[#eaba61]' : 'border-stone-300'
+                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        mode === 'voice' ? 'border-[#c98e20] bg-[#eaba61]' : 'border-stone-300 bg-stone-50'
                       }`}
                     >
-                      {mode === 'voice' && <Check size={12} className="text-white stroke-[3]" />}
+                      {mode === 'voice' && <Check size={14} className="text-white stroke-[3]" />}
                     </span>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-[#173e35] mb-1">{t.modeVoice}</h3>
-                    <p className="text-xs text-[#5c726a] leading-relaxed">
-                      Speak freely and naturally in your chosen language. AI listens and transcribes.
+                    <h3 className="text-xl font-bold text-[#173e35] mb-2">{t.modeVoice}</h3>
+                    <p className="text-sm text-[#5c726a] leading-relaxed">
+                      Speak freely and naturally in your chosen language. AI listens, transcribes, and structures your symptoms.
                     </p>
                   </div>
                 </button>
 
                 <button
                   type="button"
-                  className={`p-6 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-4 cursor-pointer ${
+                  className={`p-8 md:p-10 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-6 cursor-pointer min-h-[220px] ${
                     mode === 'text'
-                      ? 'border-[#eaba61] bg-[#fffdfa] shadow-md ring-2 ring-[#eaba61]/30'
-                      : 'border-[#e0ebe8] bg-white hover:border-[#173e35]/30'
+                      ? 'border-[#eaba61] bg-[#fffdfa] shadow-lg ring-2 ring-[#eaba61]/40'
+                      : 'border-[#e0ebe8] bg-white hover:border-[#173e35]/40 hover:shadow-md'
                   }`}
                   onClick={() => {
                     setMode('text');
@@ -176,27 +109,27 @@ export function PatientModeSelection() {
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 rounded-xl bg-[#eaba61]/20 text-[#173e35] flex items-center justify-center">
-                      <Keyboard size={24} />
+                    <div className="w-14 h-14 rounded-2xl bg-[#eaba61]/20 text-[#173e35] flex items-center justify-center shadow-inner">
+                      <Keyboard size={28} />
                     </div>
                     <span
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        mode === 'text' ? 'border-[#c98e20] bg-[#eaba61]' : 'border-stone-300'
+                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        mode === 'text' ? 'border-[#c98e20] bg-[#eaba61]' : 'border-stone-300 bg-stone-50'
                       }`}
                     >
-                      {mode === 'text' && <Check size={12} className="text-white stroke-[3]" />}
+                      {mode === 'text' && <Check size={14} className="text-white stroke-[3]" />}
                     </span>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-[#173e35] mb-1">{t.modeText}</h3>
-                    <p className="text-xs text-[#5c726a] leading-relaxed">
-                      Type your symptoms and answer guided questions on screen.
+                    <h3 className="text-xl font-bold text-[#173e35] mb-2">{t.modeText}</h3>
+                    <p className="text-sm text-[#5c726a] leading-relaxed">
+                      Type your symptoms and answer guided clinical questions at your own comfortable pace.
                     </p>
                   </div>
                 </button>
               </div>
 
-              <div className="kiosk-form-actions">
+              <div className="kiosk-form-actions mt-auto pt-4 border-t border-[#edf3f1]">
                 <button
                   type="button"
                   onClick={() => setLocation('/patient/details')}
@@ -211,6 +144,7 @@ export function PatientModeSelection() {
                 </AppButton>
               </div>
             </div>
+            </PatientFlowTransition>
           </div>
         </section>
       </div>

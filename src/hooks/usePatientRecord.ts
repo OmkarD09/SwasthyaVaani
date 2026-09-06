@@ -37,7 +37,7 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
         const data = await res.json();
         setPatientDetail(data);
         setNote(data.clinician_notes || '');
-        if (data.review_status === 'PHYSICIAN_CONFIRMED') setConfirmed(true);
+        if (data.review_status === 'PHYSICIAN_CONFIRMED' || data.review_status === 'REVIEWED') setConfirmed(true);
         setError(null);
       } else if (res.status === 404) {
         setError(`Patient record "${patientId}" was not found in database.`);
@@ -88,6 +88,7 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
         const data = await res.json();
         setFhirId(data.fhir_bundle_id);
         setConfirmed(true);
+        await loadDetail(false);
         return true;
       }
       setError(`Unable to confirm patient record (status ${res.status}).`);

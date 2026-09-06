@@ -62,7 +62,7 @@ def normalize_phone(val: str | None) -> str | None:
 
 
 @router.post("", response_model=IntakeSessionDetail)
-def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db)):
+async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db)):
     """Initialize a new patient pre-consultation clinical intake session."""
     patient: Patient | None = None
 
@@ -122,6 +122,7 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
     else:
         # Create new patient record
         patient = Patient(
+            id=str(uuid.uuid4()),
             display_name=clean_name,
             age=req.patient_age,
             gender=clean_gender,
@@ -138,6 +139,7 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
 
     token = generate_token()
     session = IntakeSession(
+        id=str(uuid.uuid4()),
         token=token,
         patient_id=patient.id,
         hospital_id=req.hospital_id,
@@ -145,21 +147,123 @@ def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(get_db
         workflow_type=req.workflow_type,
         language_code=req.language_code,
         interaction_mode=req.interaction_mode,
-        status="ACTIVE",
+        status="SUBMITTED" if req.submit_now else "ACTIVE",
+        submitted_at=datetime.now(timezone.utc) if req.submit_now else None,
         question_count=0,
     )
     db.add(session)
     db.flush()
 
-    # Initialize empty ClinicalState
+    # Initialize ClinicalState (with submitted data if provided)
     init_state = ClinicalState()
+    if req.clinical_state and isinstance(req.clinical_state, dict):
+        try:
+            init_state = ClinicalState(**req.clinical_state)
+        except Exception:
+            init_state = ClinicalState()
+    else:
+        if req.chief_complaint:
+            init_state.chief_complaint = req.chief_complaint
+        if req.symptoms:
+            init_state.symptoms = req.symptoms
+        if req.duration:
+            init_state.duration = req.duration
+        if req.severity:
+            if isinstance(req.severity, (int, float)):
+                init_state.severity = max(1, min(10, int(req.severity)))
+            else:
+                s_str = str(req.severity).strip().lower()
+                num_match = re.search(r'\b([1-9]|10)\b', s_str)
+                if num_match:
+                    init_state.severity = int(num_match.group(1))
+                elif "mild" in s_str:
+                    init_state.severity = 3
+                elif "moderate" in s_str:
+                    init_state.severity = 5
+                elif "severe" in s_str or "high" in s_str:
+                    init_state.severity = 8
+        if req.medical_history:
+            init_state.medical_history = req.medical_history
+            if req.medical_history not in init_state.past_history:
+                init_state.past_history.append(req.medical_history)
+
+    # Persist any submitted conversation history messages (batched in memory)
+    question_count = 0
+    if req.conversation_history and isinstance(req.conversation_history, list):
+        current_seq = 1
+        last_question_event: QuestionEvent | None = None
+        for item in req.conversation_history:
+            role = item.get("role")
+            content = str(item.get("content") or "").strip()
+            if not content:
+                continue
+            if role == "assistant":
+                q_id = str(uuid.uuid4())
+                last_question_event = QuestionEvent(
+                    id=q_id,
+                    intake_session_id=session.id,
+                    sequence_number=current_seq,
+                    question_text=content,
+                    target_field=item.get("category") or "general",
+                    decision_action="ASK",
+                )
+                db.add(last_question_event)
+                current_seq += 1
+                question_count += 1
+            elif role == "patient":
+                answer = Answer(
+                    id=str(uuid.uuid4()),
+                    question_event_id=last_question_event.id if last_question_event else None,
+                    intake_session_id=session.id,
+                    raw_text=content,
+                    input_mode=str(item.get("mode") or req.interaction_mode).upper(),
+                    language_code=req.language_code,
+                )
+                db.add(answer)
+                if content not in init_state.raw_transcript_snippets:
+                    init_state.raw_transcript_snippets.append(content)
+        session.question_count = question_count
+
     state_model = ClinicalStateModel(
+        id=str(uuid.uuid4()),
         intake_session_id=session.id,
         version=1,
-        state_json=init_state.model_dump(mode="json")
+        state_json=init_state.model_dump(mode="json"),
     )
     db.add(state_model)
-    db.commit()
+
+    if req.submit_now:
+        session.status = "SUBMITTED"
+        session.submitted_at = datetime.now(timezone.utc)
+        priority = "NORMAL"
+        if init_state.red_flags:
+            priority = "URGENT"
+            for rf in init_state.red_flags:
+                red_flag_entry = RedFlagModel(
+                    intake_session_id=session.id,
+                    rule_id=rf.rule_id,
+                    title=rf.title,
+                    reason=rf.reason,
+                    severity=rf.severity,
+                    evidence_json=rf.evidence_ids,
+                    status=rf.status,
+                )
+                db.add(red_flag_entry)
+        db.commit()
+        try:
+            await ws_manager.broadcast(
+                {
+                    "event": "NEW_PATIENT_INTAKE",
+                    "intake_session_id": session.id,
+                    "token": session.token,
+                    "priority": priority,
+                    "submitted_at": session.submitted_at.isoformat(),
+                }
+            )
+        except Exception as ws_err:
+            logger.warning(f"WebSocket broadcast notice: {ws_err}")
+    else:
+        db.commit()
 
     return IntakeSessionDetail(
         id=session.id,
@@ -484,6 +588,16 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
     session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Intake session not found")
+
+    if session.status == "SUBMITTED" and session.submitted_at:
+        return IntakeSubmissionResponse(
+            intake_session_id=session.id,
+            status="SUBMITTED",
+            token=session.token,
+            doctor_id=session.doctor_id,
+            submitted_at=session.submitted_at,
+            message="Patient intake successfully submitted to clinician queue.",
+        )
 
     session.status = "SUBMITTED"
     session.submitted_at = datetime.now(timezone.utc)

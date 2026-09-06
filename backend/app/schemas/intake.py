@@ -22,6 +22,14 @@ class IntakeCreateRequest(BaseModel):
     workflow_type: Literal["GENERAL_CLINICAL", "AYUSH"] = "GENERAL_CLINICAL"
     language_code: str = "en"
     interaction_mode: Literal["VOICE", "TEXT", "TOUCH", "MIXED"] = "VOICE"
+    chief_complaint: str | None = None
+    symptoms: list[str] | None = None
+    duration: str | None = None
+    severity: str | None = None
+    medical_history: str | None = None
+    clinical_state: dict[str, Any] | None = None
+    conversation_history: list[dict[str, Any]] | None = None
+    submit_now: bool = False
 
 
 class AnswerSubmitRequest(BaseModel):

@@ -241,3 +241,78 @@ def test_doctor_summary_minimal_or_empty_clinical_state(client: TestClient, db, 
     assert data["doctor_name"] == "Dr. Rajiv Sharma"
     assert data["clinical_state"]["symptoms"] == []
     assert data["documents"] == []
+
+
+def test_patient_automatic_movement_from_live_queue_to_reviewed_queue(client: TestClient, db, hospital_and_doctor, auth_headers):
+    """Verifies that confirming a patient removes them from the live queue and moves them to the reviewed queue."""
+    h, d = hospital_and_doctor
+    headers = auth_headers("DOCTOR")
+
+    p = Patient(id="pt-move-01", display_name="Ramesh Kumar", age=42, gender="Male")
+    session = IntakeSession(
+        id="intake-move-01",
+        token="T-MOVE01",
+        patient_id=p.id,
+        hospital_id=h.id,
+        doctor_id=d.id,
+        status="SUBMITTED",
+        review_status="PENDING_REVIEW",
+        language_code="hi",
+        workflow_type="GENERAL",
+        started_at=datetime.now(timezone.utc),
+        submitted_at=datetime.now(timezone.utc),
+    )
+    cstate = ClinicalStateModel(
+        intake_session_id=session.id,
+        version=1,
+        state_json={"chief_complaint": "Severe fever and chills", "symptoms": ["fever", "chills"]},
+    )
+    db.add_all([p, session, cstate])
+    db.commit()
+
+    # 1. Check live queue: patient must be present
+    live_res = client.get("/api/v1/doctor/queue", headers=headers)
+    assert live_res.status_code == 200
+    live_items = live_res.json()
+    assert any(item["intake_session_id"] == session.id for item in live_items)
+
+    # 2. Check reviewed queue: patient must NOT be present
+    rev_res = client.get("/api/v1/doctor/patients/reviewed", headers=headers)
+    assert rev_res.status_code == 200
+    rev_items = rev_res.json()
+    assert not any(item["intake_session_id"] == session.id for item in rev_items)
+
+    # 3. Doctor confirms clinical record
+    confirm_payload = {
+        "notes": "Patient advised paracetamol and complete bed rest.",
+        "edits": [],
+        "generate_fhir": False,
+    }
+    confirm_res = client.post(f"/api/v1/doctor/patients/{session.id}/confirm", json=confirm_payload, headers=headers)
+    assert confirm_res.status_code == 200
+    confirm_data = confirm_res.json()
+    assert confirm_data["review_status"] == "REVIEWED"
+    assert confirm_data["status"] == "PHYSICIAN_CONFIRMED"
+
+    # 4. Check live queue: patient must now be ABSENT (automatically moved)
+    live_res_after = client.get("/api/v1/doctor/queue", headers=headers)
+    assert live_res_after.status_code == 200
+    live_items_after = live_res_after.json()
+    assert not any(item["intake_session_id"] == session.id for item in live_items_after)
+
+    # 5. Check reviewed queue: patient must now be PRESENT
+    rev_res_after = client.get("/api/v1/doctor/patients/reviewed", headers=headers)
+    assert rev_res_after.status_code == 200
+    rev_items_after = rev_res_after.json()
+    matching_rev = [item for item in rev_items_after if item["intake_session_id"] == session.id]
+    assert len(matching_rev) == 1
+    assert matching_rev[0]["review_status"] == "REVIEWED"
+    assert matching_rev[0]["patient_name"] == "Ramesh Kumar"
+
+    # 6. Check detail endpoint: review_status must be REVIEWED
+    detail_res = client.get(f"/api/v1/doctor/patients/{session.id}", headers=headers)
+    assert detail_res.status_code == 200
+    detail_data = detail_res.json()
+    assert detail_data["review_status"] == "REVIEWED"
+    assert detail_data["clinician_notes"] == "Patient advised paracetamol and complete bed rest."
+

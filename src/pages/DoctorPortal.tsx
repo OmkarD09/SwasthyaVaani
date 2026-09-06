@@ -16,6 +16,8 @@ import {
   LockKeyhole,
   Menu,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCw,
   Search,
   Sparkles,
@@ -177,10 +179,14 @@ function DoctorPortalSidebar({
   active,
   onNavigate,
   mobileOpen,
+  collapsed = false,
+  onToggleCollapse,
 }: {
   active: string;
   onNavigate: (path: string) => void;
   mobileOpen?: boolean;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -219,48 +225,128 @@ function DoctorPortalSidebar({
   ];
 
   return (
-    <aside className={`portal-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
-      <div className="portal-brand" onClick={() => onNavigate('/')}>
-        <Brand />
+    <aside className={`portal-sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+      <div
+        className={`portal-brand ${collapsed ? 'flex justify-center px-0' : ''}`}
+        onClick={() => onNavigate('/')}
+        title={collapsed ? 'SwasthyaVaani · Clinical Workspace' : undefined}
+      >
+        {collapsed ? (
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#1f5b4e] to-[#2e7d6b] flex items-center justify-center text-white mx-auto shadow-md cursor-pointer hover:scale-105 transition-transform border border-[#eaba61]/30">
+            <Hospital size={20} className="text-[#eaba61]" />
+          </div>
+        ) : (
+          <Brand />
+        )}
       </div>
-      <div className="portal-context">
-        <span className="context-icon">
-          <Hospital size={16} />
-        </span>
-        <div>
-          <b>Clinical Workspace</b>
-          <span>Live triage queue</span>
+
+      {collapsed ? (
+        <div className="py-2 flex justify-center">
+          <div
+            className="w-10 h-10 rounded-xl bg-[rgba(255,255,255,0.06)] border border-[#eaba61]/20 flex items-center justify-center text-[#eaba61] cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+            title="Clinical Workspace · Live triage queue"
+          >
+            <Hospital size={18} />
+          </div>
         </div>
-        <ChevronDown size={14} />
-      </div>
-      <div className="side-label">DOCTOR WORKSPACE</div>
+      ) : (
+        <div className="portal-context">
+          <span className="context-icon">
+            <Hospital size={16} />
+          </span>
+          <div>
+            <b>Clinical Workspace</b>
+            <span>Live triage queue</span>
+          </div>
+          <ChevronDown size={14} />
+        </div>
+      )}
+
+      {!collapsed ? (
+        <div className="side-label">DOCTOR WORKSPACE</div>
+      ) : (
+        <div className="my-2 border-t border-[rgba(255,255,255,0.08)]" />
+      )}
+
       <nav className="portal-nav">
         {links.map((link) => {
           const Icon = link.icon;
+          const isActive = active === link.label;
           return (
-            <button
-              key={link.label}
-              className={active === link.label ? 'active' : ''}
-              onClick={() => onNavigate(link.path)}
-            >
-              <Icon size={18} />
-              <span>{link.label}</span>
-            </button>
+            <div key={link.label} className="relative group">
+              <button
+                type="button"
+                className={`
+                  ${isActive ? 'active' : ''}
+                  ${collapsed ? 'justify-center p-2.5' : ''}
+                  w-full flex items-center rounded-lg transition-all relative cursor-pointer
+                `}
+                onClick={() => onNavigate(link.path)}
+              >
+                <Icon size={18} />
+                {!collapsed && <span>{link.label}</span>}
+                {collapsed && isActive && (
+                  <span className="absolute left-0.5 top-2.5 bottom-2.5 w-1 rounded-full bg-[#eaba61]" />
+                )}
+              </button>
+              {collapsed && (
+                <div className="hidden lg:group-hover:flex absolute left-full ml-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-[#0d222b] text-white text-xs font-semibold shadow-xl border border-[#264552] pointer-events-none items-center gap-2">
+                  <span>{link.label}</span>
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
-      <div className="side-label side-label-spaced">SYSTEM</div>
+
+      {!collapsed ? (
+        <div className="side-label side-label-spaced">SYSTEM</div>
+      ) : (
+        <div className="my-2 border-t border-[rgba(255,255,255,0.08)]" />
+      )}
+
       <nav className="portal-nav">
-        <button onClick={() => alert('Support line: OPD Helpdesk Ext 402')}>
-          <CircleHelp size={18} />
-          <span>Help & support</span>
-        </button>
+        <div className="relative group">
+          <button
+            type="button"
+            className={`w-full flex items-center rounded-lg transition-all cursor-pointer ${collapsed ? 'justify-center p-2.5' : ''}`}
+            onClick={() => alert('Support line: OPD Helpdesk Ext 402')}
+          >
+            <CircleHelp size={18} />
+            {!collapsed && <span>Help & support</span>}
+          </button>
+          {collapsed && (
+            <div className="hidden lg:group-hover:flex absolute left-full ml-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-[#0d222b] text-white text-xs font-semibold shadow-xl border border-[#264552] pointer-events-none items-center gap-2">
+              <span>Help & support</span>
+            </div>
+          )}
+        </div>
       </nav>
 
       <div className="sidebar-bottom">
+        {/* Collapse/Expand Toggle Button (Desktop) */}
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className={`
+              hidden lg:flex items-center w-full py-2 px-2.5 mb-2.5 rounded-xl text-[#9ab2a4] hover:text-white hover:bg-[rgba(255,255,255,0.08)] transition-colors text-xs font-medium cursor-pointer
+              ${collapsed ? 'justify-center' : 'justify-between'}
+            `}
+            title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar to Icon-Only'}
+          >
+            {!collapsed && <span>Collapse Sidebar</span>}
+            {collapsed ? (
+              <PanelLeftOpen size={16} className="text-[#eaba61]" />
+            ) : (
+              <PanelLeftClose size={16} />
+            )}
+          </button>
+        )}
+
         <div className="relative mb-2.5" ref={menuRef}>
           {profileOpen && (
-            <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-[#264552] bg-[#0d222b] p-2.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-white">
+            <div className={`absolute ${collapsed ? 'left-full ml-3 bottom-0' : 'left-0 bottom-full mb-2'} w-64 rounded-2xl border border-[#264552] bg-[#0d222b] p-2.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-white`}>
               <div className="px-3 py-2.5 border-b border-[#1b3945] mb-1.5 bg-[#122e3a] rounded-xl">
                 <p className="font-bold text-xs text-[#6bdbca]">{clinicianName}</p>
                 <p className="font-mono text-[10px] text-[#91b3bf] mt-0.5">
@@ -314,32 +400,45 @@ function DoctorPortalSidebar({
             onClick={() => setProfileOpen(!profileOpen)}
             aria-expanded={profileOpen}
             aria-haspopup="true"
-            className="flex items-center gap-2.5 w-full p-2 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.09)] transition cursor-pointer text-left"
+            className={`flex items-center ${collapsed ? 'justify-center p-1.5' : 'gap-2.5 p-2'} w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.09)] transition cursor-pointer text-left`}
             title={`${clinicianName} · Click for profile options`}
           >
             <div className="grid place-items-center w-8 h-8 rounded-full bg-[#1e4e46] text-[#78decb] font-bold text-xs shrink-0 border border-[#2b6d61]">
               {clinicianInitials}
             </div>
-            <div className="min-w-0 flex-1">
-              <b className="block text-xs font-bold text-white truncate">{clinicianName}</b>
-              <span className="block text-[10px] text-[#86a2ab] truncate">
-                {clinicianSession?.role || 'Clinician'} session
-              </span>
-            </div>
-            <ChevronDown
-              size={14}
-              className={`text-[#7f98a2] transition-transform duration-200 shrink-0 ${profileOpen ? 'rotate-180 text-[#76ddcd]' : ''}`}
-            />
+            {!collapsed && (
+              <>
+                <div className="min-w-0 flex-1">
+                  <b className="block text-xs font-bold text-white truncate">{clinicianName}</b>
+                  <span className="block text-[10px] text-[#86a2ab] truncate">
+                    {clinicianSession?.role || 'Clinician'} session
+                  </span>
+                </div>
+                <ChevronDown
+                  size={14}
+                  className={`text-[#7f98a2] transition-transform duration-200 shrink-0 ${profileOpen ? 'rotate-180 text-[#76ddcd]' : ''}`}
+                />
+              </>
+            )}
           </button>
         </div>
 
-        <div className="secure-badge">
-          <LockKeyhole size={16} />
-          <span>
-            <b>Secure clinician workspace</b>
-            <small>Authenticated session active</small>
-          </span>
-        </div>
+        {collapsed ? (
+          <div
+            className="py-2 flex justify-center text-[#73dacb] cursor-help"
+            title="Secure clinician workspace · Authenticated session active"
+          >
+            <LockKeyhole size={16} />
+          </div>
+        ) : (
+          <div className="secure-badge">
+            <LockKeyhole size={16} />
+            <span>
+              <b>Secure clinician workspace</b>
+              <small>Authenticated session active</small>
+            </span>
+          </div>
+        )}
       </div>
     </aside>
   );
@@ -373,13 +472,79 @@ function sortPatientQueue(patients: any[]): any[] {
   });
 }
 
+function formatQueueItems(data: any[]): any[] {
+  const colors = ['coral', 'amber', 'mint', 'blue', 'lavender'];
+  const langNames: Record<string, string> = {
+    hi: 'हिन्दी',
+    mr: 'मराठी',
+    bn: 'বাংলা',
+    ta: 'தமிழ்',
+    te: 'తెలుగు',
+    en: 'English',
+  };
+  return data.map((item: any, idx: number) => {
+    const patientName = item.patient_name || 'Patient';
+    const initials = patientName
+      .split(' ')
+      .filter(Boolean)
+      .map((n: string) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'PT';
+
+    return {
+      id: item.token || `SV-${item.intake_session_id?.slice(0, 4)}`,
+      token: item.token,
+      intake_session_id: item.intake_session_id,
+      patient_id: item.patient_id,
+      name: patientName,
+      age: item.patient_age ? `${item.patient_age} yrs` : 'Age unavailable',
+      gender: item.patient_gender || 'Not recorded',
+      lang: langNames[item.language_code] || item.language_code || 'Language unavailable',
+      reason: item.chief_complaint || 'Chief complaint not recorded',
+      wait: `${String(item.wait_time_minutes || 0).padStart(2, '0')} min`,
+      wait_time_minutes: item.wait_time_minutes || 0,
+      priority: item.priority || 'Routine',
+      initials: initials,
+      color: colors[idx % colors.length],
+      has_red_flags: Boolean(item.has_red_flags),
+      status: item.status,
+      review_status: item.review_status,
+      reviewed_by: item.reviewed_by,
+      reviewed_at: item.reviewed_at,
+    };
+  });
+}
+
 type StatFilterType = 'all' | 'priority' | 'reviewed';
 
 export function DoctorPortal() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const isReviewedRoute = location === '/doctor/reviewed';
+  const viewMode: 'live' | 'reviewed' = isReviewedRoute ? 'reviewed' : 'live';
+
   const [selected, setSelected] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [queue, setQueue] = useState<any[] | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('doctor_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('doctor_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const [liveQueue, setLiveQueue] = useState<any[] | null>(null);
+  const [reviewedQueue, setReviewedQueue] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statFilter, setStatFilter] = useState<StatFilterType>('all');
@@ -404,6 +569,10 @@ export function DoctorPortal() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    setSelected(0);
+  }, [viewMode]);
+
   const getRelativeUpdatedText = () => {
     const seconds = Math.floor((now - lastUpdated.getTime()) / 1000);
     if (seconds < 10) return 'Updated just now';
@@ -413,65 +582,47 @@ export function DoctorPortal() {
     return `Updated ${mins} mins ago`;
   };
 
-  const fetchLiveQueue = async (manual = false) => {
+  const fetchQueues = async (manual = false) => {
     if (manual) setIsRefreshing(true);
     try {
-      const res = await authorizedClinicianFetch('/api/v1/doctor/queue');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          if (data.length > 0) {
-            const colors = ['coral', 'amber', 'mint', 'blue', 'lavender'];
-            const langNames: Record<string, string> = {
-              hi: 'हिन्दी',
-              mr: 'मराठी',
-              bn: 'বাংলা',
-              ta: 'தமிழ்',
-              te: 'తెలుగు',
-              en: 'English',
-            };
-            const formatted = data.map((item: any, idx: number) => {
-              const patientName = item.patient_name || 'Patient';
-              const initials = patientName
-                .split(' ')
-                .filter(Boolean)
-                .map((n: string) => n[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase() || 'PT';
+      const [liveRes, reviewedRes] = await Promise.all([
+        authorizedClinicianFetch('/api/v1/doctor/queue'),
+        authorizedClinicianFetch('/api/v1/doctor/patients/reviewed'),
+      ]);
 
-              return {
-                id: item.token || `SV-${item.intake_session_id?.slice(0, 4)}`,
-                intake_session_id: item.intake_session_id,
-                name: patientName,
-                age: item.patient_age ? `${item.patient_age} yrs` : 'Age unavailable',
-                gender: item.patient_gender || 'Not recorded',
-                lang: langNames[item.language_code] || item.language_code || 'Language unavailable',
-                reason: item.chief_complaint || 'Chief complaint not recorded',
-                wait: `${String(item.wait_time_minutes || 0).padStart(2, '0')} min`,
-                wait_time_minutes: item.wait_time_minutes || 0,
-                priority: item.priority || 'Routine',
-                initials: initials,
-                color: colors[idx % colors.length],
-                has_red_flags: Boolean(item.has_red_flags),
-                status: item.status,
-              };
-            });
-            setQueue(sortPatientQueue(formatted));
-          } else {
-            setQueue([]);
-          }
-          setError(null);
-          setLastUpdated(new Date());
+      if (liveRes.ok) {
+        const liveData = await liveRes.json();
+        if (Array.isArray(liveData)) {
+          setLiveQueue(sortPatientQueue(formatQueueItems(liveData)));
+        } else {
+          setLiveQueue([]);
         }
       } else {
-        setError(`Failed to retrieve live queue (status ${res.status}).`);
-        if (queue === null) setQueue([]);
+        if (liveQueue === null) setLiveQueue([]);
       }
+
+      if (reviewedRes.ok) {
+        const reviewedData = await reviewedRes.json();
+        if (Array.isArray(reviewedData)) {
+          setReviewedQueue(formatQueueItems(reviewedData));
+        } else {
+          setReviewedQueue([]);
+        }
+      } else {
+        if (reviewedQueue === null) setReviewedQueue([]);
+      }
+
+      if (!liveRes.ok && !reviewedRes.ok) {
+        setError(`Failed to retrieve clinical queues (status ${liveRes.status}).`);
+      } else {
+        setError(null);
+      }
+      setLastUpdated(new Date());
     } catch (err: any) {
-      console.error('DoctorPortal queue fetch error:', err);
+      console.error('DoctorPortal queues fetch error:', err);
       setError('Unable to connect to backend clinical database.');
-      if (queue === null) setQueue([]);
+      if (liveQueue === null) setLiveQueue([]);
+      if (reviewedQueue === null) setReviewedQueue([]);
     } finally {
       if (manual) {
         setTimeout(() => setIsRefreshing(false), 300);
@@ -480,18 +631,20 @@ export function DoctorPortal() {
   };
 
   useEffect(() => {
-    fetchLiveQueue();
-    const interval = setInterval(() => fetchLiveQueue(false), 5000);
+    fetchQueues();
+    const interval = setInterval(() => fetchQueues(false), 5000);
     return () => clearInterval(interval);
   }, []);
 
-  const activeQueue = queue ?? [];
-  const sortedQueue = sortPatientQueue(activeQueue);
-  const filteredQueue = sortedQueue.filter((item) => {
-    if (statFilter === 'priority') {
-      if (getPriorityWeight(item.priority, item.has_red_flags) !== 3) return false;
-    } else if (statFilter === 'reviewed') {
-      if (item.status !== 'CONFIRMED') return false;
+  const activeLiveQueue = liveQueue ?? [];
+  const activeReviewedQueue = reviewedQueue ?? [];
+  const activeQueue = viewMode === 'reviewed' ? activeReviewedQueue : activeLiveQueue;
+
+  const filteredQueue = activeQueue.filter((item) => {
+    if (viewMode === 'live') {
+      if (statFilter === 'priority') {
+        if (getPriorityWeight(item.priority, item.has_red_flags) !== 3) return false;
+      }
     }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
@@ -499,21 +652,22 @@ export function DoctorPortal() {
     const idMatch = (item.id || '').toLowerCase().includes(q);
     const sessionMatch = (item.intake_session_id || '').toLowerCase().includes(q);
     const reasonMatch = (item.reason || '').toLowerCase().includes(q);
-    return nameMatch || idMatch || sessionMatch || reasonMatch;
+    const reviewerMatch = (item.reviewed_by || '').toLowerCase().includes(q);
+    return nameMatch || idMatch || sessionMatch || reasonMatch || reviewerMatch;
   });
 
-  const waitingCount = activeQueue.length;
-  const highPriorityCount = activeQueue.filter(
+  const waitingCount = activeLiveQueue.length;
+  const highPriorityCount = activeLiveQueue.filter(
     (item) => getPriorityWeight(item.priority, item.has_red_flags) === 3
   ).length;
   const avgWaitTime =
-    activeQueue.length > 0
+    activeLiveQueue.length > 0
       ? Math.round(
-        activeQueue.reduce((acc, curr) => acc + (curr.wait_time_minutes || 0), 0) /
-        activeQueue.length
+        activeLiveQueue.reduce((acc, curr) => acc + (curr.wait_time_minutes || 0), 0) /
+        activeLiveQueue.length
       )
       : 0;
-  const reviewedCount = activeQueue.filter((item) => item.status === 'CONFIRMED').length;
+  const reviewedCount = activeReviewedQueue.length;
 
   const patient = filteredQueue.length > 0
     ? filteredQueue[Math.min(selected, filteredQueue.length - 1)]
@@ -526,25 +680,40 @@ export function DoctorPortal() {
   }).format(new Date(now));
 
   return (
-    <main className="portal-page">
+    <main className={`portal-page ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <DoctorPortalSidebar
         active="Doctor Dashboard"
         onNavigate={setLocation}
         mobileOpen={mobileOpen}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={handleToggleSidebar}
       />
-      <div className="portal-content">
+      <div className={`portal-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="portal-main">
           <div className="portal-heading-row">
             <div>
-              <button
-                type="button"
-                className="mobile-menu mb-3"
-                onClick={() => setMobileOpen(!mobileOpen)}
-                aria-label="Toggle navigation menu"
-              >
-                <Menu size={20} />
-              </button>
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  type="button"
+                  className="mobile-menu"
+                  onClick={() => setMobileOpen(!mobileOpen)}
+                  aria-label="Toggle navigation menu"
+                >
+                  <Menu size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleSidebar}
+                  className="hidden lg:inline-flex items-center justify-center w-8 h-8 rounded-lg text-[#52776c] hover:text-[#173e35] hover:bg-[#e4ede8] transition-colors cursor-pointer border border-[#c5d8d3]"
+                  title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar to Icon-Only'}
+                  aria-label={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+                >
+                  {sidebarCollapsed ? (
+                    <PanelLeftOpen size={17} className="text-[#1f5b4e]" />
+                  ) : (
+                    <PanelLeftClose size={17} />
+                  )}
+                </button>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-[11px] font-semibold text-emerald-800 tracking-wide">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -563,14 +732,16 @@ export function DoctorPortal() {
           <div className="doctor-stats">
             {/* Card 1: Waiting Now */}
             <div
-              className={`doctor-stat accent clickable-stat ${statFilter === 'all' ? 'active-filter' : ''}`}
+              className={`doctor-stat accent clickable-stat ${viewMode === 'live' && statFilter === 'all' ? 'active-filter' : ''}`}
               onClick={() => {
+                setLocation('/doctor');
                 setStatFilter('all');
                 setSelected(0);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
+                  setLocation('/doctor');
                   setStatFilter('all');
                   setSelected(0);
                 }
@@ -588,7 +759,7 @@ export function DoctorPortal() {
                 <strong>
                   <AnimatedCounter value={waitingCount} pad={2} />
                 </strong>
-                {statFilter === 'all' && <span className="stat-filter-indicator">All waiting</span>}
+                {viewMode === 'live' && statFilter === 'all' && <span className="stat-filter-indicator">All waiting</span>}
               </div>
               <small>Live connected</small>
             </div>
@@ -596,22 +767,32 @@ export function DoctorPortal() {
             {/* Card 2: High Priority */}
             <div
               className={`doctor-stat priority-alert-stat clickable-stat ${highPriorityCount > 0 ? 'has-priority-alert' : ''
-                } ${statFilter === 'priority' ? 'active-filter' : ''}`}
+                } ${viewMode === 'live' && statFilter === 'priority' ? 'active-filter' : ''}`}
               onClick={() => {
-                setStatFilter((prev) => (prev === 'priority' ? 'all' : 'priority'));
+                if (viewMode !== 'live') {
+                  setLocation('/doctor');
+                  setStatFilter('priority');
+                } else {
+                  setStatFilter((prev) => (prev === 'priority' ? 'all' : 'priority'));
+                }
                 setSelected(0);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setStatFilter((prev) => (prev === 'priority' ? 'all' : 'priority'));
+                  if (viewMode !== 'live') {
+                    setLocation('/doctor');
+                    setStatFilter('priority');
+                  } else {
+                    setStatFilter((prev) => (prev === 'priority' ? 'all' : 'priority'));
+                  }
                   setSelected(0);
                 }
               }}
               role="button"
               tabIndex={0}
               title={
-                statFilter === 'priority'
+                viewMode === 'live' && statFilter === 'priority'
                   ? 'Click to reset filter'
                   : 'Click to filter queue to high priority patients'
               }
@@ -625,7 +806,7 @@ export function DoctorPortal() {
                 <strong className="priority-number">
                   <AnimatedCounter value={highPriorityCount} pad={2} />
                 </strong>
-                {statFilter === 'priority' ? (
+                {viewMode === 'live' && statFilter === 'priority' ? (
                   <span className="stat-filter-indicator priority">Filtering Priority</span>
                 ) : highPriorityCount > 0 ? (
                   <span className="stat-filter-indicator priority">Action needed</span>
@@ -658,26 +839,22 @@ export function DoctorPortal() {
 
             {/* Card 4: Reviewed Today */}
             <div
-              className={`doctor-stat clickable-stat ${statFilter === 'reviewed' ? 'active-filter' : ''}`}
+              className={`doctor-stat clickable-stat ${viewMode === 'reviewed' ? 'active-filter' : ''}`}
               onClick={() => {
-                setStatFilter((prev) => (prev === 'reviewed' ? 'all' : 'reviewed'));
+                setLocation('/doctor/reviewed');
                 setSelected(0);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setStatFilter((prev) => (prev === 'reviewed' ? 'all' : 'reviewed'));
+                  setLocation('/doctor/reviewed');
                   setSelected(0);
                 }
               }}
               role="button"
               tabIndex={0}
-              title={
-                statFilter === 'reviewed'
-                  ? 'Click to reset filter'
-                  : 'Click to filter queue to reviewed patients'
-              }
-              aria-label={`Reviewed today: ${reviewedCount} patients. Click to toggle reviewed patients filter.`}
+              title="Click to view reviewed patients"
+              aria-label={`Reviewed today: ${reviewedCount} patients. Click to view reviewed patients.`}
             >
               <span className="stat-icon stat-icon-reviewed flex items-center justify-center shrink-0">
                 <CheckCircle2 size={18} />
@@ -687,28 +864,85 @@ export function DoctorPortal() {
                 <strong>
                   <AnimatedCounter value={reviewedCount} pad={2} />
                 </strong>
-                {statFilter === 'reviewed' && (
-                  <span className="stat-filter-indicator">Filtering Reviewed</span>
+                {viewMode === 'reviewed' && (
+                  <span className="stat-filter-indicator">Viewing Reviewed</span>
                 )}
               </div>
-              <small>of {activeQueue.length} total</small>
+              <small>Confirmed records</small>
             </div>
           </div>
 
           <div className="doctor-workspace">
             <section className="queue-panel">
+              {/* Tabs for Live Queue vs Reviewed Patients */}
+              <div className="flex items-center gap-2 border-b border-[#dce6e9] px-4 pt-3 bg-[#f8faf9] rounded-t-2xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocation('/doctor');
+                    setSelected(0);
+                  }}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${viewMode === 'live'
+                      ? 'border-[#1f5b4e] text-[#1f5b4e] bg-white rounded-t-lg shadow-2xs'
+                      : 'border-transparent text-[#6e828e] hover:text-[#1e394c]'
+                    }`}
+                >
+                  <Users size={14} />
+                  <span>Live Queue</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-extrabold ${viewMode === 'live'
+                        ? 'bg-[#1f5b4e] text-white'
+                        : 'bg-[#e2eaec] text-[#6e828e]'
+                      }`}
+                  >
+                    {waitingCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocation('/doctor/reviewed');
+                    setSelected(0);
+                  }}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${viewMode === 'reviewed'
+                      ? 'border-[#16a34a] text-[#16a34a] bg-white rounded-t-lg shadow-2xs'
+                      : 'border-transparent text-[#6e828e] hover:text-[#1e394c]'
+                    }`}
+                >
+                  <CheckCircle2 size={14} />
+                  <span>Reviewed Patients</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-extrabold ${viewMode === 'reviewed'
+                        ? 'bg-[#16a34a] text-white'
+                        : 'bg-[#e2eaec] text-[#6e828e]'
+                      }`}
+                  >
+                    {reviewedCount}
+                  </span>
+                </button>
+              </div>
+
               <div className="panel-heading">
                 <div>
-                  <h2>Live Patient Queue</h2>
+                  <h2>{viewMode === 'live' ? 'Live Patient Queue' : 'Reviewed Patients Queue'}</h2>
                   <div className="flex items-center gap-2 mt-1 text-xs text-[#6e828e]">
-                    <span className="live-pill">
-                      <span /> LIVE
-                    </span>
+                    {viewMode === 'live' ? (
+                      <span className="live-pill">
+                        <span /> LIVE
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-[#166534] bg-[#dcfce7] px-2 py-0.5 rounded-full">
+                        <CheckCircle2 size={12} className="text-[#16a34a]" /> CONFIRMED & SYNCED
+                      </span>
+                    )}
                     <span className="text-[#8ca0ab]">·</span>
                     <span className="font-mono text-[11px] text-[#607784]">{getRelativeUpdatedText()}</span>
                   </div>
                   <p className="text-[11px] text-[#7d919d] mt-1 font-medium">
-                    Prioritized by AI triage flags (High Priority first) · Requires clinical review
+                    {viewMode === 'live'
+                      ? 'Prioritized by AI triage flags (High Priority first) · Requires clinical review'
+                      : 'Patients who have completed physician clinical review · Clinical record locked & synced'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -721,7 +955,7 @@ export function DoctorPortal() {
                         setSearchQuery(e.target.value);
                         setSelected(0);
                       }}
-                      placeholder="Search patients, token..."
+                      placeholder={viewMode === 'live' ? 'Search patients, token...' : 'Search reviewed patients...'}
                       className="h-9 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-lg border border-[#dbe5e8] bg-[#fbfdfd] text-[#1e394c] placeholder:text-[#8b9da6] focus:border-[#1f5b4e] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1f5b4e] transition"
                       aria-label="Search patients by name or token"
                     />
@@ -741,7 +975,7 @@ export function DoctorPortal() {
                   </div>
                   <button
                     className="filter-button"
-                    onClick={() => fetchLiveQueue(true)}
+                    onClick={() => fetchQueues(true)}
                     disabled={isRefreshing}
                     title="Refresh queue list"
                   >
@@ -756,18 +990,12 @@ export function DoctorPortal() {
               </div>
 
               <div className="queue-list">
-                {statFilter !== 'all' && (
+                {viewMode === 'live' && statFilter !== 'all' && (
                   <div className="flex items-center justify-between gap-2 px-3 py-2 mb-2 rounded-xl bg-[#eef7f4] border border-[#cbe4dc] text-xs text-[#1e4d41] transition-all">
                     <div className="flex items-center gap-2 font-medium">
                       <Filter size={13} className="text-[#1f5b4e] shrink-0" />
                       <span>
-                        Active filter:{' '}
-                        <b>
-                          {statFilter === 'priority'
-                            ? 'High Priority Patients'
-                            : 'Reviewed Patients'}
-                        </b>{' '}
-                        ({filteredQueue.length}{' '}
+                        Active filter: <b>High Priority Patients</b> ({filteredQueue.length}{' '}
                         {filteredQueue.length === 1 ? 'patient' : 'patients'})
                       </span>
                     </div>
@@ -783,20 +1011,20 @@ export function DoctorPortal() {
                     </button>
                   </div>
                 )}
-                {queue === null ? (
+                {(viewMode === 'live' ? liveQueue : reviewedQueue) === null ? (
                   /* Initial loading state */
                   <div className="py-12 px-4 text-center rounded-xl border border-dashed border-[#dce6e9] bg-[#fbfdfd] my-3">
                     <RefreshCw size={24} className="mx-auto mb-2 text-[#1f5b4e] animate-spin" />
-                    <p className="font-semibold text-xs text-[#274457]">Connecting to live triage database...</p>
+                    <p className="font-semibold text-xs text-[#274457]">Connecting to clinical database...</p>
                   </div>
                 ) : error ? (
                   <div className="py-12 px-4 text-center rounded-xl border border-[#f2c9c4] bg-[#fff8f7] my-3">
                     <AlertTriangle size={26} className="mx-auto mb-2 text-[#b5473c]" />
-                    <p className="font-semibold text-sm text-[#713b36]">Live queue unavailable</p>
+                    <p className="font-semibold text-sm text-[#713b36]">Queue unavailable</p>
                     <p className="text-xs text-[#8b5954] mt-1 max-w-sm mx-auto">{error}</p>
                     <button
                       type="button"
-                      onClick={() => fetchLiveQueue(true)}
+                      onClick={() => fetchQueues(true)}
                       disabled={isRefreshing}
                       className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#8b3f37] hover:underline cursor-pointer"
                     >
@@ -833,17 +1061,45 @@ export function DoctorPortal() {
                         </div>
                         <div className="queue-reason">
                           <b>{item.reason}</b>
+                          {viewMode === 'reviewed' && item.reviewed_by && (
+                            <span className="block text-[11px] font-semibold text-[#15803d] mt-0.5 truncate">
+                              Reviewed by: {item.reviewed_by}
+                            </span>
+                          )}
                         </div>
-                        <div
-                          className={`priority ${badgeClass}`}
-                          title="AI-assisted triage priority · Subject to clinical verification"
-                        >
-                          <span />
-                          {badgeLabel}
-                        </div>
+                        {viewMode === 'reviewed' ? (
+                          <div
+                            className="priority bg-[#dcfce7] text-[#14532d] border border-[#86efac] font-bold text-[11px]"
+                            title="Clinician verified & confirmed"
+                          >
+                            <CheckCircle2 size={12} className="inline mr-1 text-[#16a34a]" />
+                            REVIEWED
+                          </div>
+                        ) : (
+                          <div
+                            className={`priority ${badgeClass}`}
+                            title="AI-assisted triage priority · Subject to clinical verification"
+                          >
+                            <span />
+                            {badgeLabel}
+                          </div>
+                        )}
                         <div className="queue-wait">
-                          <span>Waiting</span>
-                          <b>{item.wait}</b>
+                          {viewMode === 'reviewed' ? (
+                            <>
+                              <span className="text-[#16a34a] font-bold">Reviewed</span>
+                              <b className="text-[11px] font-medium text-[#4b6358]">
+                                {item.reviewed_at
+                                  ? new Intl.DateTimeFormat('en-IN', { timeStyle: 'short' }).format(new Date(item.reviewed_at))
+                                  : 'Done'}
+                              </b>
+                            </>
+                          ) : (
+                            <>
+                              <span>Waiting</span>
+                              <b>{item.wait}</b>
+                            </>
+                          )}
                         </div>
                         <ArrowRight size={16} className="row-arrow" />
                       </button>
@@ -868,13 +1124,13 @@ export function DoctorPortal() {
                       Clear search
                     </button>
                   </div>
-                ) : statFilter !== 'all' ? (
+                ) : viewMode === 'live' && statFilter !== 'all' ? (
                   /* Empty state for active stat filter with no matches */
                   <div className="py-12 px-4 text-center rounded-xl border border-dashed border-[#dce6e9] bg-[#fbfdfd] my-3">
                     <Filter size={26} className="mx-auto mb-2 text-[#9bb0ba]" />
                     <p className="font-semibold text-sm text-[#274457]">No matching patients</p>
                     <p className="text-xs text-[#758a96] mt-1">
-                      No patients in queue currently match the {statFilter === 'priority' ? 'high priority' : 'reviewed'} filter.
+                      No patients in queue currently match the high priority filter.
                     </p>
                     <button
                       type="button"
@@ -887,8 +1143,27 @@ export function DoctorPortal() {
                       Show all waiting patients
                     </button>
                   </div>
+                ) : viewMode === 'reviewed' ? (
+                  /* Empty state for reviewed queue */
+                  <div className="py-12 px-4 text-center rounded-xl border border-dashed border-[#dce6e9] bg-[#fbfdfd] my-3">
+                    <CheckCircle2 size={26} className="mx-auto mb-2 text-[#9bb0ba]" />
+                    <p className="font-semibold text-sm text-[#274457]">No reviewed patients yet</p>
+                    <p className="text-xs text-[#758a96] mt-1 max-w-sm mx-auto">
+                      When you review and confirm patient records from the Live Queue, they will automatically move here.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocation('/doctor');
+                        setSelected(0);
+                      }}
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#1f5b4e] hover:underline cursor-pointer"
+                    >
+                      <ArrowLeft size={13} /> Return to Live Queue
+                    </button>
+                  </div>
                 ) : (
-                  /* Empty state for empty queue */
+                  /* Empty state for empty live queue */
                   <div className="py-12 px-4 text-center rounded-xl border border-dashed border-[#dce6e9] bg-[#fbfdfd] my-3">
                     <Users size={26} className="mx-auto mb-2 text-[#9bb0ba]" />
                     <p className="font-semibold text-sm text-[#274457]">No patients waiting</p>
@@ -897,7 +1172,7 @@ export function DoctorPortal() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => fetchLiveQueue(true)}
+                      onClick={() => fetchQueues(true)}
                       disabled={isRefreshing}
                       className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#1f5b4e] hover:underline cursor-pointer"
                     >
@@ -920,7 +1195,7 @@ export function DoctorPortal() {
                 </button>
               </div>
 
-              {queue === null ? (
+              {(viewMode === 'live' ? liveQueue : reviewedQueue) === null ? (
                 <div className="py-16 text-center">
                   <RefreshCw size={22} className="mx-auto mb-2 text-[#1f5b4e] animate-spin" />
                   <p className="text-xs font-semibold text-[#274457]">Loading patient data...</p>
@@ -935,22 +1210,45 @@ export function DoctorPortal() {
                         {patient.id} · {patient.age} · {patient.lang}
                       </span>
                     </div>
-                    <span className="profile-status">Waiting {patient.wait}</span>
+                    {viewMode === 'reviewed' ? (
+                      <span className="profile-status bg-[#dcfce7] text-[#14532d] border border-[#86efac] px-2.5 py-0.5 rounded-full font-bold text-xs">
+                        ✓ Reviewed
+                      </span>
+                    ) : (
+                      <span className="profile-status">Waiting {patient.wait}</span>
+                    )}
                   </div>
-                  <div className="ai-notice">
-                    <Sparkles size={16} />
-                    <span>
-                      <b>AI-structured summary</b>
-                      <small>For physician review only</small>
-                    </span>
-                    <CheckCircle2 size={16} />
-                  </div>
+
+                  {viewMode === 'reviewed' ? (
+                    <div className="ai-notice bg-[#ecfdf5] border-[#a2d4ba] text-[#065f46]">
+                      <CheckCircle2 size={16} className="text-[#16a34a]" />
+                      <span>
+                        <b>Physician Reviewed & Confirmed</b>
+                        <small>
+                          {patient.reviewed_by ? `Sign-off by ${patient.reviewed_by}` : 'Clinical verification complete'}
+                          {patient.reviewed_at ? ` · ${new Intl.DateTimeFormat('en-IN', { timeStyle: 'short' }).format(new Date(patient.reviewed_at))}` : ''}
+                        </small>
+                      </span>
+                      <CheckCircle2 size={16} className="text-[#16a34a]" />
+                    </div>
+                  ) : (
+                    <div className="ai-notice">
+                      <Sparkles size={16} />
+                      <span>
+                        <b>AI-structured summary</b>
+                        <small>For physician review only</small>
+                      </span>
+                      <CheckCircle2 size={16} />
+                    </div>
+                  )}
+
                   <div className="summary-block">
                     <span className="summary-block-label">CHIEF CONCERN</span>
                     <h3>{patient.reason}</h3>
                     <p>
-                      Patient shared symptoms in {patient.lang} during adaptive intake. Structured
-                      clinical facts and red flag checks are ready for clinician review.
+                      {viewMode === 'reviewed'
+                        ? `Clinical intake and symptom facts for ${patient.name} have been reviewed, verified, and signed off.`
+                        : `Patient shared symptoms in ${patient.lang} during adaptive intake. Structured clinical facts and red flag checks are ready for clinician review.`}
                     </p>
                   </div>
                   <div className="summary-block">
@@ -985,7 +1283,9 @@ export function DoctorPortal() {
                   <Users size={30} className="mx-auto mb-2 text-[#9bb0ba]" />
                   <p className="font-semibold text-sm text-[#274457]">No patient selected</p>
                   <p className="text-xs text-[#758a96] mt-1 max-w-xs mx-auto">
-                    Select a patient from the live queue to inspect their clinical summary.
+                    {viewMode === 'reviewed'
+                      ? 'Select a patient from the reviewed list to inspect their confirmed clinical summary.'
+                      : 'Select a patient from the live queue to inspect their clinical summary.'}
                   </p>
                 </div>
               )}

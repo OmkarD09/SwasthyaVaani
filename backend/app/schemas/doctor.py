@@ -14,8 +14,8 @@ class DoctorQueueItem(BaseModel):
     chief_complaint: str
     language_code: str
     workflow_type: str
-    status: Literal["WAITING", "HISTORY_READY", "PRIORITY_REVIEW", "IN_REVIEW", "CONFIRMED"]
-    status_tone: Literal["teal", "amber", "red"] = "amber"
+    status: Literal["WAITING", "HISTORY_READY", "PRIORITY_REVIEW", "IN_REVIEW", "CONFIRMED", "REVIEWED"]
+    status_tone: Literal["teal", "amber", "red", "emerald"] = "amber"
     priority: Literal["Priority", "Routine"] = "Routine"
     has_red_flags: bool = False
     submitted_at: datetime
@@ -23,6 +23,9 @@ class DoctorQueueItem(BaseModel):
     abha_id: Optional[str] = None
     abha_status: Optional[str] = None
     documents_count: Optional[int] = 0
+    review_status: Optional[str] = "PENDING_REVIEW"
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
 
 
 class DoctorPatientDetail(BaseModel):
@@ -43,7 +46,9 @@ class DoctorPatientDetail(BaseModel):
     workflow_type: Optional[str] = "GENERAL"
     language_code: Optional[str] = "en"
     status: Optional[str] = "WAITING"
-    review_status: Literal["AI_DRAFT", "NEEDS_VERIFICATION", "PHYSICIAN_CONFIRMED"] = "AI_DRAFT"
+    review_status: Literal["AI_DRAFT", "NEEDS_VERIFICATION", "PHYSICIAN_CONFIRMED", "REVIEWED", "PENDING_REVIEW"] = "AI_DRAFT"
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
     clinical_state: ClinicalState
     documents: List[Dict[str, Any]] = Field(default_factory=list)
     medical_records: List[Dict[str, Any]] = Field(default_factory=list)
@@ -71,5 +76,8 @@ class PhysicianConfirmResponse(BaseModel):
     review_id: str
     confirmed_at: datetime
     status: str = "PHYSICIAN_CONFIRMED"
+    review_status: str = "REVIEWED"
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
     fhir_bundle_id: Optional[str] = None
     message: str

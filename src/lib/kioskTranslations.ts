@@ -6,6 +6,7 @@ export interface KioskTranslation {
   careDescription: string;
   steps: {
     language: { title: string; caption: string };
+    details?: { title: string; caption: string };
     story: { title: string; caption: string };
     records: { title: string; caption: string };
     ready: { title: string; caption: string };
@@ -63,7 +64,8 @@ export const KIOSK_TRANSLATIONS: Record<string, KioskTranslation> = {
     careDescription: 'Take a few quiet minutes to share what brings you in today.',
     steps: {
       language: { title: 'Language', caption: 'Choose how you speak' },
-      story: { title: 'Your story', caption: 'Tell us what brings you in' },
+      details: { title: 'Your Details', caption: 'Personal info' },
+      story: { title: 'Your Story', caption: 'Tell us what brings you in' },
       records: { title: 'Records', caption: 'Add helpful context' },
       ready: { title: 'Ready', caption: 'Review before your doctor' },
     },
@@ -785,5 +787,9 @@ export const KIOSK_TRANSLATIONS: Record<string, KioskTranslation> = {
 };
 
 export function getKioskTranslation(lang: string): KioskTranslation {
-  return KIOSK_TRANSLATIONS[lang] || KIOSK_TRANSLATIONS['English'];
+  const t = KIOSK_TRANSLATIONS[lang] || KIOSK_TRANSLATIONS['English'];
+  if (!t.steps.details) {
+    t.steps.details = { title: 'Your Details', caption: 'Personal info' };
+  }
+  return t;
 }

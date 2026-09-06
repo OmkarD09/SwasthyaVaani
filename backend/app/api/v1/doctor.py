@@ -57,7 +57,8 @@ def get_doctor_queue(
     t_start = datetime.now(timezone.utc)
     
     query = db.query(IntakeSession).filter(
-        IntakeSession.status.in_(["SUBMITTED", "IN_REVIEW", "READY_TO_SUBMIT", "ACTIVE"])
+        IntakeSession.status.in_(["SUBMITTED", "IN_REVIEW"]),
+        (IntakeSession.review_status != "REVIEWED") | (IntakeSession.review_status.is_(None)),
     )
     if doctor_id:
         query = query.filter(IntakeSession.doctor_id == doctor_id)
@@ -146,11 +147,125 @@ def get_doctor_queue(
                 wait_time_minutes=wait_mins,
                 abha_id=patient.abha_id if patient else None,
                 abha_status=patient.abha_status if patient else None,
+                review_status=s.review_status or "PENDING_REVIEW",
+                reviewed_by=s.reviewed_by,
+                reviewed_at=s.reviewed_at,
             )
         )
 
     t_elapsed = (datetime.now(timezone.utc) - t_start).total_seconds() * 1000
     print(f"[Performance] Doctor queue API: {t_elapsed:.2f} ms for {len(queue_items)} items")
+    return queue_items
+
+
+@router.get("/patients/reviewed", response_model=list[DoctorQueueItem])
+def get_reviewed_patients(
+    doctor_id: str | None = None,
+    db: Session = Depends(get_db),
+    _current_user: dict = Depends(require_doctor),
+):
+    """Retrieve reviewed patients who have been confirmed by a clinician."""
+    t_start = datetime.now(timezone.utc)
+
+    query = db.query(IntakeSession).filter(
+        IntakeSession.review_status == "REVIEWED"
+    )
+    if doctor_id:
+        query = query.filter(IntakeSession.doctor_id == doctor_id)
+
+    sessions = query.order_by(IntakeSession.reviewed_at.desc(), IntakeSession.started_at.desc()).all()
+    if not sessions:
+        return []
+
+    # 1. Batch fetch all patients in single query
+    patient_ids = list({s.patient_id for s in sessions if s.patient_id})
+    patients_map = {
+        p.id: p for p in db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
+    } if patient_ids else {}
+
+    # 2. Batch fetch doctors for reviewer display names
+    doctor_ids = list({s.reviewed_by for s in sessions if s.reviewed_by} | {s.doctor_id for s in sessions if s.doctor_id})
+    doctors_map = {
+        d.id: d for d in db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).all()
+    } if doctor_ids else {}
+
+    # 3. Batch fetch all latest clinical states in single query
+    session_ids = [s.id for s in sessions]
+    all_states = db.query(ClinicalStateModel).filter(
+        ClinicalStateModel.intake_session_id.in_(session_ids)
+    ).order_by(ClinicalStateModel.version.desc()).all()
+
+    states_map = {}
+    for st in all_states:
+        if st.intake_session_id not in states_map:
+            states_map[st.intake_session_id] = st
+
+    # 4. Batch fetch first answers in single query (only if needed)
+    all_answers = db.query(Answer).filter(
+        Answer.intake_session_id.in_(session_ids)
+    ).order_by(Answer.created_at.asc()).all()
+
+    answers_map = {}
+    for ans in all_answers:
+        if ans.intake_session_id not in answers_map:
+            answers_map[ans.intake_session_id] = ans
+
+    now_utc = datetime.now(timezone.utc)
+    queue_items: list[DoctorQueueItem] = []
+
+    for s in sessions:
+        patient = patients_map.get(s.patient_id)
+        latest_state_model = states_map.get(s.id)
+
+        state_dict = latest_state_model.state_json if latest_state_model else {}
+        chief_complaint = state_dict.get("chief_complaint")
+
+        if not chief_complaint or chief_complaint == "General consultation":
+            first_ans = answers_map.get(s.id)
+            if first_ans and first_ans.raw_text:
+                chief_complaint = first_ans.raw_text
+            else:
+                chief_complaint = "General consultation"
+
+        red_flags = state_dict.get("red_flags", [])
+        has_red_flags = len(red_flags) > 0
+
+        # Reviewer display name
+        reviewer_name = None
+        if s.reviewed_by:
+            doc_obj = doctors_map.get(s.reviewed_by)
+            reviewer_name = doc_obj.display_name if doc_obj else s.reviewed_by
+        elif s.doctor_id:
+            doc_obj = doctors_map.get(s.doctor_id)
+            reviewer_name = doc_obj.display_name if doc_obj else s.doctor_id
+
+        queue_items.append(
+            DoctorQueueItem(
+                intake_session_id=s.id,
+                token=s.token,
+                patient_id=s.patient_id,
+                patient_name=patient.display_name if patient else "Patient",
+                patient_age=patient.age if patient else None,
+                patient_gender=patient.gender if patient else None,
+                chief_complaint=chief_complaint,
+                language_code=s.language_code,
+                workflow_type=s.workflow_type,
+                status="REVIEWED",
+                status_tone="emerald",
+                priority="Routine",
+                has_red_flags=has_red_flags,
+                submitted_at=s.reviewed_at or s.submitted_at or s.started_at or now_utc,
+                wait_time_minutes=0,
+                abha_id=patient.abha_id if patient else None,
+                abha_status=patient.abha_status if patient else None,
+                review_status="REVIEWED",
+                reviewed_by=reviewer_name,
+                reviewed_at=s.reviewed_at,
+            )
+        )
+
+    t_elapsed = (datetime.now(timezone.utc) - t_start).total_seconds() * 1000
+    print(f"[Performance] Doctor reviewed queue API: {t_elapsed:.2f} ms for {len(queue_items)} items")
     return queue_items
 
 
@@ -195,7 +310,16 @@ def get_patient_clinical_detail(
         .first()
     )
 
-    review_status = "PHYSICIAN_CONFIRMED" if (review and review.status == "CONFIRMED") else "AI_DRAFT"
+    is_reviewed = session.review_status == "REVIEWED" or (review and review.status == "CONFIRMED")
+    review_status = "REVIEWED" if is_reviewed else "AI_DRAFT"
+
+    reviewer_name = None
+    if session.reviewed_by:
+        rev_doctor = db.query(Doctor).filter(Doctor.id == session.reviewed_by).first()
+        reviewer_name = rev_doctor.display_name if rev_doctor else session.reviewed_by
+    elif review and review.doctor_id:
+        rev_doctor = db.query(Doctor).filter(Doctor.id == review.doctor_id).first()
+        reviewer_name = rev_doctor.display_name if rev_doctor else review.doctor_id
 
     # Retrieve medical records / attachments uploaded by or for this patient
     docs_query = (
@@ -351,6 +475,8 @@ def get_patient_clinical_detail(
         language_code=session.language_code or "en",
         status=session.status or "WAITING",
         review_status=review_status,
+        reviewed_by=reviewer_name,
+        reviewed_at=session.reviewed_at or (review.confirmed_at if review else None),
         clinical_state=state,
         documents=doc_list,
         medical_records=all_medical_records,
@@ -433,21 +559,31 @@ async def confirm_patient_history(
     state_data = latest_state_model.state_json if (latest_state_model and isinstance(latest_state_model.state_json, dict)) else {}
     state = ClinicalState(**state_data)
 
+    now = datetime.now(timezone.utc)
+    reviewer_id = current_user.get("sub", session.doctor_id)
+    reviewer_name = doctor.display_name if doctor else reviewer_id
+
+    # Update session review status lifecycle: PENDING_REVIEW -> REVIEWED
+    session.review_status = "REVIEWED"
+    session.reviewed_by = reviewer_id
+    session.reviewed_at = now
+    session.status = "CONFIRMED"
+
     # Persist or update PhysicianReview
     review = db.query(PhysicianReviewModel).filter(PhysicianReviewModel.intake_session_id == session.id).first()
     if not review:
         review = PhysicianReviewModel(
             intake_session_id=session.id,
-            doctor_id=session.doctor_id,
+            doctor_id=session.doctor_id or reviewer_id,
             status="CONFIRMED",
             notes=req.notes,
-            confirmed_at=datetime.now(timezone.utc)
+            confirmed_at=now,
         )
         db.add(review)
     else:
         review.status = "CONFIRMED"
         review.notes = req.notes
-        review.confirmed_at = datetime.now(timezone.utc)
+        review.confirmed_at = now
     db.flush()
 
     # Record any edits
@@ -491,14 +627,20 @@ async def confirm_patient_history(
         "action": "CONFIRMED",
         "intake_session_id": session.id,
         "token": session.token,
+        "review_status": "REVIEWED",
+        "reviewed_by": reviewer_name,
+        "reviewed_at": now.isoformat(),
         "message": f"Patient #{session.token} confirmed by physician."
     })
 
     return PhysicianConfirmResponse(
         intake_session_id=session.id,
         review_id=review.id,
-        confirmed_at=review.confirmed_at or datetime.now(timezone.utc),
+        confirmed_at=review.confirmed_at or now,
         status="PHYSICIAN_CONFIRMED",
+        review_status="REVIEWED",
+        reviewed_by=reviewer_name,
+        reviewed_at=review.confirmed_at or now,
         fhir_bundle_id=fhir_bundle_id,
         message=f"Clinical history confirmed by physician. FHIR Bundle generated: {fhir_bundle_id or 'N/A'}"
     )

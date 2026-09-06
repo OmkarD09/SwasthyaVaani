@@ -147,56 +147,15 @@ export function PatientVoiceChat({
   const isComponentMounted = useRef<boolean>(true);
   const isSubmittingRef = useRef<boolean>(false);
 
-  // 1. Initialize Intake Session in Backend
+  // 1. Cleanup on unmount
   useEffect(() => {
     isComponentMounted.current = true;
-    async function initSession() {
-      try {
-        const profile = getStoredPatientProfile();
-        // Avoid sending placeholder demo ABHA if neither scanned nor modified
-        const isDefaultDemoAbha = profile?.abhaNumber === '91-4521-8890-1234' && !profile?.isAbhaFromQr;
-        const abhaIdToSend = isDefaultDemoAbha ? null : (profile?.abhaNumber || null);
-        const abhaAddressToSend = isDefaultDemoAbha ? null : (profile?.abhaAddress || null);
-        const phoneToSend = profile?.phone === '9876543210' && !profile?.isAbhaFromQr ? null : (profile?.phone || null);
-
-        const res = await fetch('/api/v1/intakes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            patient_name: profile?.name || patientName || 'Patient',
-            patient_age: (profile?.age ? parseInt(profile.age, 10) : null) ?? (parseInt(patientAge, 10) || null),
-            patient_gender: profile?.gender || 'Female',
-            phone: phoneToSend,
-            date_of_birth: profile?.dateOfBirth || null,
-            abha_id: abhaIdToSend,
-            abha_address: abhaAddressToSend,
-            language_code: langCode,
-            workflow_type: 'GENERAL_CLINICAL',
-            interaction_mode: 'VOICE',
-            consent_given: true,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (isComponentMounted.current) {
-            setIntakeSessionId(data.id);
-            localStorage.setItem('swasthya_active_intake_id', data.id);
-            localStorage.setItem('swasthya_active_token', data.token || '');
-            localStorage.setItem('swasthya_active_patient_id', data.patient_id || '');
-          }
-        }
-      } catch (err) {
-        console.warn('[SwasthyaVaani Voice] Backend session init notice:', err);
-      }
-    }
-    initSession();
-
     return () => {
       isComponentMounted.current = false;
       stopSpeaking();
       stopListening();
     };
-  }, [patientName, patientAge, langCode]);
+  }, []);
 
   // 2. Automatically Speak initial or updated question
   useEffect(() => {
@@ -555,116 +514,105 @@ export function PatientVoiceChat({
     setLiveTranscript('');
     liveTranscriptRef.current = '';
 
-    try {
-      const activeId = intakeSessionId || localStorage.getItem('swasthya_active_intake_id');
+    const fieldKeys = ['chief_complaint', 'duration', 'severity', 'medical_history'];
+    const categoryLabels = ['Chief Complaint', 'Duration & Onset', 'Severity Level', 'Medications & History'];
+    const targetField = fieldKeys[questionCount - 1] || `q_${questionCount}`;
+    const category = categoryLabels[questionCount - 1] || activeCategory;
 
-      if (activeId && recordedAudio) {
-        const formData = new FormData();
-        formData.append('file', recordedAudio, `intake-${Date.now()}.webm`);
-        formData.append('language_code', langCode);
-        if (currentQuestionEventId) formData.append('question_event_id', currentQuestionEventId);
+    setConversationHistory((prev) => [
+      ...prev,
+      {
+        category,
+        questionText: activeQuestionText,
+        answerText: answerToSubmit,
+      },
+    ]);
 
-        const res = await fetch(`/api/v1/intakes/${activeId}/voice-answer`, {
-          method: 'POST',
-          body: formData,
-        });
+    recordIntakeAnswer(
+      targetField,
+      answerToSubmit,
+      'voice',
+      category,
+      activeQuestionText,
+    );
 
-        if (res.ok) {
-          const data = await res.json();
-          const decision = data.decision;
-          const updatedState = data.clinical_state;
-          const backendTranscript = data.transcript_text || answerToSubmit;
-          if (data.detected_language) {
-            localStorage.setItem('swasthya_detected_language', data.detected_language);
-          }
-          const nextQEventId = data.next_question_event_id ?? data.question_event_id ?? decision?.question_event_id ?? null;
-          setCurrentQuestionEventId(nextQEventId);
-
-          setConversationHistory((prev) => [...prev, {
-            category: activeCategory,
-            questionText: activeQuestionText,
-            answerText: backendTranscript,
-          }]);
-          recordIntakeAnswer(
-            `q_${questionCount}`,
-            backendTranscript,
-            'voice',
-            activeCategory,
-            activeQuestionText,
-          );
-
-          if (updatedState?.red_flags?.length > 0) {
-            setRedFlags(updatedState.red_flags);
-          }
-
-          const nextQCount = questionCount + 1;
-          setQuestionCount(nextQCount);
-
-          // Check if AI Engine says STOP or reached max 10 questions
-          if (decision?.action === 'STOP' || decision?.action === 'ESCALATE') {
-            setIsFinished(true);
-            setFinishReason(decision?.reason || 'Clinical intake completed.');
-
-            const completionSpeech =
-              currentLang === 'हिन्दी'
-                ? 'धन्यवाद! आपकी स्वास्थ्य संबंधी जानकारी दर्ज कर ली गई है। अब आप अपनी पुरानी पर्ची या रिपोर्ट जोड़ सकते हैं।'
-                : currentLang === 'मराठी'
-                ? 'धन्यवाद! तुमची आरोग्य माहिती नोंदवली गेली आहे. आता तुम्ही तुमची कागदपत्रे जोडू शकता.'
-                : 'Thank you! Your clinical information has been recorded. You can now attach previous documents or proceed.';
-
-            speakQuestionText(completionSpeech);
-            setIsProcessing(false);
-            isSubmittingRef.current = false;
-            return;
-          }
-
-          // If AI Engine says ASK next dynamic question
-          if (decision?.action === 'ASK' && decision?.question) {
-            const nextText = decision.question;
-            const nextTarget = decision.target_field || 'Clinical Detail';
-            pendingAudioBase64Ref.current = data.audio_base64 || null;
-            setActiveCategory(nextTarget.toUpperCase().replace('_', ' '));
-            setActiveQuestionText(nextText);
-            setIsProcessing(false);
-            isSubmittingRef.current = false;
-            return;
-          }
-          throw new Error('The voice intake service returned no next action.');
-        }
-        throw new Error(`The voice intake service returned status ${res.status}.`);
-      }
-      throw new Error(activeId ? 'No recorded audio was available.' : 'No active intake session is available.');
-    } catch (err) {
-      console.warn('Backend adaptive answer processing note:', err);
-      setApiError(err instanceof Error ? err.message : 'Unable to process the voice answer.');
-    }
-
-    setIsProcessing(false);
-    isSubmittingRef.current = false;
-    return;
-
-    // Fallback: If offline or rate-limited, advance question count
     const nextQCount = questionCount + 1;
     setQuestionCount(nextQCount);
 
-    if (nextQCount > MAX_QUESTIONS) {
+    if (nextQCount > 4) {
       setIsFinished(true);
+      setFinishReason('Clinical intake completed.');
+
       const completionSpeech =
         currentLang === 'हिन्दी'
-          ? 'धन्यवाद! आपकी जानकारी दर्ज कर ली गई है।'
-          : 'Thank you! Your information has been recorded.';
+          ? 'धन्यवाद! आपकी स्वास्थ्य संबंधी जानकारी दर्ज कर ली गई है। अब आप अपनी पुरानी पर्ची या रिपोर्ट जोड़ सकते हैं।'
+          : currentLang === 'मराठी'
+          ? 'धन्यवाद! तुमची आरोग्य माहिती नोंदवली गेली आहे. आता तुम्ही तुमची कागदपत्रे जोडू शकता.'
+          : 'Thank you! Your clinical information has been recorded. You can now attach previous documents or proceed.';
+
       speakQuestionText(completionSpeech);
-    } else {
-      const fallbackQuestions = [
-        currentLang === 'हिन्दी' ? 'यह तकलीफ आपको कितने दिनों या हफ्तों से है?' : 'How long have you been experiencing this discomfort?',
-        currentLang === 'हिन्दी' ? '1 से 10 के पैमाने पर दर्द या परेशानी कितनी तेज है?' : 'On a scale of 1 to 10, how severe is your pain or discomfort?',
-        currentLang === 'हिन्दी' ? 'क्या यह दर्द शरीर के किसी अन्य हिस्से में भी जा रहा है?' : 'Does the pain radiate to any other part of your body?',
-        currentLang === 'हिन्दी' ? 'क्या इसके साथ चक्कर, सांस फूलना या बुखार है?' : 'Are you experiencing any other symptoms like fever or dizziness?'
-      ];
-      const nextFallback = fallbackQuestions[(nextQCount - 2) % fallbackQuestions.length];
-      setActiveQuestionText(nextFallback);
+      setIsProcessing(false);
+      isSubmittingRef.current = false;
+      return;
     }
 
+    const fallbackQuestions: Record<number, Record<string, string>> = {
+      2: {
+        English: 'How long have you been experiencing this discomfort?',
+        'हिन्दी': 'यह तकलीफ आपको कितने दिनों या हफ्तों से है?',
+        'मराठी': 'हा त्रास तुम्हाला किती दिवसांपासून किंवा आठवड्यांपासून होत आहे?',
+        'বাংলা': 'এই কষ্টটি আপনি কত দিন বা সপ্তাহ ধরে অনুভব করছেন?',
+        'తెలుగు': 'ఈ అసౌకర్యం మీకు ఎన్ని రోజులుగా లేదా వారాలుగా ఉంది?',
+        'தமிழ்': 'இந்த அசௌகரியம் உங்களுக்கு எத்தனை நாட்களாக உள்ளது?',
+        'ગુજરાતી': 'આ તકલીફ તમને કેટલા દિવસોથી છે?',
+        'ಕನ್ನಡ': 'ಈ ತೊಂದರೆ ನಿಮಗೆ ಎಷ್ಟು ದಿನಗಳಿಂದ ಇದೆ?',
+        'മലയാളം': 'ഈ ബുദ്ധിമുട്ട് നിങ്ങൾക്ക് എത്ര ദിവസമായി ഉണ്ട്?',
+        'ਪੰਜਾਬੀ': 'ਇਹ ਤਕਲੀਫ ਤੁਹਾਨੂੰ ਕਿੰਨੇ ਦਿਨਾਂ ਤੋਂ ਹੈ?',
+        'ଓଡ଼ିଆ': 'ଏହି ଅସୁବିଧା ଆପଣଙ୍କୁ କେତେ ଦିନରୁ ହେଉଛି?',
+        'অসমীয়া': 'এই সমস্যাটো আপোনাৰ কিমান দিনৰ পৰা হৈছে?',
+        'اردو': 'یہ تکلیف آپ کو کتنے دنوں سے ہے؟',
+      },
+      3: {
+        English: 'On a scale of 1 to 10, how severe is your pain or discomfort?',
+        'हिन्दी': '1 से 10 के पैमाने पर दर्द या परेशानी कितनी तेज है?',
+        'मराठी': '१ ते १० च्या प्रमाणात वेदना किंवा त्रास किती तीव्र आहे?',
+        'বাংলা': '১ থেকে ১০ স্কেলে ব্যথা বা যন্ত্রণা কতটা তীব্র?',
+        'తెలుగు': '1 నుండి 10 స్కేలుపై నొప్పి ఎంత తీవ్రంగా ఉంది?',
+        'தமிழ்': '1 முதல் 10 வரை வலி எவ்வளவு தீவிரமாக உள்ளது?',
+        'ગુજરાતી': '1 થી 10 ના માપદંડ પર દુખાવો કેટલો તીવ્ર છે?',
+        'ಕನ್ನಡ': '1 ರಿಂದ 10 ರ ಪ್ರಮಾಣದಲ್ಲಿ ನೋವು ಎಷ್ಟು ತೀವ್ರವಾಗಿದೆ?',
+        'മലയാളം': '1 മുതൽ 10 വരെയുള്ള സ്കെയിലിൽ വേദന എത്രത്തോളമുണ്ട്?',
+        'ਪੰਜਾਬੀ': '1 ਤੋਂ 10 ਦੇ ਪੈਮਾਨੇ ਤੇ ਦਰਦ ਕਿੰਨਾ ਤੇਜ਼ ਹੈ?',
+        'ଓଡ଼ିଆ': '୧ ରୁ ୧୦ ମଧ୍ୟରେ କଷ୍ଟ କେତେ ତୀବ୍ର?',
+        'অসমীয়া': '১ ৰ পৰা ১০ ৰ ভিতৰত বিষ কিমান তীব্ৰ?',
+        'اردو': '1 سے 10 کے پیمانے پر درد کतना شدید ہے؟',
+      },
+      4: {
+        English: 'Are you taking any regular medications, or do you have any allergies?',
+        'हिन्दी': 'क्या आप कोई नियमित दवाई ले रहे हैं या आपको कोई एलर्जी है?',
+        'मराठी': 'तुम्ही कोणतीही नियमित औषधे घेत आहात का किंवा काही ऍलर्जी आहे का?',
+        'বাংলা': 'আপনি কি কোনো নিয়মিত ওষুধ খাচ্ছেন বা আপনার কোনো অ্যালার্জি আছে?',
+        'తెలుగు': 'మీరు ఏదైనా మందులు వాడుతున్నారా లేదా ఏదైనా అలర్జీ ఉందా?',
+        'தமிழ்': 'வழக்கமான மருந்துகள் ஏதேனும் உட்கொள்கிறீர்களா அல்லது ஒவ்வாமை உள்ளதா?',
+        'ગુજરાતી': 'શું તમે કોઈ નિયમિત દવા લો છો અથવા કોઈ એલર્જી છે?',
+        'ಕನ್ನಡ': 'ನೀವು ಯಾವುದೇ ನಿಯಮಿತ ಔಷಧಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳುತ್ತಿದ್ದೀರಾ ಅಥವಾ ಅಲರ್ಜಿ ಇದೆಯೇ?',
+        'മലയാളം': 'പതിവായി മരുന്നുകൾ കഴിക്കുന്നുണ്ടോ അല്ലെങ്കിൽ എന്തെങ്കിലും അലർജിയുണ്ടോ?',
+        'ਪੰਜਾਬੀ': 'ਕੀ ਤੁਸੀਂ ਕੋਈ ਰੈਗੂਲਰ ਦਵਾਈ ਲੈ ਰਹੇ ਹੋ ਜਾਂ ਕੋਈ ਐਲਰਜੀ ਹੈ?',
+        'ଓଡ଼ିଆ': 'ଆପଣ କୌଣସି ନିୟମିତ ଔଷଧ ଖାଉଛନ୍ତି କିମ୍ବା ଆଲର୍ଜି ଅଛି କି?',
+        'অসমীয়া': 'আপুনি কোনো নিয়মিত ঔষধ খাই আছে নেকি বা এলাৰ্জি আছে নেকি?',
+        'اردو': 'کیا آپ کوئی باقاعدہ دوائیں لے رہے ہیں یا کوئی الرجی ہے؟',
+      },
+    };
+
+    const nextCategory = categoryLabels[nextQCount - 1] || 'Clinical Detail';
+    setActiveCategory(nextCategory);
+    const nextQuestionText =
+      fallbackQuestions[nextQCount]?.[currentLang] ||
+      fallbackQuestions[nextQCount]?.['English'] ||
+      'Please tell us more details about your symptoms.';
+
+    setActiveQuestionText(nextQuestionText);
+    speakQuestionText(nextQuestionText);
     setIsProcessing(false);
     isSubmittingRef.current = false;
   };
@@ -676,7 +624,7 @@ export function PatientVoiceChat({
   };
 
   return (
-    <div className="kiosk-card voice-intake-container max-w-3xl mx-auto w-full">
+    <div className="kiosk-card voice-intake-container w-full">
       {/* Top Header & Adaptive Progress Counter */}
       <div className="flex items-center justify-between border-b border-[#e8ece7] pb-4 mb-5">
         <div className="flex items-center gap-2">
@@ -720,39 +668,39 @@ export function PatientVoiceChat({
 
       {/* Active Question Box */}
       {!isFinished ? (
-        <div className="bg-[#fcfdfa] border border-[#e2e7df] rounded-2xl p-6 shadow-sm mb-6 relative overflow-hidden">
-          <div className="flex items-center justify-between mb-3">
+        <div className="bg-[#fcfdfa] border border-[#e2e7df] rounded-2xl p-8 md:p-10 shadow-sm mb-6 relative overflow-hidden">
+          <div className="flex items-center justify-between mb-4">
             <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#c98e20] flex items-center gap-1.5">
-              <Bot size={15} />
+              <Bot size={16} />
               AI Clinical Inquiry · {activeCategory}
             </span>
 
             {/* Live Automated Status Pill */}
             {isProcessing ? (
-              <span className="flex items-center gap-1.5 text-xs text-amber-800 font-semibold bg-amber-100 px-3 py-1 rounded-full animate-pulse">
-                <Sparkles size={13} className="animate-spin" />
+              <span className="flex items-center gap-1.5 text-xs text-amber-800 font-semibold bg-amber-100 px-3.5 py-1.5 rounded-full animate-pulse">
+                <Sparkles size={14} className="animate-spin" />
                 AI is thinking & analyzing...
               </span>
             ) : isSpeakingAi ? (
-              <span className="flex items-center gap-1.5 text-xs text-[#1f5b4e] font-semibold bg-[#1f5b4e]/10 px-3 py-1 rounded-full animate-pulse">
-                <Volume2 size={13} />
+              <span className="flex items-center gap-1.5 text-xs text-[#1f5b4e] font-semibold bg-[#1f5b4e]/10 px-3.5 py-1.5 rounded-full animate-pulse">
+                <Volume2 size={14} />
                 AI Speaking question aloud...
               </span>
             ) : isListening ? (
-              <span className="flex items-center gap-1.5 text-xs text-emerald-800 font-semibold bg-emerald-100 px-3 py-1 rounded-full animate-pulse">
-                <Mic size={13} />
+              <span className="flex items-center gap-1.5 text-xs text-emerald-800 font-semibold bg-emerald-100 px-3.5 py-1.5 rounded-full animate-pulse">
+                <Mic size={14} />
                 Listening to you... Speak freely
               </span>
             ) : null}
           </div>
 
-          <h2 className="text-lg md:text-xl font-semibold text-[#173e35] leading-relaxed mb-4">
+          <h2 className="text-xl md:text-2xl font-semibold text-[#173e35] leading-relaxed mb-6">
             {activeQuestionText}
           </h2>
 
           {/* Audio Waveform Canvas */}
-          <div className="relative w-full h-14 bg-[#173e35]/5 rounded-xl flex items-center justify-center overflow-hidden mb-4 border border-[#e2e7df]">
-            <canvas ref={canvasRef} width={600} height={56} className="w-full h-full" />
+          <div className="relative w-full h-16 bg-[#173e35]/5 rounded-xl flex items-center justify-center overflow-hidden mb-5 border border-[#e2e7df]">
+            <canvas ref={canvasRef} width={720} height={64} className="w-full h-full" />
             {isSpeakingAi && (
               <div className="absolute inset-0 flex items-center justify-center text-xs text-[#173e35] bg-white/60 backdrop-blur-xs font-semibold gap-2">
                 <Waves size={16} className="text-[#c98e20] animate-pulse" />
@@ -769,10 +717,10 @@ export function PatientVoiceChat({
           {/* Live Transcript & Silence Auto-Submit Bar */}
           {isListening && (
             <div className="mb-4">
-              <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-950 text-sm flex items-start gap-2.5">
-                <Mic size={16} className="text-emerald-600 mt-0.5 animate-bounce shrink-0" />
+              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-950 text-base flex items-start gap-3">
+                <Mic size={18} className="text-emerald-600 mt-0.5 animate-bounce shrink-0" />
                 <div className="flex-1">
-                  <p className="font-medium">
+                  <p className="font-medium leading-relaxed">
                     {liveTranscript || 'Listening... Please speak your answer freely.'}
                   </p>
                 </div>
@@ -793,17 +741,17 @@ export function PatientVoiceChat({
 
           {/* Quick Click Answer Chips */}
           <div className="mb-5">
-            <span className="text-xs font-medium text-[#5c726a] mb-2 block">
+            <span className="text-sm font-semibold text-[#4e685f] mb-2.5 block">
               Or Tap Quick Answer Suggestion:
             </span>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2.5">
               {(SUGGESTED_CHIPS[currentLang] || SUGGESTED_CHIPS['English']).map((chip, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleChipClick(chip)}
                   disabled={isProcessing}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#f5f7f4] hover:bg-[#eaf1ec] text-[#173e35] border border-[#dce3da] hover:border-[#1f5b4e] transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-98"
+                  className="px-4 py-2 rounded-xl text-sm font-medium bg-[#f5f7f4] hover:bg-[#eaf1ec] text-[#173e35] border border-[#dce3da] hover:border-[#1f5b4e] transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-98"
                 >
                   {chip}
                 </button>

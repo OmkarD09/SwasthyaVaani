@@ -24,6 +24,7 @@ function Router() {
       <Route path="/clinician/login" component={ClinicianLogin} />
       <Route path="/staff/login" component={ClinicianLogin} />
       <Route path="/doctor/login" component={ClinicianLogin} />
+      <Route path="/doctor/reviewed" component={DoctorPortal} />
       <Route path="/doctor" component={DoctorPortal} />
       <Route path="/doctor/patient/:id/conversation" component={DoctorPatientConversation} />
       <Route path="/doctor/patient/:id/summary" component={DoctorPatientSummary} />

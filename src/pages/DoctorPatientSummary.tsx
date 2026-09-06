@@ -262,7 +262,10 @@ export function DoctorPatientSummary() {
         (cs.severity && cs.severity >= 8)
     ) || redFlags.length > 0;
 
-  const isConfirmed = confirmed || patientDetail.review_status === 'PHYSICIAN_CONFIRMED';
+  const isConfirmed =
+    confirmed ||
+    patientDetail.review_status === 'PHYSICIAN_CONFIRMED' ||
+    patientDetail.review_status === 'REVIEWED';
   const confidencePercent =
     typeof cs.confidence === 'number' ? Math.round(cs.confidence * 100) : null;
   const languageLabel =
@@ -354,7 +357,7 @@ export function DoctorPatientSummary() {
               <div className="flex flex-wrap items-center gap-2">
                 {isConfirmed ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-[#86efac] bg-[#dcfce7] px-3.5 py-1 font-mono text-xs font-extrabold text-[#14532d]">
-                    <CheckCircle2 size={14} className="text-[#16a34a]" /> PHYSICIAN CONFIRMED
+                    <CheckCircle2 size={14} className="text-[#16a34a]" /> REVIEWED
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-[#fcd34d] bg-[#fef9ee] px-3.5 py-1 font-mono text-xs font-extrabold text-[#92400e]">
@@ -368,9 +371,16 @@ export function DoctorPatientSummary() {
                   </span>
                 )}
               </div>
-              <p className="text-xs font-medium text-[#4b6358] font-sans">
-                Last updated: {lastUpdated}
-              </p>
+              {isConfirmed && (patientDetail.reviewed_by || patientDetail.reviewed_at) ? (
+                <p className="text-[11px] font-semibold text-[#14532d] font-sans">
+                  {patientDetail.reviewed_by ? `Reviewed by: ${patientDetail.reviewed_by}` : 'Reviewed by Clinician'}
+                  {patientDetail.reviewed_at ? ` · ${new Intl.DateTimeFormat('en-IN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(patientDetail.reviewed_at))}` : ''}
+                </p>
+              ) : (
+                <p className="text-xs font-medium text-[#4b6358] font-sans">
+                  Last updated: {lastUpdated}
+                </p>
+              )}
             </div>
           </div>
         </div>

@@ -22,6 +22,11 @@ import { getStoredLanguage } from '../lib/kioskState';
 import { buildClinicalSummary } from '../lib/conversationStore';
 import { getStoredDocumentUpload } from '../lib/documentUploadState';
 import { patientApi } from '../services/patientApi';
+import {
+  KioskProgressSidebar,
+  KioskTopProgressBar,
+} from '../components/patient/KioskProgress';
+import { PatientFlowTransition } from '../components/patient/PatientFlowTransition';
 
 export function PatientReviewSummary() {
   const [, setLocation] = useLocation();
@@ -68,72 +73,7 @@ export function PatientReviewSummary() {
   return (
     <main className="kiosk-page">
       <div className="kiosk-layout">
-        {/* Left Progress Sidebar */}
-        <aside className="kiosk-progress">
-          <div className="kiosk-brand">
-            <button
-              className="brand-button"
-              onClick={() => setLocation('/')}
-              aria-label="SwasthyaVaani home"
-            >
-              <Brand light />
-            </button>
-          </div>
-
-          <div className="kiosk-welcome">
-            <span className="eyebrow">{t.intakeEyebrow}</span>
-            <h1>
-              {t.careStartsHere}
-              <br />
-              <em>{t.careStartsHereEm}</em>
-            </h1>
-            <p>{t.careDescription}</p>
-          </div>
-
-          <div className="step-list">
-            <div className="kiosk-step done">
-              <span className="step-icon">
-                <Check size={20} />
-              </span>
-              <span>
-                <b>{t.steps.language.title}</b>
-                <small>{t.steps.language.caption}</small>
-              </span>
-            </div>
-            <div className="kiosk-step done">
-              <span className="step-icon">
-                <Check size={20} />
-              </span>
-              <span>
-                <b>Your Details</b>
-                <small>Personal info</small>
-              </span>
-            </div>
-            <div className="kiosk-step done">
-              <span className="step-icon">
-                <Check size={20} />
-              </span>
-              <span>
-                <b>{t.steps.story.title}</b>
-                <small>{t.steps.story.caption}</small>
-              </span>
-            </div>
-            <div className="kiosk-step current">
-              <span className="step-icon">
-                <FileText size={20} />
-              </span>
-              <span>
-                <b>Review Summary</b>
-                <small>Verify AI intake</small>
-              </span>
-            </div>
-          </div>
-
-          <div className="kiosk-help">
-            <CircleHelp size={18} />
-            <span>{t.needHelp}</span>
-          </div>
-        </aside>
+        <KioskProgressSidebar currentStep={5} t={t} />
 
         {/* Right Main Content */}
         <section className="kiosk-main">
@@ -149,22 +89,18 @@ export function PatientReviewSummary() {
                 <span>Back to Final Review</span>
               </button>
 
-              <div className="kiosk-progress-top" style={{ margin: 0 }}>
-                <span>REVIEW SUMMARY</span>
-                <div>
-                  <i className="filled" />
-                  <i className="filled" />
-                  <i className="filled" />
-                  <i className="filled" />
-                </div>
-                <span className="time-note">
-                  <Clock3 size={14} /> 1 min review
-                </span>
-              </div>
+              <KioskTopProgressBar
+                currentStep={5}
+                t={t}
+                stepSuffix="REVIEW SUMMARY"
+                timeNote="1 min review"
+                className="!m-0"
+              />
             </div>
 
             {/* Review Summary Card */}
-            <div className="kiosk-card review-summary-card">
+            <PatientFlowTransition stepKey="review-summary">
+              <div className="kiosk-card review-summary-card">
               <div className="kiosk-card-heading" style={{ marginTop: 0 }}>
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                   <span className="review-badge-ai">
@@ -305,6 +241,7 @@ export function PatientReviewSummary() {
                 </AppButton>
               </div>
             </div>
+            </PatientFlowTransition>
           </div>
         </section>
       </div>

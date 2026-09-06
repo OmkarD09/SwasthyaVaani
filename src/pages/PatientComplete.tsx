@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { clearStoredDocumentUpload } from '../lib/documentUploadState';
 import { patientApi } from '../services/patientApi';
+import { PatientFlowTransition } from '../components/patient/PatientFlowTransition';
 
 interface SubmissionData {
   patientName: string;
@@ -291,55 +292,56 @@ export function PatientComplete() {
       </header>
 
       {/* Main Content Layout */}
-      <div className="flex-1 max-w-4xl mx-auto w-full p-4 md:p-8 flex flex-col justify-center items-center">
-        <div className="w-full bg-white rounded-3xl shadow-xl border border-[#dce8e4] overflow-hidden">
+      <div className="flex-1 max-w-6xl mx-auto w-full p-4 md:p-8 flex flex-col justify-center items-center">
+        <PatientFlowTransition stepKey="complete">
+          <div className="w-full bg-white rounded-3xl shadow-xl border border-[#dce8e4] overflow-hidden">
           {/* Header Banner with Success Animation */}
-          <div className="bg-gradient-to-br from-[#173e35] to-[#23584c] text-white p-6 md:p-8 text-center relative">
+          <div className="bg-gradient-to-br from-[#173e35] to-[#23584c] text-white p-8 md:p-12 text-center relative">
             <div className="absolute top-4 right-4 text-emerald-200/40">
-              <Sparkles size={32} />
+              <Sparkles size={36} />
             </div>
 
             {/* Success Icon */}
-            <div className="mx-auto w-20 h-20 rounded-full bg-[#eaba61]/20 border-2 border-[#eaba61] flex items-center justify-center text-[#eaba61] mb-4 shadow-lg animate-pulse">
-              <CheckCircle2 size={44} strokeWidth={2.5} className="text-[#eaba61]" />
+            <div className="mx-auto w-24 h-24 rounded-full bg-[#eaba61]/20 border-2 border-[#eaba61] flex items-center justify-center text-[#eaba61] mb-5 shadow-lg animate-pulse">
+              <CheckCircle2 size={52} strokeWidth={2.5} className="text-[#eaba61]" />
             </div>
 
-            <span className="inline-block uppercase tracking-wider text-xs font-mono px-3 py-1 rounded-full bg-[#eaba61]/20 text-[#eaba61] font-semibold mb-2">
-              SUBMISSION CONFIRMED
+            <span className="inline-block uppercase tracking-wider text-xs font-mono px-3.5 py-1.5 rounded-full bg-[#eaba61]/20 text-[#eaba61] font-semibold mb-3">
+              SUBMISSION CONFIRMED · READY FOR DOCTOR
             </span>
 
-            <h1 className="text-2xl md:text-3xl font-serif font-bold text-white mb-2">
+            <h1 className="text-3xl md:text-4xl font-serif font-bold text-white mb-3">
               {t.heading}
             </h1>
-            <p className="text-emerald-100/90 text-sm md:text-base max-w-xl mx-auto leading-relaxed">
+            <p className="text-emerald-100/90 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
               {t.subheading}
             </p>
           </div>
 
-          <div className="p-6 md:p-8 space-y-6">
+          <div className="p-8 md:p-10 space-y-8">
             {/* Prominent Queue Token Card */}
-            <div className="bg-gradient-to-r from-[#fff9eb] to-[#fef6e2] border-2 border-[#eaba61]/60 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-[#eaba61] text-[#173e35] flex items-center justify-center shadow-inner shrink-0">
-                  <Ticket size={30} strokeWidth={2.2} />
+            <div className="bg-gradient-to-r from-[#fff9eb] to-[#fef6e2] border-2 border-[#eaba61]/60 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 rounded-2xl bg-[#eaba61] text-[#173e35] flex items-center justify-center shadow-inner shrink-0">
+                  <Ticket size={34} strokeWidth={2.2} />
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-wider font-mono font-bold text-[#8c6214]">
                     {t.tokenLabel}
                   </div>
-                  <div className="text-3xl md:text-4xl font-extrabold text-[#173e35] tracking-tight font-mono">
+                  <div className="text-4xl md:text-5xl font-extrabold text-[#173e35] tracking-tight font-mono mt-1">
                     {submission.token}
                   </div>
                 </div>
               </div>
 
-              <div className="text-xs text-[#6e5420] text-center sm:text-right max-w-xs leading-relaxed">
+              <div className="text-sm text-[#6e5420] text-center sm:text-right max-w-sm leading-relaxed">
                 {t.tokenHelp}
               </div>
             </div>
 
             {/* Summary Details Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
               {/* Patient Name */}
               <div className="p-4 rounded-xl bg-[#f8faf9] border border-[#e4edea]">
                 <div className="flex items-center gap-2 text-xs font-mono uppercase text-[#5a776e] mb-1">
@@ -517,7 +519,8 @@ export function PatientComplete() {
             </div>
           </div>
         </div>
-      </div>
+      </PatientFlowTransition>
+    </div>
 
       {/* Submitted Summary Modal */}
       {showSummaryModal && (

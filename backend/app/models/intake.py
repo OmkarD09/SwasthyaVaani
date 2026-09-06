@@ -30,6 +30,11 @@ class IntakeSession(Base):
     submitted_at = Column(DateTime, nullable=True, index=True)
     completed_at = Column(DateTime, nullable=True)
 
+    # Review status lifecycle: PENDING_REVIEW -> REVIEWED
+    review_status = Column(String, default="PENDING_REVIEW", nullable=False, index=True)
+    reviewed_by = Column(String, ForeignKey("doctors.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+
     # Relationships
     questions = relationship("QuestionEvent", back_populates="intake_session", cascade="all, delete-orphan")
     answers = relationship("Answer", back_populates="intake_session", cascade="all, delete-orphan")

@@ -1,6 +1,7 @@
+import re
 from datetime import datetime, timezone
 from typing import List, Optional, Any, Dict, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Provenance(BaseModel):
@@ -102,6 +103,26 @@ class ClinicalState(BaseModel):
     medications: List[Medication] = Field(default_factory=list)
     allergies: List[str] = Field(default_factory=list)
     investigations: List[Investigation] = Field(default_factory=list)
+    medical_history: Optional[str] = None
+
+    @field_validator("severity", mode="before")
+    @classmethod
+    def parse_severity(cls, v: Any) -> Optional[int]:
+        if v is None or v == "":
+            return None
+        if isinstance(v, (int, float)):
+            return max(1, min(10, int(v)))
+        v_str = str(v).strip().lower()
+        match = re.search(r'\b([1-9]|10)\b', v_str)
+        if match:
+            return int(match.group(1))
+        if "mild" in v_str:
+            return 3
+        if "moderate" in v_str:
+            return 5
+        if "severe" in v_str or "high" in v_str:
+            return 8
+        return None
 
     # Canonical Dimension Tracking (Source of Truth for Candidate Generation)
     canonical_dimensions: Dict[str, CanonicalDimensionState] = Field(default_factory=dict)

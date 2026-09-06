@@ -8,14 +8,17 @@ export type DoctorQueueItem = {
   chief_complaint: string;
   language_code: string;
   workflow_type: string;
-  status: 'WAITING' | 'HISTORY_READY' | 'PRIORITY_REVIEW' | 'IN_REVIEW' | 'CONFIRMED';
-  status_tone: 'teal' | 'amber' | 'red';
+  status: 'WAITING' | 'HISTORY_READY' | 'PRIORITY_REVIEW' | 'IN_REVIEW' | 'CONFIRMED' | 'REVIEWED';
+  status_tone: 'teal' | 'amber' | 'red' | 'emerald';
   priority: 'Priority' | 'Routine';
   has_red_flags: boolean;
   submitted_at: string;
   wait_time_minutes: number;
   abha_id?: string | null;
   abha_status?: string | null;
+  review_status?: string;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
 };
 
 export type PatientDetail = {
@@ -36,7 +39,9 @@ export type PatientDetail = {
   workflow_type: string;
   language_code: string;
   status: string;
-  review_status: 'AI_DRAFT' | 'NEEDS_VERIFICATION' | 'PHYSICIAN_CONFIRMED';
+  review_status: 'AI_DRAFT' | 'NEEDS_VERIFICATION' | 'PHYSICIAN_CONFIRMED' | 'REVIEWED' | 'PENDING_REVIEW';
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
   clinical_state: {
     chief_complaint?: string;
     symptoms?: string[];
