@@ -9,16 +9,19 @@ from app.schemas.question import QuestionDecision
 
 class IntakeCreateRequest(BaseModel):
     patient_id: str | None = None
-    patient_name: str = "Demo Patient"
-    patient_age: int | None = 35
-    patient_gender: str | None = "Other"
+    patient_name: str | None = "Patient"
+    patient_age: int | None = None
+    patient_gender: str | None = None
+    phone: str | None = None
+    date_of_birth: str | None = None
+    abha_id: str | None = None
+    abha_address: str | None = None
+    consent_given: bool = False
     hospital_id: str = "hosp_district_01"
     doctor_id: str = "doc_001"
     workflow_type: Literal["GENERAL_CLINICAL", "AYUSH"] = "GENERAL_CLINICAL"
     language_code: str = "en"
     interaction_mode: Literal["VOICE", "TEXT", "TOUCH", "MIXED"] = "VOICE"
-    consent_given: bool = True
-    abha_id: str | None = None
 
 
 class AnswerSubmitRequest(BaseModel):
@@ -73,6 +76,12 @@ class IntakeSessionDetail(BaseModel):
     patient_name: str
     patient_age: int | None = None
     patient_gender: str | None = None
+    phone: str | None = None
+    date_of_birth: str | None = None
+    abha_id: str | None = None
+    abha_address: str | None = None
+    abha_status: str = "UNVERIFIED"
+    consent_recorded: bool = False
     hospital_id: str
     doctor_id: str
     workflow_type: str

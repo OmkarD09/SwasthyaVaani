@@ -331,6 +331,20 @@ export function DoctorPatientSummary() {
                   {patientDetail.patient_gender ? <span>{patientDetail.patient_gender}</span> : null}
                   {patientDetail.patient_gender && <span>•</span>}
                   <span className="font-mono font-bold text-[#14532d]">ID: {patientDetail.patient_id}</span>
+                  {patientDetail.phone && (
+                    <>
+                      <span>•</span>
+                      <span>Phone: {patientDetail.phone}</span>
+                    </>
+                  )}
+                  {patientDetail.abha_id && (
+                    <>
+                      <span>•</span>
+                      <span className="font-mono bg-[#f0fdf4] text-[#166534] border border-[#bbf7d0] px-2 py-0.5 rounded text-[11px] font-bold">
+                        ABHA: {patientDetail.abha_id} (QR Data)
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
