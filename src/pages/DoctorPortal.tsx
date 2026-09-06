@@ -473,6 +473,15 @@ function sortPatientQueue(patients: any[]): any[] {
   });
 }
 
+function formatWaitDisplay(waitMinutes?: number): string {
+  const mins = Math.max(0, Math.round(waitMinutes || 0));
+  if (mins === 0) return '< 1 min';
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
+}
+
 function formatQueueItems(data: any[]): any[] {
   const colors = ['coral', 'amber', 'mint', 'blue', 'lavender'];
   const langNames: Record<string, string> = {
@@ -497,13 +506,14 @@ function formatQueueItems(data: any[]): any[] {
       item.display_id ||
       item.patient_display_id ||
       (item.patient_id && /^P\d+$/.test(item.patient_id) ? item.patient_id : null) ||
-      item.token ||
       `P${String(idx + 1).padStart(3, '0')}`;
 
+    const waitMins = item.wait_time_minutes || 0;
+
     return {
-      id: displayId,
-      display_id: item.display_id || item.patient_display_id || displayId,
-      patient_display_id: item.patient_display_id || item.display_id || displayId,
+      id: item.intake_session_id || displayId || `item-${idx}`,
+      display_id: displayId,
+      patient_display_id: item.patient_display_id || displayId,
       token: item.token,
       intake_session_id: item.intake_session_id,
       patient_id: item.patient_id,
@@ -512,12 +522,13 @@ function formatQueueItems(data: any[]): any[] {
       gender: item.patient_gender || 'Not recorded',
       lang: langNames[item.language_code] || item.language_code || 'Language unavailable',
       reason: item.chief_complaint || 'Chief complaint not recorded',
-      wait: `${String(item.wait_time_minutes || 0).padStart(2, '0')} min`,
-      wait_time_minutes: item.wait_time_minutes || 0,
-      priority: item.priority || 'Routine',
+      wait: formatWaitDisplay(waitMins),
+      wait_time_minutes: waitMins,
+      priority: item.priority || (item.has_red_flags ? 'Priority' : 'Routine'),
       initials: initials,
       color: colors[idx % colors.length],
       has_red_flags: Boolean(item.has_red_flags),
+      documents_count: item.documents_count || 0,
       status: item.status,
       review_status: item.review_status,
       reviewed_by: item.reviewed_by,
@@ -544,8 +555,10 @@ export function DoctorPortal() {
   useEffect(() => {
     const isReviewed = location.startsWith('/doctor/reviewed') || location.includes('/reviewed');
     const targetTab = isReviewed ? 'reviewed' : 'live';
-    setActiveTab(targetTab);
-  }, [location]);
+    if (activeTab !== targetTab) {
+      setActiveTab(targetTab);
+    }
+  }, [location, activeTab]);
 
   const viewMode = activeTab;
 
@@ -594,10 +607,6 @@ export function DoctorPortal() {
     const timer = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    setSelected(0);
-  }, [viewMode]);
 
   const getRelativeUpdatedText = () => {
     const seconds = Math.floor((now - lastUpdated.getTime()) / 1000);
@@ -665,12 +674,21 @@ export function DoctorPortal() {
   const handleSwitchTab = (tab: 'live' | 'reviewed') => {
     setActiveTab(tab);
     setSelected(0);
+    setSearchQuery('');
+    setStatFilter('all');
     const targetPath = tab === 'reviewed' ? '/doctor/reviewed' : '/doctor';
     if (location !== targetPath) {
       setLocation(targetPath);
     }
     fetchQueues(false);
   };
+
+  // Immediate sync and refetch whenever active tab changes
+  useEffect(() => {
+    setSelected(0);
+    setSearchQuery('');
+    fetchQueues(false);
+  }, [activeTab]);
 
   useEffect(() => {
     fetchQueues();
@@ -821,9 +839,7 @@ export function DoctorPortal() {
         activeLiveQueue.length
       )
       : 0;
-  const reviewedCount = activeReviewedQueue.filter((item) =>
-    isTodayLocal(item.reviewed_at || item.submitted_at)
-  ).length;
+  const reviewedCount = activeReviewedQueue.length;
 
   const patient = filteredQueue.length > 0
     ? filteredQueue[Math.min(selected, filteredQueue.length - 1)]
@@ -1187,20 +1203,21 @@ export function DoctorPortal() {
                       <button
                         type="button"
                         className={`queue-row ${selected === index ? 'selected' : ''}`}
-                        key={item.id || item.intake_session_id || index}
+                        key={item.intake_session_id || item.token || item.id || index}
                         onClick={() => {
                           setSelected(index);
                           setLocation(`/doctor/patient/${patientId}`);
                         }}
                         onMouseEnter={() => setSelected(index)}
                         title={`Open clinical record for ${item.name}`}
-                        aria-label={`Open clinical record for ${item.name} (${item.id})`}
+                        aria-label={`Open clinical record for ${item.name} (${item.display_id || item.id})`}
                       >
                         <div className={`queue-avatar ${item.color || 'coral'}`}>{item.initials}</div>
                         <div className="queue-patient">
                           <b>{item.name}</b>
                           <span>
-                            {item.id} · {item.age}
+                            {item.display_id || item.id}
+                            {item.token ? ` · Token ${item.token}` : ''} · {item.age}
                           </span>
                         </div>
                         <div className="queue-reason">
@@ -1348,7 +1365,8 @@ export function DoctorPortal() {
                     <div>
                       <h3>{patient.name}</h3>
                       <span>
-                        {patient.id} · {patient.age} · {patient.lang}
+                        {patient.display_id || patient.id}
+                        {patient.token ? ` · Token ${patient.token}` : ''} · {patient.age} · {patient.lang}
                       </span>
                     </div>
                     {viewMode === 'reviewed' ? (
@@ -1394,9 +1412,13 @@ export function DoctorPortal() {
                   </div>
                   <div className="summary-block">
                     <span className="summary-block-label">
-                      ATTACHMENTS <small>0</small>
+                      ATTACHMENTS <small>{patient.documents_count || 0}</small>
                     </span>
-                    <p>Document metadata is not available in the current doctor API contract.</p>
+                    <p>
+                      {(patient.documents_count || 0) > 0
+                        ? `${patient.documents_count} medical document(s) uploaded and extracted for this patient.`
+                        : 'No previous prescription or lab report attachments uploaded.'}
+                    </p>
                   </div>
                   <div className="summary-actions">
                     <AppButton

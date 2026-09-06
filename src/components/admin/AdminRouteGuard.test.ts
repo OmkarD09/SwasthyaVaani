@@ -5,7 +5,7 @@ import {
   clearClinicianSession,
   getClinicianSession,
   type ClinicianSession,
-} from '../../lib/clinicianAuth';
+} from '../../lib/clinicianAuth.ts';
 
 // Mock localStorage and sessionStorage
 const storage: Record<string, string> = {};

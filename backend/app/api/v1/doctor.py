@@ -65,7 +65,7 @@ def get_doctor_queue(
     if doctor_id:
         query = query.filter(IntakeSession.doctor_id == doctor_id)
         
-    sessions = query.order_by(IntakeSession.started_at.desc()).all()
+    sessions = query.order_by(IntakeSession.submitted_at.asc(), IntakeSession.started_at.asc()).all()
     if not sessions:
         return []
 
@@ -95,6 +95,17 @@ def get_doctor_queue(
     for ans in all_answers:
         if ans.intake_session_id not in answers_map:
             answers_map[ans.intake_session_id] = ans
+
+    # 4. Batch fetch document counts in single query
+    doc_records = db.query(DocumentModel.intake_session_id, DocumentModel.patient_id).filter(
+        (DocumentModel.intake_session_id.in_(session_ids)) | (DocumentModel.patient_id.in_(patient_ids))
+    ).all()
+    doc_counts: dict[str, int] = {}
+    for d_sess_id, d_pat_id in doc_records:
+        if d_sess_id:
+            doc_counts[d_sess_id] = doc_counts.get(d_sess_id, 0) + 1
+        elif d_pat_id:
+            doc_counts[d_pat_id] = doc_counts.get(d_pat_id, 0) + 1
 
     now_utc = datetime.now(timezone.utc)
     queue_items: list[DoctorQueueItem] = []
@@ -139,6 +150,8 @@ def get_doctor_queue(
             except Exception:
                 db.rollback()
 
+        session_doc_count = doc_counts.get(s.id, doc_counts.get(s.patient_id or "", 0))
+
         queue_items.append(
             DoctorQueueItem(
                 intake_session_id=s.id,
@@ -160,6 +173,7 @@ def get_doctor_queue(
                 wait_time_minutes=wait_mins,
                 abha_id=patient.abha_id if patient else None,
                 abha_status=patient.abha_status if patient else None,
+                documents_count=session_doc_count,
                 review_status=s.review_status or "PENDING_REVIEW",
                 reviewed_by=s.reviewed_by,
                 reviewed_at=s.reviewed_at,
@@ -223,6 +237,17 @@ def get_reviewed_patients(
         if ans.intake_session_id not in answers_map:
             answers_map[ans.intake_session_id] = ans
 
+    # 5. Batch fetch document counts in single query
+    doc_records = db.query(DocumentModel.intake_session_id, DocumentModel.patient_id).filter(
+        (DocumentModel.intake_session_id.in_(session_ids)) | (DocumentModel.patient_id.in_(patient_ids))
+    ).all()
+    doc_counts: dict[str, int] = {}
+    for d_sess_id, d_pat_id in doc_records:
+        if d_sess_id:
+            doc_counts[d_sess_id] = doc_counts.get(d_sess_id, 0) + 1
+        elif d_pat_id:
+            doc_counts[d_pat_id] = doc_counts.get(d_pat_id, 0) + 1
+
     now_utc = datetime.now(timezone.utc)
     queue_items: list[DoctorQueueItem] = []
 
@@ -261,6 +286,8 @@ def get_reviewed_patients(
             except Exception:
                 db.rollback()
 
+        session_doc_count = doc_counts.get(s.id, doc_counts.get(s.patient_id or "", 0))
+
         queue_items.append(
             DoctorQueueItem(
                 intake_session_id=s.id,
@@ -282,6 +309,7 @@ def get_reviewed_patients(
                 wait_time_minutes=0,
                 abha_id=patient.abha_id if patient else None,
                 abha_status=patient.abha_status if patient else None,
+                documents_count=session_doc_count,
                 review_status="REVIEWED",
                 reviewed_by=reviewer_name,
                 reviewed_at=s.reviewed_at,

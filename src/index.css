@@ -3611,6 +3611,7 @@ h2 em,
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .kiosk-progress-top i::after,
   .kiosk-step,
   .step-icon {
