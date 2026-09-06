@@ -1,3 +1,4 @@
+import json
 import re
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
@@ -61,10 +62,12 @@ SYSTEM_INSTRUCTION = """You extract untrusted candidates from OCR evidence only.
 Extract only facts explicitly stated in the supplied blocks. Never diagnose, prescribe,
 infer diseases, calculate lab interpretations, or add unsupported medical details.
 Preserve missing information as null. Every candidate must cite one or more supplied
-evidence IDs that support every populated field. Preserve source-backed string values
-exactly as written in OCR evidence: do not normalize, reformat, translate, or infer
-numeric date ordering. For example, keep 01-09-2026 as 01-09-2026, never 2026-09-01.
-Return schema-valid structured output only. Every result is a candidate
+evidence IDs that support every populated field. When an entity or instruction spans
+across multiple consecutive lines or blocks (such as a medicine name on one line and
+strength/frequency on the next), cite ALL relevant evidence IDs in source_evidence.
+Preserve source-backed string values exactly as written in OCR evidence: do not normalize,
+reformat, translate, or infer numeric date ordering. For example, keep 01-09-2026 as 01-09-2026,
+never 2026-09-01. Return schema-valid structured output only. Every result is a candidate
 requiring physician review; never mark anything confirmed or processed. Do not provide
 reasoning or chain-of-thought."""
 
@@ -92,8 +95,12 @@ def validate_candidate_evidence(
             raise DocumentCandidateValidationError(
                 "Candidate referenced evidence outside the supplied OCR run"
             )
+        sorted_reference_ids = sorted(
+            reference_ids,
+            key=lambda rid: getattr(evidence[rid], "block_index", 0),
+        )
         supporting_text = _normalized(
-            " ".join(evidence[reference_id].text for reference_id in reference_ids)
+            " ".join(evidence[reference_id].text for reference_id in sorted_reference_ids)
         )
         for value in _candidate_values(candidate):
             if _normalized(value) not in supporting_text:
@@ -118,7 +125,7 @@ class GeminiDocumentExtractor(AbstractDocumentExtractor):
                 "Gemini document extraction requires KUNAL_GEMINI_API_KEY"
             )
         self.model_name = model_name
-        self._api_key = api_key
+        self._api_key = api_key.strip().strip("<>").strip()
         self._transport = transport or self._google_transport
 
     async def _google_transport(
@@ -155,7 +162,7 @@ class GeminiDocumentExtractor(AbstractDocumentExtractor):
     async def extract_candidates(
         self, extraction_input: DocumentExtractionInput
     ) -> DocumentCandidateExtractionResult:
-        contents = extraction_input.model_dump_json(exclude_none=False)
+        contents = serialize_extraction_input_for_llm(extraction_input)
         try:
             payload = await self._transport(
                 SYSTEM_INSTRUCTION, contents, DocumentCandidateExtractionResult
@@ -240,10 +247,11 @@ class GroqDocumentExtractor(AbstractDocumentExtractor):
     async def extract_candidates(
         self, extraction_input: DocumentExtractionInput
     ) -> DocumentCandidateExtractionResult:
+        contents = serialize_extraction_input_for_llm(extraction_input)
         try:
             payload = await self._transport(
                 SYSTEM_INSTRUCTION,
-                extraction_input.model_dump_json(exclude_none=False),
+                contents,
                 DocumentCandidateExtractionResult,
             )
             result = (
@@ -263,6 +271,23 @@ class GroqDocumentExtractor(AbstractDocumentExtractor):
             ) from exc
         validate_candidate_evidence(extraction_input, result)
         return result
+
+
+def serialize_extraction_input_for_llm(extraction_input: DocumentExtractionInput) -> str:
+    """Serialize minimal payload for semantic extraction without coordinates or duplicate text."""
+    payload = {
+        "document_type_hint": extraction_input.document_type_hint,
+        "file_name": extraction_input.file_name,
+        "evidence_blocks": [
+            {
+                "evidence_id": block.evidence_id,
+                "page": block.page_number,
+                "text": block.text,
+            }
+            for block in extraction_input.evidence_blocks
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def get_document_extractor(
@@ -318,7 +343,7 @@ def build_document_extraction_input(
                 text=block.text,
                 ocr_confidence=block.confidence,
                 page_number=block.page_number,
-                bounding_box=block.bounding_box_json,
+                bounding_box=None,
                 provider_name=run.provider_name,
                 provider_version=run.provider_version,
                 processed_at=run.created_at,

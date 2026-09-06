@@ -15,6 +15,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.security import HTTPAuthorizationCredentials
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -39,6 +40,8 @@ from app.schemas.document import (
 )
 from app.services.document_extraction import (
     DocumentCandidateValidationError,
+    DocumentExtractorConfigurationError,
+    DocumentExtractorProviderError,
     build_document_extraction_input,
     extract_and_persist_candidates,
     get_configured_document_extractor,
@@ -58,6 +61,7 @@ from app.services.providers.ocr_provider import (
     MockOCRProvider,
     OCRInferenceError,
     OCRProviderConfigurationError,
+    OCRUnsupportedDocumentError,
 )
 
 logger = logging.getLogger(__name__)
@@ -395,6 +399,12 @@ async def run_document_processing(
         file_bytes = load_private_file(doc.storage_object_id)
         result = await ocr.process_document(file_bytes, doc.file_name, doc.mime_type)
 
+        try:
+            db.execute(text("SELECT 1"))
+        except Exception:
+            db.rollback()
+            doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+
         ocr_run = replace_ocr_evidence(db, doc, result)
         db.commit()
 
@@ -447,11 +457,19 @@ async def run_document_processing(
         doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
         if doc:
             doc.status = "PROCESSING_FAILED"
-            doc.failure_code = (
-                "OCR_SERVICE_UNAVAILABLE"
-                if isinstance(exc, (OCRProviderConfigurationError, OCRInferenceError))
-                else type(exc).__name__
-            )
+            err_msg = str(exc).lower()
+            if isinstance(exc, (OCRProviderConfigurationError, OCRInferenceError, OCRUnsupportedDocumentError)):
+                doc.failure_code = "OCR_FAILED"
+            elif "413" in str(exc) or "rate_limit" in err_msg or "too large" in err_msg or "tokens per minute" in err_msg:
+                doc.failure_code = "EXTRACTION_RATE_LIMITED"
+            elif isinstance(exc, DocumentCandidateValidationError):
+                doc.failure_code = "VALIDATION_FAILED"
+            elif isinstance(exc, DocumentExtractorConfigurationError):
+                doc.failure_code = "EXTRACTOR_CONFIG_ERROR"
+            elif isinstance(exc, DocumentExtractorProviderError):
+                doc.failure_code = "EXTRACTION_FAILED"
+            else:
+                doc.failure_code = type(exc).__name__
             doc.processed_at = datetime.now(timezone.utc)
             db.commit()
         logger.exception("Failed processing document %s", document_id)

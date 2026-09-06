@@ -40,6 +40,22 @@ import { usePatientRecord } from '../hooks/usePatientRecord';
 import { PatientRecordShell } from '../components/doctor/PatientRecordShell';
 import { authorizedClinicianFetch, getClinicianAccessToken } from '../lib/clinicianAuth';
 
+function getFailureBadge(code?: string): string {
+  switch (code) {
+    case 'EXTRACTION_RATE_LIMITED':
+      return 'Rate-Limited';
+    case 'VALIDATION_FAILED':
+      return 'Validation Incomplete';
+    case 'EXTRACTION_FAILED':
+      return 'Extraction Failed';
+    case 'OCR_FAILED':
+    case 'OCR_SERVICE_UNAVAILABLE':
+      return 'OCR Failed';
+    default:
+      return 'Processing Incomplete';
+  }
+}
+
 export function DoctorPatientSummary() {
   const params = useParams<{ id: string }>();
   const patientId = params?.id || '';
@@ -614,7 +630,7 @@ export function DoctorPatientSummary() {
                                 )}
                                 {isFailed && (
                                   <span className="inline-flex items-center gap-1 rounded bg-[#fee2e2] px-1.5 py-0.2 font-mono font-bold text-[#b91c1c] border border-[#fecaca]">
-                                    <AlertTriangle size={10} /> OCR Failed
+                                    <AlertTriangle size={10} /> {getFailureBadge(doc.failure_code)}
                                   </span>
                                 )}
                               </div>
