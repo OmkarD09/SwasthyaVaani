@@ -1,4 +1,5 @@
 // SwasthyaVaani - Hospital Admin & QA API Client
+import { authorizedClinicianFetch } from '../lib/clinicianAuth';
 
 const API_BASE = '/api/v1/admin';
 
@@ -295,7 +296,7 @@ const MOCK_AI_MONITORING: AIMonitoringSummary = {
 
 export async function fetchAdminStats(): Promise<AdminDashboardStats> {
   try {
-    const res = await fetch(`${API_BASE}/stats`);
+    const res = await authorizedClinicianFetch(`${API_BASE}/stats`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -306,7 +307,7 @@ export async function fetchAdminStats(): Promise<AdminDashboardStats> {
 
 export async function fetchAIMonitoring(): Promise<AIMonitoringSummary> {
   try {
-    const res = await fetch(`${API_BASE}/ai-monitoring`);
+    const res = await authorizedClinicianFetch(`${API_BASE}/ai-monitoring`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -317,7 +318,7 @@ export async function fetchAIMonitoring(): Promise<AIMonitoringSummary> {
 
 export async function fetchEmergencyCases(priority = 'ALL'): Promise<EmergencyCaseItem[]> {
   try {
-    const res = await fetch(`${API_BASE}/emergency-cases?priority=${encodeURIComponent(priority)}`);
+    const res = await authorizedClinicianFetch(`${API_BASE}/emergency-cases?priority=${encodeURIComponent(priority)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -359,7 +360,7 @@ export async function fetchAuditLogs(params?: {
     if (params?.actor_role) query.set('actor_role', params.actor_role);
     if (params?.search) query.set('search', params.search);
 
-    const res = await fetch(`${API_BASE}/audit?${query.toString()}`);
+    const res = await authorizedClinicianFetch(`${API_BASE}/audit?${query.toString()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -398,7 +399,7 @@ export async function fetchAuditLogs(params?: {
 
 export async function fetchDoctors(): Promise<DoctorProfile[]> {
   try {
-    const res = await fetch(`${API_BASE}/doctors`);
+    const res = await authorizedClinicianFetch(`${API_BASE}/doctors`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -452,7 +453,7 @@ export async function onboardDoctor(payload: {
   contact?: string;
   working_hours?: string;
 }): Promise<DoctorProfile> {
-  const res = await fetch(`${API_BASE}/doctors`, {
+  const res = await authorizedClinicianFetch(`${API_BASE}/doctors`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -462,7 +463,7 @@ export async function onboardDoctor(payload: {
 }
 
 export async function updateDoctorStatus(doctorId: string, is_active: boolean): Promise<DoctorProfile> {
-  const res = await fetch(`${API_BASE}/doctors/${doctorId}`, {
+  const res = await authorizedClinicianFetch(`${API_BASE}/doctors/${doctorId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ is_active })
@@ -473,7 +474,7 @@ export async function updateDoctorStatus(doctorId: string, is_active: boolean): 
 
 export async function fetchDepartments(): Promise<DepartmentItem[]> {
   try {
-    const res = await fetch(`${API_BASE}/departments`);
+    const res = await authorizedClinicianFetch(`${API_BASE}/departments`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -489,7 +490,7 @@ export async function fetchDepartments(): Promise<DepartmentItem[]> {
 }
 
 export async function createDepartment(payload: { name: string; code: string }): Promise<DepartmentItem> {
-  const res = await fetch(`${API_BASE}/departments`, {
+  const res = await authorizedClinicianFetch(`${API_BASE}/departments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -500,7 +501,7 @@ export async function createDepartment(payload: { name: string; code: string }):
 
 export async function fetchStaffUsers(): Promise<StaffUserItem[]> {
   try {
-    const res = await fetch(`${API_BASE}/users`);
+    const res = await authorizedClinicianFetch(`${API_BASE}/users`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -522,7 +523,7 @@ export async function createStaffUser(payload: {
   role: string;
   phone?: string;
 }): Promise<StaffUserItem> {
-  const res = await fetch(`${API_BASE}/users`, {
+  const res = await authorizedClinicianFetch(`${API_BASE}/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -532,7 +533,7 @@ export async function createStaffUser(payload: {
 }
 
 export async function updateStaffRole(userId: string, role: string, is_active?: boolean): Promise<StaffUserItem> {
-  const res = await fetch(`${API_BASE}/users/${userId}/role`, {
+  const res = await authorizedClinicianFetch(`${API_BASE}/users/${userId}/role`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role, is_active })
@@ -542,7 +543,7 @@ export async function updateStaffRole(userId: string, role: string, is_active?: 
 }
 
 export async function loadDemoScenario(token: string): Promise<{ status: string; message: string; scenario: string }> {
-  const res = await fetch(`${API_BASE}/seed/scenario/${encodeURIComponent(token)}`, {
+  const res = await authorizedClinicianFetch(`${API_BASE}/seed/scenario/${encodeURIComponent(token)}`, {
     method: 'POST'
   });
   if (!res.ok) throw new Error(await res.text());
@@ -550,7 +551,7 @@ export async function loadDemoScenario(token: string): Promise<{ status: string;
 }
 
 export async function resetDemoState(): Promise<{ status: string; message: string }> {
-  const res = await fetch(`${API_BASE}/seed/reset`, {
+  const res = await authorizedClinicianFetch(`${API_BASE}/seed/reset`, {
     method: 'POST'
   });
   if (!res.ok) throw new Error(await res.text());
@@ -558,7 +559,7 @@ export async function resetDemoState(): Promise<{ status: string; message: strin
 }
 
 export async function runQARegressionTests(): Promise<QATestRunResult> {
-  const res = await fetch(`${API_BASE}/qa/run-tests`, {
+  const res = await authorizedClinicianFetch(`${API_BASE}/qa/run-tests`, {
     method: 'POST'
   });
   if (!res.ok) throw new Error(await res.text());
@@ -567,7 +568,7 @@ export async function runQARegressionTests(): Promise<QATestRunResult> {
 
 export async function fetchServiceStatus(): Promise<ServiceHealthStatus> {
   try {
-    const res = await fetch(`${API_BASE}/services/status`);
+    const res = await authorizedClinicianFetch(`${API_BASE}/services/status`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {

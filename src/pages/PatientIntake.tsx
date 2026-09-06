@@ -46,6 +46,7 @@ import {
   getStoredDocumentUpload,
   storeDocumentUpload,
 } from '../lib/documentUploadState';
+import { getStoredConsent, hasValidConsent } from '../lib/consentStore';
 import { getStoredPatientProfile } from '../services/patientApi';
 
 function getStoredPatientIdentity(): { name: string; age: string } {
@@ -520,6 +521,8 @@ export function PatientIntake() {
                             category: m.category,
                           }));
 
+                          const audioConsent = getStoredConsent();
+
                           const createRes = await fetch('/api/v1/intakes', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -535,6 +538,10 @@ export function PatientIntake() {
                               workflow_type: 'GENERAL_CLINICAL',
                               interaction_mode: mode.toUpperCase(),
                               consent_given: true,
+                              consent_language: audioConsent?.consent_language || (langCode === 'hi' ? 'हिन्दी' : langCode === 'mr' ? 'मराठी' : 'English'),
+                              consent_timestamp: audioConsent?.consent_timestamp || new Date().toISOString(),
+                              consent_method: audioConsent?.consent_method || 'AUDIO_GUIDED',
+                              consent_version: audioConsent?.consent_version || 'v1.0',
                               chief_complaint: summary.chiefConcern,
                               symptoms: summary.symptoms.length > 0 ? summary.symptoms : [summary.chiefConcern],
                               duration: summary.duration,

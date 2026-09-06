@@ -88,6 +88,21 @@ export function usePatientRecord(patientId: string | undefined): PatientRecordSt
         const data = await res.json();
         setFhirId(data.fhir_bundle_id);
         setConfirmed(true);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('swasthyavaani-patient-reviewed', {
+              detail: {
+                intake_session_id: patientDetail.intake_session_id,
+                patient_id: patientDetail.patient_id,
+                token: patientDetail.token,
+                display_id: patientDetail.display_id || patientDetail.patient_display_id,
+                name: patientDetail.patient_name,
+                reviewed_at: data.reviewed_at || new Date().toISOString(),
+                reviewed_by: data.reviewed_by,
+              },
+            })
+          );
+        }
         await loadDetail(false);
         return true;
       }

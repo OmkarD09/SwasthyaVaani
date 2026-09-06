@@ -15,16 +15,28 @@ import { DoctorPatientAyush } from './pages/DoctorPatientAyush';
 import { DoctorPatientHistory } from './pages/DoctorPatientHistory';
 import { DoctorPortal } from './pages/DoctorPortal';
 import { HospitalOperations } from './pages/HospitalOperations';
+import { AdminRouteGuard } from './components/admin/AdminRouteGuard';
 import NotFound from './pages/not-found';
 import { Toaster } from './components/ui/toaster';
+
+function ProtectedAdmin() {
+  return (
+    <AdminRouteGuard>
+      <HospitalOperations />
+    </AdminRouteGuard>
+  );
+}
 
 function Router() {
   return (
     <Switch>
-      {/* Staff & Clinician Portal */}
+      {/* Staff, Clinician & Admin Portal Login */}
+      <Route path="/admin/login" component={ClinicianLogin} />
       <Route path="/clinician/login" component={ClinicianLogin} />
       <Route path="/staff/login" component={ClinicianLogin} />
       <Route path="/doctor/login" component={ClinicianLogin} />
+
+      {/* Doctor Workstation */}
       <Route path="/doctor/reviewed" component={DoctorPortal} />
       <Route path="/doctor" component={DoctorPortal} />
       <Route path="/doctor/patient/:id/history" component={DoctorPatientHistory} />
@@ -32,13 +44,15 @@ function Router() {
       <Route path="/doctor/patient/:id/summary" component={DoctorPatientSummary} />
       <Route path="/doctor/patient/:id/ayush" component={DoctorPatientAyush} />
       <Route path="/doctor/patient/:id" component={DoctorPatientReview} />
-      <Route path="/admin" component={HospitalOperations} />
-      <Route path="/admin/dashboard" component={HospitalOperations} />
-      <Route path="/admin/ai-monitoring" component={HospitalOperations} />
-      <Route path="/admin/emergency" component={HospitalOperations} />
-      <Route path="/admin/audit" component={HospitalOperations} />
-      <Route path="/admin/onboarding" component={HospitalOperations} />
-      <Route path="/admin/qa" component={HospitalOperations} />
+
+      {/* Protected Admin Routes */}
+      <Route path="/admin" component={ProtectedAdmin} />
+      <Route path="/admin/dashboard" component={ProtectedAdmin} />
+      <Route path="/admin/ai-monitoring" component={ProtectedAdmin} />
+      <Route path="/admin/emergency" component={ProtectedAdmin} />
+      <Route path="/admin/audit" component={ProtectedAdmin} />
+      <Route path="/admin/onboarding" component={ProtectedAdmin} />
+      <Route path="/admin/qa" component={ProtectedAdmin} />
 
       {/* Public Landing */}
       <Route path="/" component={HomePage} />

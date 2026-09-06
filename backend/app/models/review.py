@@ -17,8 +17,8 @@ class PhysicianReviewModel(Base):
     doctor_id = Column(String, ForeignKey("doctors.id"), nullable=False, index=True)
     status = Column(String, default="NOT_REVIEWED")  # NOT_REVIEWED, IN_REVIEW, EDITED, CONFIRMED
     notes = Column(Text, nullable=True)
-    confirmed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     intake_session = relationship("IntakeSession", back_populates="physician_review")
     edits = relationship("PhysicianEditModel", back_populates="review", cascade="all, delete-orphan")

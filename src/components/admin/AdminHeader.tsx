@@ -10,6 +10,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { ServiceHealthStatus } from '../../services/adminApi';
+import { getClinicianSession, clearClinicianSession } from '../../lib/clinicianAuth';
 
 interface AdminHeaderProps {
   title: string;
@@ -29,8 +30,23 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   onToggleSidebar,
 }) => {
   const [, setLocation] = useLocation();
+  const session = getClinicianSession();
+  const displayName = session?.display_name || 'Administrator';
+  const initials =
+    displayName
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'AD';
 
   const isHealthy = serviceStatus?.overall_status === 'HEALTHY' || true;
+
+  const handleLogout = () => {
+    clearClinicianSession();
+    setLocation('/admin/login');
+  };
 
   return (
     <header className="h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between shadow-xs select-none w-full">
@@ -99,26 +115,26 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         {/* User Identity Pill */}
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-teal-700 to-emerald-500 flex items-center justify-center text-white text-[11px] font-extrabold shadow-xs shrink-0">
-            RO
+            {initials}
           </div>
           <div className="hidden md:block text-left leading-tight">
             <div className="text-xs font-bold text-slate-800 flex items-center gap-1">
-              Rohan <Sparkles size={11} className="text-amber-500" />
+              {displayName} <Sparkles size={11} className="text-amber-500" />
             </div>
             <div className="text-[10px] text-slate-400 font-medium">
-              Admin & QA Lead
+              {session?.role || 'HOSPITAL_ADMIN'}
             </div>
           </div>
           <ChevronDown size={13} className="text-slate-400 hidden md:block" />
         </div>
 
-        {/* Exit portal button */}
+        {/* Logout button */}
         <button
-          className="ml-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
-          onClick={() => setLocation('/')}
-          title="Exit to Public Homepage"
+          className="ml-1 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:text-rose-900 hover:bg-rose-50 rounded-lg transition-colors border border-rose-200"
+          onClick={handleLogout}
+          title="Logout of Admin Session"
         >
-          Exit
+          Logout
         </button>
       </div>
     </header>

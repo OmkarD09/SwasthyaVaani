@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.schemas.clinical_state import ClinicalState
 from app.schemas.question import QuestionDecision
+from app.core.datetime_utils import ensure_utc
 
 
 class IntakeCreateRequest(BaseModel):
@@ -17,6 +18,10 @@ class IntakeCreateRequest(BaseModel):
     abha_id: str | None = None
     abha_address: str | None = None
     consent_given: bool = False
+    consent_language: str | None = None
+    consent_timestamp: datetime | str | None = None
+    consent_method: str | None = "AUDIO_GUIDED"
+    consent_version: str | None = "v1.0"
     hospital_id: str = "hosp_district_01"
     doctor_id: str = "doc_001"
     workflow_type: Literal["GENERAL_CLINICAL", "AYUSH"] = "GENERAL_CLINICAL"
@@ -25,7 +30,7 @@ class IntakeCreateRequest(BaseModel):
     chief_complaint: str | None = None
     symptoms: list[str] | None = None
     duration: str | None = None
-    severity: str | None = None
+    severity: str | int | None = None
     medical_history: str | None = None
     clinical_state: dict[str, Any] | None = None
     conversation_history: list[dict[str, Any]] | None = None
@@ -71,16 +76,26 @@ class IntakeReviewUpdateRequest(BaseModel):
 class IntakeSubmissionResponse(BaseModel):
     intake_session_id: str
     token: str
+    patient_id: str | None = None
+    patient_display_id: str | None = None
+    display_id: str | None = None
     status: str
     doctor_id: str
     submitted_at: datetime
     message: str
+
+    @field_validator("submitted_at", mode="before")
+    @classmethod
+    def validate_utc_timestamps(cls, v):
+        return ensure_utc(v)
 
 
 class IntakeSessionDetail(BaseModel):
     id: str
     token: str
     patient_id: str
+    patient_display_id: str | None = None
+    display_id: str | None = None
     patient_name: str
     patient_age: int | None = None
     patient_gender: str | None = None
@@ -100,3 +115,8 @@ class IntakeSessionDetail(BaseModel):
     clinical_state: ClinicalState
     created_at: datetime
     submitted_at: datetime | None = None
+
+    @field_validator("created_at", "submitted_at", mode="before")
+    @classmethod
+    def validate_utc_timestamps(cls, v):
+        return ensure_utc(v)

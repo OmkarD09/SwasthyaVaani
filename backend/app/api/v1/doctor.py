@@ -25,6 +25,8 @@ from app.schemas.doctor import (
     PhysicianConfirmResponse,
 )
 from app.services.fhir.mapper import map_clinical_state_to_fhir_r4
+from app.services.patient_id import generate_next_patient_display_id
+from app.core.datetime_utils import ensure_utc, ensure_utc_iso
 
 router = APIRouter(prefix="/doctor", tags=["Doctor Portal"])
 
@@ -128,11 +130,22 @@ def get_doctor_queue(
         status_tone = "red" if has_red_flags else "teal" if s.status == "SUBMITTED" else "amber"
         queue_status = "PRIORITY_REVIEW" if has_red_flags else "HISTORY_READY" if s.status in ["SUBMITTED", "READY_TO_SUBMIT"] else "WAITING"
 
+        display_id = patient.display_id if patient else None
+        if not display_id and patient and s.status in ["SUBMITTED", "IN_REVIEW", "READY_TO_SUBMIT"]:
+            display_id = generate_next_patient_display_id(db)
+            patient.display_id = display_id
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+
         queue_items.append(
             DoctorQueueItem(
                 intake_session_id=s.id,
                 token=s.token,
                 patient_id=s.patient_id,
+                patient_display_id=display_id,
+                display_id=display_id,
                 patient_name=patient.display_name if patient else "Patient",
                 patient_age=patient.age if patient else None,
                 patient_gender=patient.gender if patient else None,
@@ -239,11 +252,22 @@ def get_reviewed_patients(
             doc_obj = doctors_map.get(s.doctor_id)
             reviewer_name = doc_obj.display_name if doc_obj else s.doctor_id
 
+        display_id = patient.display_id if patient else None
+        if not display_id and patient:
+            display_id = generate_next_patient_display_id(db)
+            patient.display_id = display_id
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+
         queue_items.append(
             DoctorQueueItem(
                 intake_session_id=s.id,
                 token=s.token,
                 patient_id=s.patient_id,
+                patient_display_id=display_id,
+                display_id=display_id,
                 patient_name=patient.display_name if patient else "Patient",
                 patient_age=patient.age if patient else None,
                 patient_gender=patient.gender if patient else None,
@@ -280,10 +304,19 @@ def get_patient_clinical_detail(
     
     session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
     if not session:
-        # Fallback to search by token or patient_id
-        session = db.query(IntakeSession).filter(
-            (IntakeSession.token == intake_id) | (IntakeSession.patient_id == intake_id)
-        ).first()
+        # Fallback to search by patient display_id (e.g. P001), token, or patient_id
+        matching_pat = db.query(Patient).filter(Patient.display_id == intake_id).first()
+        if matching_pat:
+            session = (
+                db.query(IntakeSession)
+                .filter(IntakeSession.patient_id == matching_pat.id)
+                .order_by(IntakeSession.started_at.desc())
+                .first()
+            )
+        if not session:
+            session = db.query(IntakeSession).filter(
+                (IntakeSession.token == intake_id) | (IntakeSession.patient_id == intake_id)
+            ).first()
         
     if not session:
         raise HTTPException(status_code=404, detail="Intake session not found")
@@ -441,7 +474,7 @@ def get_patient_clinical_detail(
                 "document_type": doc.document_type or "PRESCRIPTION",
                 "status": doc.status or "PENDING",
                 "failure_code": doc.failure_code,
-                "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+                "uploaded_at": ensure_utc_iso(doc.uploaded_at),
                 "uploadedAt": uploaded_str,
                 "url": f"/api/v1/documents/{doc.id}/view",
                 "storage_url": f"/api/v1/documents/{doc.id}/view",
@@ -456,10 +489,21 @@ def get_patient_clinical_detail(
             logger.warning(f"Error committing unlinked doc update: {commit_err}")
             db.rollback()
 
+    display_id = patient.display_id if patient else None
+    if not display_id and patient and session.status in ["SUBMITTED", "IN_REVIEW", "CONFIRMED", "READY_TO_SUBMIT"]:
+        display_id = generate_next_patient_display_id(db)
+        patient.display_id = display_id
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+
     detail = DoctorPatientDetail(
         intake_session_id=session.id,
         token=session.token or "",
         patient_id=session.patient_id or "",
+        patient_display_id=display_id,
+        display_id=display_id,
         patient_name=(patient.display_name if patient and patient.display_name else "Patient"),
         patient_age=patient.age if patient else None,
         patient_gender=patient.gender if patient else None,
@@ -528,7 +572,7 @@ def get_patient_conversation_timeline(
             "originalPatientText": ans.raw_text,
             "originalLanguage": ans.language_code or "en",
             "inputMode": ans.input_mode.lower() if ans.input_mode else "text",
-            "timestamp": ans.created_at.isoformat() if ans.created_at else None,
+            "timestamp": ensure_utc_iso(ans.created_at),
         })
 
     return {"intake_session_id": session.id, "exchanges": exchanges}

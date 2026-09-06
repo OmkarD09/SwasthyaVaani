@@ -14,6 +14,7 @@ import { getKioskTranslation } from '../lib/kioskTranslations';
 import {
   getStoredLanguage,
 } from '../lib/kioskState';
+import { hasValidConsent } from '../lib/consentStore';
 import { patientApi, type PatientProfileData } from '../services/patientApi';
 import {
   KioskProgressSidebar,
@@ -39,6 +40,11 @@ export function PatientDetails() {
   const [isAbhaFromQr, setIsAbhaFromQr] = useState(false);
 
   useEffect(() => {
+    if (!hasValidConsent()) {
+      setLocation('/patient/language');
+      return;
+    }
+
     const l = getStoredLanguage() || localStorage.getItem('sv_selected_language');
     if (l) setLanguage(l);
 
@@ -47,7 +53,7 @@ export function PatientDetails() {
         setPatientData(profile);
       }
     });
-  }, []);
+  }, [setLocation]);
 
   const t = getKioskTranslation(language || 'English');
 

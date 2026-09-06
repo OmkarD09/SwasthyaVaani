@@ -7,6 +7,8 @@ export interface PatientHeaderProps {
   patientAge?: number | null;
   patientGender?: string | null;
   patientId?: string;
+  patientDisplayId?: string | null;
+  displayId?: string | null;
   workflowType?: string;
   hospitalName?: string;
   reviewStatus: 'AI_DRAFT' | 'NEEDS_VERIFICATION' | 'PHYSICIAN_CONFIRMED';
@@ -20,6 +22,8 @@ export function PatientHeader({
   patientAge,
   patientGender,
   patientId,
+  patientDisplayId,
+  displayId,
   workflowType,
   hospitalName,
   reviewStatus,
@@ -30,6 +34,7 @@ export function PatientHeader({
 
   const isConfirmed = confirmed || reviewStatus === 'PHYSICIAN_CONFIRMED';
   const confidencePercent = confidence ? Math.round(confidence * 100) : null;
+  const shownPatientId = displayId || patientDisplayId || patientId;
 
   return (
     <div className="border-b border-[#d8ddd3] pb-5">
@@ -65,12 +70,12 @@ export function PatientHeader({
               <strong className="font-bold text-[#173e35]">Gender:</strong>{' '}
               {patientGender || 'Not recorded'}
             </span>
-            {patientId ? (
+            {shownPatientId ? (
               <>
                 <span>•</span>
                 <span>
                   <strong className="font-bold text-[#173e35]">Patient ID:</strong>{' '}
-                  <span className="font-mono text-xs text-[#2c5244]">{patientId}</span>
+                  <span className="font-mono text-xs text-[#2c5244]">{shownPatientId}</span>
                 </span>
               </>
             ) : null}

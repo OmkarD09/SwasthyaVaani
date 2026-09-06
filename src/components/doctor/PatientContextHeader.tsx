@@ -6,6 +6,8 @@ export interface PatientContextHeaderProps {
   patientAge?: number | null;
   patientGender?: string | null;
   patientId?: string;
+  patientDisplayId?: string | null;
+  displayId?: string | null;
   reviewStatus?: 'AI_DRAFT' | 'NEEDS_VERIFICATION' | 'PHYSICIAN_CONFIRMED' | string;
   confirmed?: boolean;
   confidence?: number;
@@ -17,12 +19,15 @@ export function PatientContextHeader({
   patientAge,
   patientGender,
   patientId,
+  patientDisplayId,
+  displayId,
   reviewStatus = 'AI_DRAFT',
   confirmed = false,
   confidence,
 }: PatientContextHeaderProps) {
   const isConfirmed = confirmed || reviewStatus === 'PHYSICIAN_CONFIRMED';
   const confidencePercent = confidence ? Math.round(confidence * 100) : null;
+  const shownPatientId = displayId || patientDisplayId || patientId;
 
   return (
     <div className="rounded-2xl border border-[#d8ddd3] bg-[#f8f7ef] p-5 shadow-xs mb-6">
@@ -47,12 +52,12 @@ export function PatientContextHeader({
               <strong className="font-bold text-[#173e35]">Gender:</strong>{' '}
               {patientGender || 'Not recorded'}
             </span>
-            {patientId ? (
+            {shownPatientId ? (
               <>
                 <span>•</span>
                 <span>
                   <strong className="font-bold text-[#173e35]">Patient ID:</strong>{' '}
-                  <span className="font-mono text-xs text-[#2c5244]">{patientId}</span>
+                  <span className="font-mono text-xs text-[#2c5244]">{shownPatientId}</span>
                 </span>
               </>
             ) : null}

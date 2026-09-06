@@ -74,9 +74,6 @@ function ShellNav() {
         ))}
       </nav>
       <div className="nav-actions">
-        <button className="login-link" onClick={() => setLocation('/clinician/login')}>
-          Portal login <ArrowRight size={15} />
-        </button>
         <AppButton onClick={() => setLocation('/patient')} className="nav-cta">
           Start intake <ArrowRight size={15} />
         </AppButton>
@@ -364,9 +361,6 @@ export function HomePage() {
             SwasthyaVaani turns the minutes before a consultation into meaningful clinical context—without taking
             control away from the physician.
           </p>
-          <AppButton variant="outline" onClick={() => setLocation('/admin')}>
-            Explore the hospital portal <ArrowRight size={16} />
-          </AppButton>
         </div>
         <div className="opd-metrics">
           <div className="metric-main">

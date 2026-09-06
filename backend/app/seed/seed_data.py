@@ -123,8 +123,11 @@ def _seed_scenario_a027(db: Session, hospital_id: str, doctor_id: str):
     """Seed Token #A-027: Sunita Verma / Sanjay Kumar - Cardiac Red-Flag."""
     p1 = db.query(Patient).filter(Patient.id == "pat_001").first()
     if not p1:
-        p1 = Patient(id="pat_001", display_name="Sunita Verma", age=45, gender="Female", abha_id="ABHA-9928-1123")
+        p1 = Patient(id="pat_001", display_id="P001", display_name="Sunita Verma", age=45, gender="Female", abha_id="ABHA-9928-1123")
         db.add(p1)
+        db.flush()
+    elif not p1.display_id:
+        p1.display_id = "P001"
         db.flush()
 
     s1 = db.query(IntakeSession).filter(IntakeSession.id == "intake_001").first()
@@ -188,8 +191,11 @@ def _seed_scenario_a021(db: Session, hospital_id: str, doctor_id: str):
     """Seed Token #A-021: Ramesh Patel - AYUSH Stream."""
     p2 = db.query(Patient).filter(Patient.id == "pat_002").first()
     if not p2:
-        p2 = Patient(id="pat_002", display_name="Ramesh Patel", age=58, gender="Male", abha_id="ABHA-4412-8874")
+        p2 = Patient(id="pat_002", display_id="P002", display_name="Ramesh Patel", age=58, gender="Male", abha_id="ABHA-4412-8874")
         db.add(p2)
+        db.flush()
+    elif not p2.display_id:
+        p2.display_id = "P002"
         db.flush()
 
     s2 = db.query(IntakeSession).filter(IntakeSession.id == "intake_002").first()
@@ -243,8 +249,11 @@ def _seed_scenario_sv2048(db: Session, hospital_id: str, doctor_id: str):
     """Seed Token #SV-2048: Meena Kumari - General OPD Bronchitis & Prescription."""
     p3 = db.query(Patient).filter(Patient.id == "pat_003").first()
     if not p3:
-        p3 = Patient(id="pat_003", display_name="Meena Kumari", age=34, gender="Female", abha_id="ABHA-1029-3382")
+        p3 = Patient(id="pat_003", display_id="P003", display_name="Meena Kumari", age=34, gender="Female", abha_id="ABHA-1029-3382")
         db.add(p3)
+        db.flush()
+    elif not p3.display_id:
+        p3.display_id = "P003"
         db.flush()
 
     s3 = db.query(IntakeSession).filter(IntakeSession.id == "intake_003").first()

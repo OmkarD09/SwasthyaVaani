@@ -202,6 +202,7 @@ export function DoctorPatientHistory() {
           patientAge={patientDetail.patient_age}
           patientGender={patientDetail.patient_gender}
           patientId={patientDetail.patient_id}
+          displayId={patientDetail.display_id || patientDetail.patient_display_id}
           reviewStatus={patientDetail.review_status}
           confirmed={confirmed}
           confidence={cs.confidence}

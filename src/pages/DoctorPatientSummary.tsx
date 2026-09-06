@@ -44,6 +44,7 @@ import {
 import { usePatientRecord } from '../hooks/usePatientRecord';
 import { PatientRecordShell } from '../components/doctor/PatientRecordShell';
 import { authorizedClinicianFetch, getClinicianAccessToken } from '../lib/clinicianAuth';
+import { formatLocalDateTime, formatLocalFullDate } from '../lib/dateUtils';
 
 export function DoctorPatientSummary() {
   const params = useParams<{ id: string }>();
@@ -347,10 +348,7 @@ export function DoctorPatientSummary() {
   const allMedicalRecords: any[] = Array.isArray(patientDetail.medical_records)
     ? patientDetail.medical_records
     : [];
-  const lastUpdated = new Intl.DateTimeFormat('en-IN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(patientDetail.submitted_at));
+  const lastUpdated = formatLocalFullDate(patientDetail.submitted_at);
 
 
   return (
@@ -379,7 +377,9 @@ export function DoctorPatientSummary() {
                   {patientDetail.patient_age && <span>•</span>}
                   {patientDetail.patient_gender ? <span>{patientDetail.patient_gender}</span> : null}
                   {patientDetail.patient_gender && <span>•</span>}
-                  <span className="font-mono font-bold text-[#14532d]">ID: {patientDetail.patient_id}</span>
+                  <span className="font-mono font-bold text-[#14532d]">
+                    ID: {patientDetail.display_id || patientDetail.patient_display_id || patientDetail.patient_id}
+                  </span>
                   {patientDetail.phone && (
                     <>
                       <span>•</span>
@@ -420,7 +420,7 @@ export function DoctorPatientSummary() {
               {isConfirmed && (patientDetail.reviewed_by || patientDetail.reviewed_at) ? (
                 <p className="text-[11px] font-semibold text-[#14532d] font-sans">
                   {patientDetail.reviewed_by ? `Reviewed by: ${patientDetail.reviewed_by}` : 'Reviewed by Clinician'}
-                  {patientDetail.reviewed_at ? ` · ${new Intl.DateTimeFormat('en-IN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(patientDetail.reviewed_at))}` : ''}
+                  {patientDetail.reviewed_at ? ` · ${formatLocalDateTime(patientDetail.reviewed_at)}` : ''}
                 </p>
               ) : (
                 <p className="text-xs font-medium text-[#4b6358] font-sans">
