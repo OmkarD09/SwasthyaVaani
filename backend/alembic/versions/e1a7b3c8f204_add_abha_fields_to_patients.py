@@ -17,20 +17,27 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("patients", sa.Column("abha_address", sa.String(), nullable=True))
-    op.create_index("ix_patients_abha_address", "patients", ["abha_address"], unique=False)
-    op.add_column(
-        "patients",
-        sa.Column("abha_status", sa.String(), server_default="UNVERIFIED", nullable=False),
-    )
-    op.add_column(
-        "patients",
-        sa.Column("verification_timestamp", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.add_column(
-        "patients",
-        sa.Column("consent_recorded", sa.Boolean(), server_default=sa.text("false"), nullable=False),
-    )
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    existing_cols = [c["name"] for c in insp.get_columns("patients")]
+    if "abha_address" not in existing_cols:
+        op.add_column("patients", sa.Column("abha_address", sa.String(), nullable=True))
+        op.create_index("ix_patients_abha_address", "patients", ["abha_address"], unique=False)
+    if "abha_status" not in existing_cols:
+        op.add_column(
+            "patients",
+            sa.Column("abha_status", sa.String(), server_default="UNVERIFIED", nullable=False),
+        )
+    if "verification_timestamp" not in existing_cols:
+        op.add_column(
+            "patients",
+            sa.Column("verification_timestamp", sa.DateTime(timezone=True), nullable=True),
+        )
+    if "consent_recorded" not in existing_cols:
+        op.add_column(
+            "patients",
+            sa.Column("consent_recorded", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        )
 
 
 def downgrade() -> None:
