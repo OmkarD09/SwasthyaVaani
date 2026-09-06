@@ -1,53 +1,58 @@
 # SwasthyaVaani — Backend Schema
 
-> **Audience:** AI coding agents and backend developers.
+> **Status:** Updated backend/data source of truth
 >
-> **Purpose:** Define the backend data model, typed schemas, relationships, state machines, and persistence rules for SwasthyaVaani.
+> **Purpose:** Define the persistent data model, typed state structures, relationships, provenance, workflow state, AYUSH assessment model, document evidence model, and persistence invariants for SwasthyaVaani.
 >
-> **Related documents:**
-> - `PRD.md` — product requirements
-> - `TRD.md` — technical requirements
-> - `architecture.md` — system architecture
-> - `rules.md` — hard implementation and safety rules
+> **Primary references:** Final `SwasthyaVaani_architecture.md`, updated PRD, updated TRD, `SwasthyaVaani_Current_Project_State.md`, original Backend Schema, Rules, App Flow, and AYUSH Implementation Specification.
+>
+> **Important:** This document evolves the existing schema. Existing working entities remain the foundation; richer AYUSH and evidence structures are additive where required.
 
 ---
 
 # 1. Schema Design Principles
 
-1. PostgreSQL is the primary persistent system of record.
-2. Clinical information must remain structured.
-3. Raw patient input, AI-derived information, document-derived information, and physician-confirmed information must remain distinguishable.
-4. Every important extracted clinical fact should retain provenance where practical.
-5. AI output is untrusted until validated.
-6. Clinical state is separate from raw conversation history.
-7. Safety signals are explicit records, not hidden inside free-form text.
-8. Contradictions are explicit records and are never automatically resolved.
+1. PostgreSQL/Supabase is the production persistence direction.
+2. SQLite remains supported for local development and controlled testing where compatible.
+3. Clinical information must remain structured.
+4. Raw patient input and structured clinical state must remain distinguishable.
+5. Patient-stated, AI-derived, document-derived, and physician-confirmed information must remain distinguishable.
+6. Important clinical facts should retain provenance where practical.
+7. Safety signals are explicit records.
+8. Contradictions preserve both conflicting values.
 9. Physician confirmation is explicit.
-10. Database authorization must be enforced server-side.
-11. Large documents are stored in object storage; metadata and references are stored in PostgreSQL.
+10. AI output is untrusted until validated.
+11. Large medical documents belong in private object/file storage; metadata and references belong in the database.
 12. Schema changes use migrations.
+13. Authorization is enforced server-side.
+14. Demo data are synthetic.
+15. Do not use the database as a raw dump of arbitrary LLM output.
 
 ---
 
 # 2. Technology
 
-Recommended:
+Current implementation:
 
 ```text
-PostgreSQL
-Supabase
-SQLAlchemy
+SQLAlchemy 2
 Pydantic
 Alembic
+SQLite
 ```
 
-Optional:
+Production direction:
 
 ```text
-Redis
+PostgreSQL / Supabase
 ```
 
-Use Redis only for temporary state/cache/rate limiting/jobs when actually needed. PostgreSQL remains the source of truth for persistent clinical data.
+Potential supporting components:
+
+```text
+Supabase Storage / private object storage
+Redis only where temporary cache/rate-limit/job requirements justify it
+```
 
 ---
 
@@ -57,73 +62,69 @@ Use Redis only for temporary state/cache/rate limiting/jobs when actually needed
 Hospital
  └── Department
       └── Doctor
+           └── User account
 
 Patient
  └── IntakeSession
-      ├── IntakePreferences
-      ├── Answer[]
-      ├── ClinicalState
+      ├── QuestionEvent[]
+      │    └── Answer
+      ├── ClinicalStateModel[]
+      ├── AyushAssessmentModel
       ├── Document[]
-      │     └── DocumentExtraction[]
-      ├── TimelineEvent[]
+      │    ├── OCRRun[]
+      │    │    └── OCRevidence[]
+      │    ├── CandidateSet[]
+      │    │    └── Candidate[]
+      │    │         └── EvidenceLink[]
+      │    └── Extraction[]
       ├── RedFlag[]
       ├── Contradiction[]
-      ├── PhysicianReview
-      └── AuditEvent[]
+      └── PhysicianReview
+           └── PhysicianEdit[]
 
-IntakeSession
- └── QuestionEvent[]
-```
-
-Additional platform entities:
-
-```text
-User
-Role
-Language
-Workflow
-SafetyRule
-ProviderConfiguration
 AuditEvent
+KnowledgeDocument
+ └── KnowledgeChunk[]
 ```
 
 ---
 
-# 4. User / Identity Schema
+# 4. Identity and Role Schema
 
 ## 4.1 User
 
-The authentication provider may be Supabase Auth or another implementation.
-
-Application-level user record:
-
 ```text
 User
-------
+----
 id
 auth_provider_id
 role
 display_name
-email
-phone
+email?
+phone?
+password_hash?
 is_active
 created_at
 updated_at
 ```
 
-Roles:
+Current roles may include:
 
 ```text
-PATIENT
 DOCTOR
 ADMIN
+HOSPITAL_ADMIN
+SUPER_ADMIN
+PATIENT
 ```
 
-Do not use the client-provided role as authoritative.
+The exact role set must follow the deployed authorization implementation.
+
+The client-provided role is never authoritative.
 
 ---
 
-# 5. Hospital Schema
+# 5. Hospital
 
 ```text
 Hospital
@@ -131,10 +132,10 @@ Hospital
 id
 name
 code
-address
-city
-state
-country
+address?
+city?
+state?
+country?
 is_active
 created_at
 updated_at
@@ -142,15 +143,14 @@ updated_at
 
 Constraints:
 
-- `id` unique;
-- `code` unique;
-- `is_active` boolean.
-
-A kiosk may be configured with a fixed hospital, or the patient may select a hospital in a multi-hospital deployment.
+```text
+id → unique
+code → unique
+```
 
 ---
 
-# 6. Department Schema
+# 6. Department
 
 ```text
 Department
@@ -167,18 +167,12 @@ updated_at
 Relationship:
 
 ```text
-Hospital 1 ──── N Department
-```
-
-Foreign key:
-
-```text
-department.hospital_id → hospital.id
+Hospital 1 ─── N Department
 ```
 
 ---
 
-# 7. Doctor Schema
+# 7. Doctor
 
 ```text
 Doctor
@@ -195,21 +189,19 @@ created_at
 updated_at
 ```
 
-Use `license_identifier` only if genuinely required by the deployment.
-
 Relationships:
 
 ```text
-Hospital 1 ──── N Doctor
-Department 1 ── N Doctor
-User 1 ──────── 1 Doctor
+User 1 ─── 1 Doctor
+Hospital 1 ─── N Doctor
+Department 1 ─── N Doctor
 ```
 
 ---
 
-# 8. Patient Schema
+# 8. Patient
 
-Patient identity should be kept separate from an intake session.
+Patient identity is separate from an intake session.
 
 ```text
 Patient
@@ -226,59 +218,29 @@ created_at
 updated_at
 ```
 
-For demo mode, use synthetic patients.
+Demo patients must be synthetic.
 
-Do not require Aadhaar as a substitute for ABHA.
-
----
-
-# 9. ABHA Identity Data
-
-If ABHA is integrated:
-
-```text
-Patient
-  └── abha_id
-```
-
-Do not store unnecessary identity data.
-
-Recommended:
-
-```text
-abha_id
-abha_link_status
-abha_verified_at
-```
-
-only if required by the actual integration.
-
-If no live ABDM connection exists, the application may run with:
-
-```text
-abha_status = NOT_CONNECTED
-```
-
-and remain functional.
+Avoid collecting unnecessary identity fields.
 
 ---
 
-# 10. IntakeSession Schema
+# 9. IntakeSession
 
-An `IntakeSession` represents one pre-consultation patient interaction.
+An IntakeSession represents one pre-consultation encounter.
 
 ```text
 IntakeSession
 -------------
 id
+token
 patient_id
-hospital_id
-doctor_id
-workflow_id
+hospital_id?
+doctor_id?
+workflow_type
+ayush_system?
 interaction_mode
 language_code
 status
-current_question_index
 question_count
 started_at
 completed_at?
@@ -287,12 +249,49 @@ created_at
 updated_at
 ```
 
-Suggested `status`:
+## Workflow
+
+```text
+GENERAL_CLINICAL
+AYUSH
+DUAL_SYSTEM
+```
+
+## AYUSH system context
+
+For detailed current AYUSH implementation:
+
+```text
+AYURVEDA
+```
+
+The architecture remains extensible to:
+
+```text
+YOGA_NATUROPATHY
+UNANI
+SIDDHA
+HOMOEOPATHY
+```
+
+Do not create empty system-specific records unless the workflow actually supports them.
+
+## Interaction mode
+
+```text
+VOICE
+TEXT
+TOUCH
+MIXED
+```
+
+## Session status
+
+Recommended states:
 
 ```text
 NOT_STARTED
 ACTIVE
-NEEDS_REVIEW
 READY_TO_SUBMIT
 SUBMITTED
 LIMITED_HISTORY
@@ -300,137 +299,13 @@ PATIENT_ABORTED
 ERROR
 ```
 
-Recommended:
-
-```text
-interaction_mode:
-VOICE
-TEXT
-TOUCH
-MIXED
-```
+The exact deployed enum/state values must remain compatible with current code.
 
 ---
 
-# 11. IntakeSession Preferences
+# 10. QuestionEvent
 
-Either normalize into a table or keep compact session preferences in typed JSON.
-
-Recommended structured fields:
-
-```text
-language_code
-interaction_mode
-hospital_id
-doctor_id
-workflow_id
-```
-
-Avoid storing critical authorization or ownership rules only inside JSON.
-
----
-
-# 12. ClinicalState Schema
-
-Clinical state is the structured working representation of the interview.
-
-Example relational/JSON shape:
-
-```json
-{
-  "chiefComplaint": null,
-  "symptoms": [],
-  "onset": null,
-  "duration": null,
-  "severity": null,
-  "location": null,
-  "associatedSymptoms": [],
-  "aggravatingFactors": [],
-  "relievingFactors": [],
-  "pastHistory": [],
-  "familyHistory": [],
-  "medications": [],
-  "allergies": [],
-  "investigations": [],
-  "ayush": null,
-  "documents": [],
-  "redFlags": [],
-  "contradictions": [],
-  "uncertainties": [],
-  "missingInformation": []
-}
-```
-
-Store the current structured state in a dedicated table or versioned JSON field.
-
-Recommended:
-
-```text
-ClinicalState
-------------
-id
-intake_session_id
-version
-state_json
-created_at
-updated_at
-```
-
-Relationship:
-
-```text
-IntakeSession 1 ──── N ClinicalStateVersion
-```
-
-This permits state history during development/debugging.
-
----
-
-# 13. Clinical Fact Schema
-
-For important fields, a normalized fact model is recommended.
-
-```text
-ClinicalFact
-------------
-id
-intake_session_id
-field_name
-value_json
-source_type
-source_id
-confidence?
-status
-created_at
-updated_at
-```
-
-`source_type`:
-
-```text
-PATIENT_ANSWER
-DOCUMENT
-AI_DERIVED
-PHYSICIAN
-```
-
-`status`:
-
-```text
-CANDIDATE
-VALIDATED
-NEEDS_REVIEW
-CONFIRMED
-REJECTED
-```
-
-This gives the system a common representation for provenance.
-
----
-
-# 14. Question Schema
-
-Store the actual questions asked, not just the final answer.
+Every adaptive question must be persisted.
 
 ```text
 QuestionEvent
@@ -453,13 +328,15 @@ STOP
 ESCALATE
 ```
 
-Do not store internal chain-of-thought.
+The `target_field` is the canonical dimension selected by the adaptive engine.
 
-`reason` should be a concise machine/debug explanation, not hidden model reasoning.
+Do not store internal model chain-of-thought.
+
+`reason` should remain a short machine/debug explanation if present.
 
 ---
 
-# 15. Answer Schema
+# 11. Answer
 
 ```text
 Answer
@@ -474,375 +351,399 @@ language_code
 created_at
 ```
 
-`input_mode`:
+The answer must remain traceable to the QuestionEvent that produced it.
 
-```text
-VOICE
-TEXT
-TOUCH
-```
-
-Raw audio should NOT be stored by default.
-
-If audio is explicitly required for a controlled demo, it must be treated as sensitive temporary data with a defined retention policy.
+This linkage is especially important for adaptive reasoning and evidence provenance.
 
 ---
 
-# 16. Answer Extraction Schema
+# 12. ClinicalStateModel
 
-A patient answer may produce multiple candidate facts.
+ClinicalState is the structured working representation of the patient interview.
 
 ```text
-AnswerExtraction
-----------------
+ClinicalStateModel
+------------------
 id
-answer_id
-field_name
-value_json
-confidence?
-status
+intake_session_id
+version
+state_json
 created_at
+```
+
+Current architecture treats state versions as immutable historical snapshots.
+
+Relationship:
+
+```text
+IntakeSession 1 ─── N ClinicalStateModel
+```
+
+The latest version is the active working state.
+
+---
+
+# 13. ClinicalState Logical Structure
+
+The current structured state may contain:
+
+```text
+chief_complaint
+symptoms
+onset
+duration
+severity
+location
+character
+radiation
+associated_symptoms
+timing
+aggravating_factors
+relieving_factors
+past_history
+family_history
+medications
+allergies
+investigations
+
+ayush
+
+documents
+red_flags
+contradictions
+uncertainties
+
+canonical_dimensions
+resolved_dimensions
+active_exploration_mode
+explored_areas
+
+domain-specific fields
+```
+
+Examples of currently supported focused fields may include:
+
+```text
+food_exposure
+stool_consistency
+stool_frequency
+hydration_status
+bloating
+dark_stool
+blood_in_stool
+dizziness
+weakness
+negated_symptoms
+```
+
+Only fields actually required by the implemented clinical engine should remain active.
+
+---
+
+# 14. CanonicalDimensionState
+
+Important adaptive dimensions should use canonical state tracking.
+
+Conceptual structure:
+
+```text
+CanonicalDimensionState
+-----------------------
+status
+value
+characterization?
+last_updated_turn
+```
+
+Status:
+
+```text
+UNKNOWN
+KNOWN_TRUE
+KNOWN_FALSE
+AMBIGUOUS
+KNOWN_WITH_VALUE
 ```
 
 Example:
 
-```json
-{
-  "field_name": "duration",
-  "value_json": "3 days",
-  "confidence": 0.96,
-  "status": "VALIDATED"
-}
+```text
+"How long?"
+"Since when?"
+"For 3 days?"
+
+        ↓
+
+canonical dimension:
+symptom_duration
 ```
 
-Pipeline:
+This prevents alias fragmentation and repeated questions.
+
+---
+
+# 15. Clinical Fact / Evidence Representation
+
+Important structured information may be represented as a validated fact with source metadata.
+
+Conceptually:
 
 ```text
-Answer
- ↓
-LLM extraction
- ↓
-Schema validation
- ↓
-Domain validation
- ↓
 ClinicalFact
-```
-
----
-
-# 17. Information Gap Schema
-
-The question engine should track unresolved required information.
-
-```text
-InformationGap
---------------
-id
-intake_session_id
-field_name
-priority
-reason
-status
-created_at
-updated_at
-```
-
-`status`:
-
-```text
-OPEN
-RESOLVED
-DEFERRED
-NOT_APPLICABLE
-```
-
-`priority`:
-
-```text
-HIGH
-MEDIUM
-LOW
-```
-
-Do not ask questions for resolved or irrelevant gaps.
-
----
-
-# 18. Interview Configuration
-
-Make interview control values configurable.
-
-```text
-InterviewConfig
----------------
-id
-workflow_id
-max_questions
-max_consecutive_low_progress
-low_information_gain_threshold
-is_active
-version
-created_at
-updated_at
-```
-
-Initial recommended values:
-
-```text
-max_questions = 15
-max_consecutive_low_progress = 2
-```
-
-These are safety/configuration defaults, not fixed product rules.
-
----
-
-# 19. Question Decision Schema
-
-Backend representation:
-
-```json
-{
-  "action": "ASK",
-  "question": "Where exactly do you feel the pain?",
-  "targetField": "location",
-  "reason": "Relevant unresolved field",
-  "confidence": 0.91
-}
-```
-
-Validate against:
-
-```text
-QuestionDecisionSchema
-```
-
-Before executing the action.
-
----
-
-# 20. Document Schema
-
-```text
-Document
---------
-id
-patient_id
-intake_session_id?
-file_name
-storage_object_id
-mime_type
-file_size
-document_type
-status
-uploaded_at
-processed_at?
-created_at
-updated_at
-```
-
-`document_type`:
-
-```text
-PRESCRIPTION
-LAB_REPORT
-DISCHARGE_SUMMARY
-MEDICAL_RECORD
-OTHER
-```
-
-`status`:
-
-```text
-UPLOADED
-OCR_PROCESSING
-OCR_COMPLETED
-EXTRACTING
-EXTRACTED
-NEEDS_REVIEW
-CONFIRMED
-FAILED
-```
-
----
-
-# 21. Document Extraction Schema
-
-```text
-DocumentExtraction
-------------------
-id
-document_id
-field_type
+------------
 field_name
 value_json
-confidence?
-source_page?
-source_region_json?
-status
-created_at
-updated_at
-```
-
-Examples:
-
-```text
-field_type = MEDICATION
-field_name = drug_name
-value = Atorvastatin
-```
-
-or:
-
-```text
-field_type = LAB
-field_name = uric_acid
-value = 8.2 mg/dL
-```
-
----
-
-# 22. Medication Schema
-
-For structured medication facts:
-
-```text
-MedicationFact
---------------
-id
-document_extraction_id?
-intake_session_id
-drug_name
-dose?
-frequency?
-duration?
 source_type
-source_id
+source_id?
 confidence?
 status
 created_at
 updated_at
-```
-
-Use controlled statuses:
-
-```text
-EXTRACTED
-NEEDS_REVIEW
-CONFIRMED
-REJECTED
-```
-
----
-
-# 23. Investigation Schema
-
-```text
-InvestigationFact
------------------
-id
-document_extraction_id?
-intake_session_id
-test_name
-value?
-unit?
-reference_range?
-observed_at?
-source_type
-source_id
-confidence?
-status
-created_at
-updated_at
-```
-
-Do not invent reference ranges.
-
-If unavailable:
-
-```text
-reference_range = null
-```
-
----
-
-# 24. Provenance Schema
-
-Recommended reusable logical structure:
-
-```text
-Provenance
-----------
-source_type
-source_id
-page?
-region_json?
-confidence?
 ```
 
 Source types:
 
 ```text
-PATIENT_ANSWER
+PATIENT_STATED
+AI_INFERRED
 DOCUMENT
-AI_DERIVED
-PHYSICIAN
+PHYSICIAN_CONFIRMED
+```
+
+Status examples:
+
+```text
+CANDIDATE
+VALIDATED
+NEEDS_REVIEW
+CONFIRMED
+REJECTED
+```
+
+Use the existing ClinicalState structure when a separate normalized table is unnecessary.
+
+Do not create duplicate storage models without a concrete persistence requirement.
+
+---
+
+# 16. AYUSH Assessment
+
+The target richer AYUSH assessment is an additive structure.
+
+```text
+AyushAssessmentModel
+--------------------
+id
+intake_session_id
+system
+status
+assessment_json
+created_at
+updated_at
+```
+
+The richer logical object should support:
+
+```text
+system
+dimensions
+ahara_vihara
+evidence
+confidence
+uncertainties
+overall_status
+physician_review_state
+```
+
+The current `ClinicalState.ayush` remains the adaptive working representation until migration is complete.
+
+---
+
+# 17. AYUSH System Context
+
+AYUSH is the umbrella category.
+
+Current detailed assessment:
+
+```text
+AYURVEDA
+```
+
+Future extensibility:
+
+```text
+AYURVEDA
+YOGA_NATUROPATHY
+UNANI
+SIDDHA
+HOMOEOPATHY
+```
+
+Do not represent Ayurveda-specific concepts as universal AYUSH attributes.
+
+---
+
+# 18. Ayurveda Assessment Dimensions
+
+## Current/core
+
+```text
+Prakriti
+Vikriti
+Agni
+Koshtha
+Ahara-Vihara
+Dosha evidence
+```
+
+## Expanded
+
+```text
+Sara
+Samhanana
+Pramana
+Satmya
+Sattva
+Ahara Shakti
+Vyayama Shakti
+Vaya
+```
+
+Expanded dimensions are adaptive assessment targets, not mandatory fields for every AYUSH session.
+
+---
+
+# 19. AYUSH Dimension State
+
+Each important AYUSH dimension should support:
+
+```text
+value
+status
+confidence
+source
+evidence[]
+last_updated_turn
 ```
 
 Example:
 
 ```json
 {
-  "source_type": "DOCUMENT",
-  "source_id": "doc_123",
-  "page": 1,
-  "confidence": 0.94
+  "dimension": "agni",
+  "value": "irregular digestive pattern",
+  "status": "NEEDS_REVIEW",
+  "source": "AI_INFERRED",
+  "confidence": 0.61,
+  "evidence": [
+    "question-event-17",
+    "question-event-19"
+  ],
+  "last_updated_turn": 5
 }
 ```
 
+The system must not create unsupported certainty.
+
 ---
 
-# 25. TimelineEvent Schema
+# 20. AYUSH Provenance
+
+Minimum source distinction:
 
 ```text
-TimelineEvent
--------------
-id
-patient_id
-intake_session_id?
-event_type
-event_date?
-title
-description?
-source_type
-source_id
-metadata_json?
-created_at
-```
-
-Possible `event_type`:
-
-```text
-DIAGNOSIS
-PRESCRIPTION
-LAB_REPORT
-DISCHARGE
-VISIT
-PATIENT_REPORTED
+PATIENT_STATED
+AI_INFERRED
+DOCUMENT
 PHYSICIAN_CONFIRMED
-OTHER
 ```
 
-Timeline should be evidence-linked.
+The doctor must be able to distinguish a patient statement from an AI-derived interpretation.
+
+A physician-confirmed value should not overwrite the historical AI inference without retaining an audit trail.
 
 ---
 
-# 26. RedFlag Schema
+# 21. AYUSH Evidence
+
+Possible evidence links:
 
 ```text
-RedFlag
--------
+QuestionEvent
+Answer
+Document
+DocumentCandidate
+PhysicianEdit
+```
+
+Conceptually:
+
+```text
+AyushAssessment
+   ↓
+Dimension
+   ↓
+Value
+   ↓
+Evidence[]
+```
+
+This enables traceable review.
+
+---
+
+# 22. AYUSH Assessment Status
+
+Recommended logical statuses:
+
+```text
+INCOMPLETE
+PRELIMINARY
+NEEDS_REVIEW
+PHYSICIAN_CONFIRMED
+```
+
+The deployed implementation may use equivalent values.
+
+---
+
+# 23. AYUSH and Adaptive Engine
+
+AYUSH dimensions are not stored as an independent questionnaire state.
+
+They participate in the same adaptive selection pipeline:
+
+```text
+ClinicalState
++
+AYUSH assessment
+        ↓
+workflow/domain context
+        ↓
+relevant gaps
+        ↓
+candidate dimensions
+        ↓
+information gain
+        ↓
+duplicate/resolved filtering
+        ↓
+safety
+        ↓
+ASK / STOP / ESCALATE
+```
+
+In `DUAL_SYSTEM`, modern and AYUSH dimensions may exist in the same candidate pool.
+
+---
+
+# 24. RedFlagModel
+
+Safety signals are explicit records.
+
+```text
+RedFlagModel
+------------
 id
 intake_session_id
 rule_id
@@ -850,46 +751,40 @@ title
 reason
 severity
 status
+evidence_json?
 created_at
-reviewed_at?
-reviewed_by?
+updated_at
 ```
 
-Suggested:
+The exact fields follow the existing implementation.
+
+Red flags are:
 
 ```text
-severity = PRIORITY
-status = OPEN | REVIEWED
+alerts
+priority-review signals
 ```
 
-Evidence links:
-
-```text
-RedFlagEvidence
----------------
-id
-red_flag_id
-evidence_type
-evidence_id
-```
-
-This allows the doctor to see exactly which answers/facts triggered the rule.
+not diagnoses.
 
 ---
 
-# 27. SafetyRule Schema
+# 25. ContradictionModel
+
+Contradictions preserve both conflicting values.
 
 ```text
-SafetyRule
-----------
+ContradictionModel
+------------------
 id
-rule_code
-version
-name
-description
-rule_expression
-priority
-is_active
+intake_session_id
+field_name
+value_a_json
+value_b_json
+source_a?
+source_b?
+status
+reason?
 created_at
 updated_at
 ```
@@ -897,85 +792,218 @@ updated_at
 Example:
 
 ```text
-rule_code: RF-CP-001
-version: v1
+Patient:
+stopped medication
+
+Document:
+medication listed
+
+→ INFORMATION_CONFLICT
 ```
 
-Do not allow uncontrolled natural-language safety rules to execute directly.
-
-Rules should be represented as validated/configurable conditions.
+The physician resolves the conflict.
 
 ---
 
-# 28. Contradiction Schema
+# 26. DocumentModel
+
+Documents are associated with both patient and intake context where available.
 
 ```text
-Contradiction
--------------
+DocumentModel
+------------
 id
-intake_session_id
-field_name
-value_a_json
-source_a_json
-value_b_json
-source_b_json
+patient_id
+intake_session_id?
+file_name
+storage_object_id
+mime_type
+file_size?
+sha256
+document_type?
 status
 created_at
 updated_at
-resolved_at?
-resolved_by?
 ```
 
-Status:
+Current document status may include:
 
 ```text
-OPEN
-REVIEWED
-RESOLVED_BY_PHYSICIAN
-DISMISSED
+PENDING
+PROCESSING
+COMPLETED
+FAILED
+NEEDS_REVIEW
 ```
 
-The system must retain both values.
+The exact deployed values must remain compatible with code.
 
 ---
 
-# 29. PhysicianReview Schema
+# 27. Document OCR Run
 
 ```text
-PhysicianReview
----------------
+DocumentOCRRunModel
+-------------------
+id
+document_id
+provider_name
+model_name?
+status
+aggregate_confidence?
+pages_processed?
+raw_text?
+created_at
+completed_at?
+```
+
+This records a single OCR processing execution.
+
+---
+
+# 28. Document OCR Evidence
+
+```text
+DocumentOCREvidenceModel
+------------------------
+id
+ocr_run_id
+document_id
+block_index
+page_number?
+text
+confidence?
+bounding_box_json?
+created_at
+```
+
+OCR evidence is the source material against which extracted candidates are verified.
+
+---
+
+# 29. Document Candidate Set
+
+```text
+DocumentCandidateSetModel
+-------------------------
+id
+document_id
+ocr_run_id
+provider_name
+model_name
+created_at
+```
+
+A candidate set represents one extraction run over one OCR result.
+
+---
+
+# 30. Document Candidate
+
+```text
+DocumentCandidateModel
+----------------------
+id
+candidate_set_id
+candidate_type
+value_json
+extraction_confidence
+status
+created_at
+updated_at
+```
+
+Candidate types may include:
+
+```text
+MEDICATION
+LAB
+CLINICAL_HISTORY
+OTHER
+```
+
+Only types actually supported by the extractor should be exposed.
+
+---
+
+# 31. Document Candidate Evidence Link
+
+```text
+DocumentCandidateEvidenceLinkModel
+-----------------------------------
+candidate_id
+evidence_id
+```
+
+Relationship:
+
+```text
+Candidate M ─── N OCR Evidence
+```
+
+This supports the existing evidence-grounding requirement.
+
+An extracted candidate must not be treated as trusted merely because an LLM produced it.
+
+---
+
+# 32. DocumentExtractionModel
+
+The existing backward-compatible extraction representation may remain:
+
+```text
+DocumentExtractionModel
+-----------------------
+id
+document_id
+field_type
+field_name
+value_json
+confidence
+ocr_confidence
+created_at
+updated_at
+```
+
+Do not create redundant extraction tables unless the current code requires them.
+
+---
+
+# 33. PhysicianReviewModel
+
+```text
+PhysicianReviewModel
+--------------------
 id
 intake_session_id
 doctor_id
 status
-reviewed_at?
-confirmed_at?
-summary_version
 notes?
+confirmed_at?
 created_at
 updated_at
 ```
 
-Status:
+Suggested logical status:
 
 ```text
-NOT_REVIEWED
-IN_REVIEW
-EDITED
+PENDING
 CONFIRMED
 ```
 
-Only `CONFIRMED` should be considered the final physician-approved state.
+The exact deployed state must follow existing code.
+
+Physician confirmation is the authoritative handoff event.
 
 ---
 
-# 30. PhysicianEdit Schema
+# 34. PhysicianEditModel
 
-Important physician changes should be auditable.
+Important doctor changes remain auditable.
 
 ```text
-PhysicianEdit
--------------
+PhysicianEditModel
+------------------
 id
 physician_review_id
 field_name
@@ -985,681 +1013,436 @@ reason?
 created_at
 ```
 
-Do not silently overwrite important clinical information without preserving the review event.
+For AYUSH this can record:
+
+```text
+AI inferred → physician corrected
+```
+
+or:
+
+```text
+preliminary → physician confirmed
+```
 
 ---
 
-# 31. AuditEvent Schema
+# 35. AuditEventModel
 
 ```text
-AuditEvent
-----------
+AuditEventModel
+---------------
 id
-actor_user_id?
+actor_user_id
 actor_role
 event_type
 resource_type
 resource_id
-metadata_json?
+metadata_json
 created_at
 ```
 
-Possible event types:
+Audit events should capture meaningful administrative and physician actions.
 
-```text
-LOGIN
-INTAKE_STARTED
-INTAKE_SUBMITTED
-DOCUMENT_UPLOADED
-DOCUMENT_PROCESSED
-RED_FLAG_CREATED
-CONTRADICTION_CREATED
-PHYSICIAN_EDITED
-PHYSICIAN_CONFIRMED
-FHIR_GENERATED
-ADMIN_CHANGED
-PROVIDER_ERROR
-```
-
-Avoid storing unnecessary clinical content in audit metadata.
+Do not place secrets or unnecessary full medical content in audit metadata.
 
 ---
 
-# 32. Workflow Schema
+# 36. KnowledgeDocument
+
+The RAG knowledge base is separate from patient records.
 
 ```text
-Workflow
---------
+KnowledgeDocument
+-----------------
 id
-name
-code
-type
+title
+source
+source_type
 version
-is_active
-configuration_json?
+language?
+workflow?
+status
 created_at
 updated_at
 ```
 
-Examples:
+AYUSH reference material may be represented with:
 
 ```text
-GENERAL_CLINICAL
-AYUSH
+workflow = AYUSH
 ```
 
-The question engine loads workflow-specific required fields and question rules.
+or another explicit system/workflow identifier.
 
 ---
 
-# 33. WorkflowField Schema
+# 37. KnowledgeChunk
 
 ```text
-WorkflowField
+KnowledgeChunk
+--------------
+id
+document_id
+chunk_index
+content
+topic?
+embedding
+created_at
+```
+
+Current implementation stores embeddings as relational data rather than using a native vector column.
+
+Target optimization may use:
+
+```text
+PostgreSQL pgvector
++
+native vector similarity
++
+HNSW/appropriate index
+```
+
+Do not introduce a separate vector database solely for this optimization.
+
+---
+
+# 38. Timeline / Event Representation
+
+Where a timeline model exists, events should point back to their source records.
+
+Conceptually:
+
+```text
+TimelineEvent
 -------------
 id
-workflow_id
-field_name
-field_type
-required_level
-question_priority
-is_active
-version
-```
-
-`required_level`:
-
-```text
-REQUIRED
-RELEVANT
-OPTIONAL
-```
-
-This is the basis of deterministic fallback behavior.
-
----
-
-# 34. Doctor Queue Model
-
-The queue should be derived from submitted intake sessions rather than maintained as duplicated state where possible.
-
-Conceptual fields:
-
-```text
-QueueItem
----------
 intake_session_id
-doctor_id
-hospital_id
-priority
-status
-submitted_at
-```
-
-Status examples:
-
-```text
-WAITING
-HISTORY_READY
-PRIORITY_REVIEW
-IN_REVIEW
-CONFIRMED
-```
-
-Avoid duplicating patient data unnecessarily.
-
----
-
-# 35. Doctor Assignment Rules
-
-At submission:
-
-```text
-intake_session.doctor_id
-```
-
-is the target doctor.
-
-The backend must verify:
-
-```text
-doctor exists
-doctor active
-doctor belongs to selected hospital/department as applicable
-patient session authorized
-```
-
-Never trust a browser-provided doctor assignment.
-
----
-
-# 36. Service / Provider Configuration
-
-```text
-ProviderConfiguration
----------------------
-id
-provider_type
-provider_name
-is_active
-configuration_json
-created_at
-updated_at
-```
-
-Provider types:
-
-```text
-LLM
-SPEECH
-OCR
-TRANSLATION
-ABDM
-FHIR
-```
-
-Secrets must NOT be stored as plain configuration JSON unless using a secure secret store.
-
----
-
-# 37. ProviderEvent Schema
-
-Useful for technical observability.
-
-```text
-ProviderEvent
--------------
-id
-provider_type
-provider_name
-operation
-status
-latency_ms?
-error_code?
-request_id?
-created_at
-```
-
-Do not log raw patient content.
-
----
-
-# 38. FHIR Export Schema
-
-FHIR should be generated from physician-confirmed data.
-
-```text
-FHIRExport
-----------
-id
-intake_session_id
-physician_review_id
-status
-resource_type
-bundle_json
-validation_status
-created_at
-```
-
-Status:
-
-```text
-PENDING
-GENERATED
-VALIDATED
-FAILED
-EXPORTED
-```
-
-`bundle_json` should only contain data permitted by the integration.
-
----
-
-# 39. Notification/Event Schema
-
-Optional but useful:
-
-```text
-DomainEvent
------------
-id
 event_type
-aggregate_type
-aggregate_id
-payload_json
-created_at
-processed_at?
+event_time
+source_type
+source_id
+metadata_json
 ```
 
-Examples:
+Possible sources:
 
 ```text
-INTAKE_SUBMITTED
-QUEUE_UPDATED
-PHYSICIAN_CONFIRMED
+ANSWER
+DOCUMENT
+REDFLAG
+PHYSICIAN_REVIEW
+PHYSICIAN_EDIT
 ```
 
-For the prototype, direct WebSocket publication from application services is acceptable; do not introduce a full event bus unless needed.
+Do not duplicate complete source objects inside the timeline.
 
 ---
 
-# 40. Recommended Foreign Keys
+# 39. Relationships
 
-At minimum:
-
-```text
-department.hospital_id → hospital.id
-doctor.hospital_id → hospital.id
-doctor.department_id → department.id
-doctor.user_id → user.id
-
-patient.user_id → user.id
-
-intake_session.patient_id → patient.id
-intake_session.hospital_id → hospital.id
-intake_session.doctor_id → doctor.id
-intake_session.workflow_id → workflow.id
-
-answer.question_event_id → question_event.id
-answer.intake_session_id → intake_session.id
-
-clinical_state.intake_session_id → intake_session.id
-
-document.patient_id → patient.id
-document.intake_session_id → intake_session.id
-
-document_extraction.document_id → document.id
-
-timeline_event.patient_id → patient.id
-timeline_event.intake_session_id → intake_session.id
-
-red_flag.intake_session_id → intake_session.id
-contradiction.intake_session_id → intake_session.id
-
-physician_review.intake_session_id → intake_session.id
-physician_review.doctor_id → doctor.id
-
-audit_event.actor_user_id → user.id
-```
-
-Use cascading deletes cautiously for clinical/audit records. Do not accidentally delete audit history when removing an application relationship.
-
----
-
-# 41. Indexing
-
-Recommended indexes:
+Core relationships:
 
 ```text
-hospital.code
-department.hospital_id
-doctor.hospital_id
-doctor.department_id
-patient.abha_id
-intake_session.patient_id
-intake_session.doctor_id
-intake_session.hospital_id
-intake_session.status
-intake_session.submitted_at
-answer.intake_session_id
-question_event.intake_session_id
-document.patient_id
-document.intake_session_id
-document.status
-red_flag.intake_session_id
-red_flag.status
-contradiction.intake_session_id
-contradiction.status
-audit_event.resource_type + resource_id
-```
+Hospital 1 ─── N Department
+Hospital 1 ─── N Doctor
+Department 1 ─ N Doctor
+User 1 ─────── 1 Doctor
+User 1 ─────── 0..1 Patient
 
-Add indexes based on actual query patterns.
+Patient 1 ──── N IntakeSession
+Doctor 1 ───── N IntakeSession
 
----
+IntakeSession 1 ─── N QuestionEvent
+QuestionEvent 1 ─── 0..1 Answer
+IntakeSession 1 ─── N ClinicalStateModel
+IntakeSession 1 ─── 0..1 AyushAssessmentModel
+IntakeSession 1 ─── N RedFlagModel
+IntakeSession 1 ─── N ContradictionModel
+IntakeSession 1 ─── 0..1 PhysicianReviewModel
 
-# 42. Transaction Boundaries
+Patient 1 ──── N DocumentModel
+Document 1 ─── N DocumentOCRRunModel
+DocumentOCRRun 1 ─── N DocumentOCREvidenceModel
+Document 1 ─── N DocumentCandidateSetModel
+CandidateSet 1 ─── N DocumentCandidateModel
+Candidate M ─── N OCRevidence
 
-## Patient submission
-
-Must be transactional:
-
-```text
-validate session
- ↓
-validate patient confirmation
- ↓
-persist submission
- ↓
-assign/confirm doctor
- ↓
-commit
- ↓
-publish queue update
-```
-
-Do not notify the doctor before the database transaction commits.
-
-## Physician confirmation
-
-```text
-validate authorization
- ↓
-persist edits
- ↓
-persist confirmation
- ↓
-commit
- ↓
-optional FHIR generation
+KnowledgeDocument 1 ─── N KnowledgeChunk
 ```
 
 ---
 
-# 43. Concurrency Rules
+# 40. Persistence Invariants
 
-Prevent two doctors from accidentally editing the same review state without detection.
-
-Possible mechanisms:
+The following must remain true:
 
 ```text
-version number
-updated_at comparison
-optimistic locking
+1. Patient → IntakeSession is explicit.
+2. IntakeSession → doctor/hospital assignment is server-validated.
+3. Every answer is traceable to an intake session.
+4. Every answer is traceable to its QuestionEvent.
+5. ClinicalState is structured.
+6. State versions are ordered and retrievable.
+7. Canonical dimensions prevent semantic alias fragmentation.
+8. Important facts retain provenance where practical.
+9. Red flags are explicit records.
+10. Contradictions preserve both conflicting sources.
+11. Documents remain linked to their patient/session context.
+12. OCR candidates remain traceable to OCR evidence.
+13. Physician confirmation is explicit.
+14. Physician changes are auditable.
+15. AI output is never automatically equivalent to physician confirmation.
+16. Schema changes use migrations.
+17. Authorization is not derived from client-side identifiers.
+18. Demo records are synthetic.
 ```
-
-For example:
-
-```text
-expected_version
-actual_version
-```
-
-If mismatch:
-
-```text
-409 CONFLICT
-```
-
-and require refresh/review.
 
 ---
 
-# 44. Data State Hierarchy
+# 41. Transaction Boundaries
 
-Do not treat all information equally.
-
-Recommended hierarchy:
+Answer processing should keep the following state changes consistent where practical:
 
 ```text
-RAW
- ↓
-EXTRACTED
- ↓
-VALIDATED
- ↓
-PATIENT_CONFIRMED
- ↓
-PHYSICIAN_CONFIRMED
+Answer
+QuestionEvent relationship
+ClinicalState version
+AYUSH assessment update
+RedFlag / Contradiction state
+next QuestionEvent
 ```
 
-Not every field must pass every state, but state transitions must be explicit.
+Document processing should preserve:
+
+```text
+Document
+OCR run
+OCR evidence
+candidate set
+candidates
+evidence links
+```
+
+Physician confirmation should preserve:
+
+```text
+PhysicianReview
+PhysicianEdit
+AuditEvent
+```
+
+Failure must never falsely mark a critical operation as complete.
 
 ---
 
-# 45. State Transition Rules
+# 42. Backward Compatibility
 
-### AI extraction
-
-```text
-RAW → EXTRACTED
-```
-
-### Validation
+The existing prototype uses:
 
 ```text
-EXTRACTED → VALIDATED
+ClinicalState.ayush
 ```
 
-### Patient correction
+for adaptive AYUSH data.
+
+The richer target:
 
 ```text
-VALIDATED → PATIENT_CONFIRMED
+AyushAssessmentModel
 ```
 
-### Physician confirmation
+should be introduced additively.
+
+Migration strategy:
 
 ```text
-PATIENT_CONFIRMED → PHYSICIAN_CONFIRMED
+Existing ClinicalState.ayush
+        ↓
+compatibility layer
+        ↓
+AyushAssessmentModel
 ```
 
-### Rejection
-
-```text
-EXTRACTED/VALIDATED → REJECTED
-```
-
-No automatic transition from AI output directly to physician-confirmed.
+Do not delete current fields until all consumers and migrations have been verified.
 
 ---
 
-# 46. API Response Models
+# 43. Demo Seed Data
 
-All FastAPI endpoints should use Pydantic response schemas.
+Use synthetic seed data only.
 
-Examples:
-
-```text
-HospitalResponse
-DoctorResponse
-IntakeResponse
-QuestionDecisionResponse
-ClinicalStateResponse
-DocumentResponse
-DocumentExtractionResponse
-RedFlagResponse
-ContradictionResponse
-DoctorPatientResponse
-PhysicianReviewResponse
-FHIRExportResponse
-```
-
-Do not return ORM entities directly from endpoints.
-
----
-
-# 47. Pagination
-
-Use pagination for:
-
-- hospitals if large;
-- doctor lists;
-- doctor patient queue;
-- timelines;
-- documents;
-- audit events.
-
-Example:
-
-```text
-?page=1&page_size=25
-```
-
-Set safe maximum page size.
-
----
-
-# 48. File Upload Limits
-
-Define configurable:
-
-```text
-MAX_FILE_SIZE_BYTES
-ALLOWED_MIME_TYPES
-```
-
-Example supported prototype types:
-
-```text
-image/jpeg
-image/png
-application/pdf
-```
-
-Do not rely only on browser-declared MIME type.
-
----
-
-# 49. Data Retention
-
-Separate:
-
-```text
-temporary session
-persistent clinical record
-document
-audit record
-```
-
-The product must not assume that browser cleanup deletes backend data.
-
-Retention and deletion rules should be configurable by deployment requirements.
-
----
-
-# 50. Demo Seed Schema
-
-Create deterministic seed data for:
+A controlled seed set may include:
 
 ```text
 1–2 hospitals
 3–5 doctors
-4 synthetic patients
-4 intake sessions
-sample answers
-sample documents
-sample extracted fields
+multiple synthetic patients
+clinical intake cases
+document/OCR cases
 red-flag case
 contradiction case
 AYUSH case
 ```
 
-Seed data must be safe to reset.
+Seed reset must remain safe.
+
+Do not hard-code production patient data into frontend components.
 
 ---
 
-# 51. Example End-to-End Record
+# 44. Schema Migration Rules
 
-```text
-Patient
-  ↓
-IntakeSession
-  ↓
-Answers
-  ↓
-ClinicalState
-  ├── ClinicalFacts
-  ├── RedFlags
-  ├── Contradictions
-  └── Documents
-          ↓
-     DocumentExtraction
-          ↓
-     TimelineEvent
-  ↓
-Patient Review
-  ↓
-PhysicianReview
-  ↓
-FHIRExport
-```
+When modifying the schema:
 
----
-
-# 52. Minimum Backend Schema for First Working Vertical Slice
-
-If implementing incrementally, the minimum database set is:
-
-```text
-User
-Hospital
-Department
-Doctor
-Patient
-Workflow
-IntakeSession
-QuestionEvent
-Answer
-ClinicalState
-PhysicianReview
-AuditEvent
-```
-
-Then add:
-
-```text
-Document
-DocumentExtraction
-TimelineEvent
-RedFlag
-Contradiction
-FHIRExport
-```
-
-as those capabilities are implemented.
-
----
-
-# 53. Backend Schema Rules for AI Agents
-
-When an AI coding agent modifies the schema:
-
-1. Inspect existing migrations first.
-2. Never edit an already-applied migration in a shared environment.
-3. Create a new migration for schema changes.
+1. Inspect the actual current ORM models and migrations.
+2. Do not edit already-applied shared migrations casually.
+3. Create a new additive migration.
 4. Update Pydantic schemas.
 5. Update ORM models.
 6. Update affected API responses.
-7. Update tests.
-8. Update seed fixtures where necessary.
-9. Check foreign-key behavior.
-10. Check authorization impact.
-11. Check whether existing records remain compatible.
+7. Update repositories/services if present.
+8. Update tests.
+9. Update seed fixtures.
+10. Verify foreign keys and authorization impact.
+11. Verify backward compatibility with existing records.
+12. Test migration up/down behavior when supported.
 
 ---
 
-# 54. Schema Anti-Patterns
+# 45. Schema Anti-Patterns
 
 Do NOT:
 
-- store the entire application state in one unstructured JSON blob;
-- store large documents directly in PostgreSQL unless explicitly justified;
+- store the entire application state as one unstructured blob;
 - store raw LLM output as trusted clinical truth;
-- duplicate the same patient data across queue/summary/timeline tables unnecessarily;
-- use client IDs as authorization;
-- store provider secrets in regular database tables without secure secret handling;
-- hard-delete clinical/audit history casually;
-- create one table per symptom or one table per question;
-- create separate unrelated data models for modern medicine and AYUSH.
+- store large medical documents directly in PostgreSQL without justification;
+- duplicate the same patient data across queue and summary tables;
+- use client-provided IDs as authorization;
+- create one table per symptom;
+- create one independent data model for every question;
+- create a separate disconnected AYUSH data architecture;
+- silently replace patient facts with document/AI facts;
+- delete audit history casually.
 
 ---
 
-# 55. Final Schema Invariants
+# 46. AYUSH-Specific Schema Invariants
 
-The following must always remain true:
+The following must remain true:
 
 ```text
-1. Patient → IntakeSession is explicit.
-2. IntakeSession → Doctor assignment is server-validated.
-3. ClinicalState is structured.
-4. Raw answers remain traceable.
-5. Important extracted facts retain provenance.
-6. Red flags have explicit evidence.
-7. Contradictions preserve both conflicting values.
-8. Physician confirmation is explicit.
-9. FHIR is generated from validated/confirmed data.
-10. Uploaded documents remain linked to their source.
-11. External provider failure does not invalidate the data model.
-12. Demo data are synthetic.
-13. Authorization is server-side.
-14. AI output is never automatically treated as confirmed clinical truth.
-15. Schema changes use migrations.
+1. AYUSH is linked to the intake session.
+2. Ayurveda-specific dimensions are scoped to Ayurveda.
+3. Existing baseline AYUSH fields remain compatible.
+4. Expanded Dashavidha dimensions may be unknown.
+5. Unknown does not mean negative.
+6. Ambiguous does not mean confirmed.
+7. AI_INFERRED is not PHYSICIAN_CONFIRMED.
+8. Evidence can point back to patient answers or documents.
+9. Physician corrections are auditable.
+10. AYUSH does not create autonomous diagnosis/treatment fields.
+```
+
+---
+
+# 47. Doctor Data Contract
+
+The doctor patient dossier should be able to retrieve:
+
+```text
+Patient
+IntakeSession
+Latest ClinicalState
+Relevant AYUSH Assessment
+RedFlags
+Contradictions
+Documents
+OCR evidence/candidates
+Conversation timeline
+PhysicianReview
+PhysicianEdits
+```
+
+The exact response can remain aggregated through the current doctor patient-detail API.
+
+Avoid creating multiple competing sources of truth.
+
+---
+
+# 48. FHIR Data Boundary
+
+FHIR mapping should consume validated/confirmed data.
+
+```text
+ClinicalState
++
+physician-confirmed information
+        ↓
+FHIR mapper
+        ↓
+FHIR R4 Bundle
+```
+
+The database schema should preserve enough source information for safe mapping.
+
+Do not treat raw transcript or unvalidated LLM output as final FHIR truth.
+
+---
+
+# 49. Current vs Target Schema Status
+
+## Current / verified
+
+```text
+Users
+Patients
+Hospitals
+Departments
+Doctors
+IntakeSessions
+QuestionEvents
+Answers
+ClinicalStateModel
+RedFlags
+Contradictions
+PhysicianReview
+PhysicianEdit
+AuditEvent
+Documents
+OCR runs/evidence
+Document candidates/evidence links
+KnowledgeDocuments
+KnowledgeChunks
+```
+
+## Target refinements
+
+```text
+richer AyushAssessmentModel
+stronger AYUSH evidence links
+expanded Dashavidha fields
+native PostgreSQL vector storage
+cloud/private object storage
+```
+
+The target refinements must not break existing consumers.
+
+---
+
+# 50. Final Schema Principle
+
+> **The database is the structured evidence and workflow record of SwasthyaVaani—not a storage dump for model output.**
+
+The schema must preserve:
+
+```text
+who said it
+what was inferred
+where evidence came from
+what remains uncertain
+what the physician changed
+what the physician confirmed
+```
+
+This is the foundation for safe adaptive intake, AYUSH assessment, document intelligence, doctor review, auditability, and future interoperability.

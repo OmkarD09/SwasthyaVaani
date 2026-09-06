@@ -13,7 +13,8 @@ if backend_dir not in sys.path:
 from app.core.config import settings
 from app.core.database import Base
 # Import all models to register with Base.metadata
-from app.models import user, intake, document, safety, review
+from app.models import user, intake, document, safety, review, ayush
+
 
 config = context.config
 

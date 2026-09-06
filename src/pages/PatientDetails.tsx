@@ -9,8 +9,12 @@ import {
   ArrowRight,
   ArrowLeft,
   CircleHelp,
+  QrCode,
+  AtSign,
 } from 'lucide-react';
 import { Brand, AppButton } from '../components/Brand';
+import { AbhaVerificationModal } from '../components/AbhaVerificationModal';
+import { type ParsedQrPatientData } from '../utils/parseAbhaQr';
 import { getKioskTranslation } from '../lib/kioskTranslations';
 import {
   getStoredLanguage,
@@ -30,6 +34,9 @@ export function PatientDetails() {
   });
   const [profileErrors, setProfileErrors] = useState<{ name?: string; age?: string }>({});
   const [savedNotice, setSavedNotice] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrNotice, setQrNotice] = useState(false);
+  const [isAbhaFromQr, setIsAbhaFromQr] = useState(false);
 
   useEffect(() => {
     const l = getStoredLanguage() || localStorage.getItem('sv_selected_language');
@@ -43,6 +50,31 @@ export function PatientDetails() {
   }, []);
 
   const t = getKioskTranslation(language || 'English');
+
+  const handleApplyQrData = (data: ParsedQrPatientData) => {
+    setPatientData((prev) => {
+      const updated: PatientProfileData = { ...prev };
+      if (data.fullName) updated.name = data.fullName;
+      if (data.age !== undefined) updated.age = String(data.age);
+      if (data.gender) updated.gender = data.gender;
+      if (data.phone) updated.phone = data.phone;
+      if (data.abhaId) {
+        updated.abhaNumber = data.abhaId;
+        updated.isAbhaFromQr = true;
+      }
+      if (data.abhaAddress) updated.abhaAddress = data.abhaAddress;
+      if (data.dateOfBirth) updated.dateOfBirth = data.dateOfBirth;
+      return updated;
+    });
+
+    if (data.abhaId) {
+      setIsAbhaFromQr(true);
+    }
+    setQrNotice(true);
+    setTimeout(() => {
+      setQrNotice(false);
+    }, 4000);
+  };
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +93,10 @@ export function PatientDetails() {
     }
 
     setProfileErrors({});
-    await patientApi.updateProfile({ ...patientData });
+    await patientApi.updateProfile({
+      ...patientData,
+      isAbhaFromQr: isAbhaFromQr || Boolean(patientData.isAbhaFromQr),
+    });
     setSavedNotice(true);
 
     setTimeout(() => {
@@ -180,6 +215,13 @@ export function PatientDetails() {
                 </div>
               )}
 
+              {qrNotice && (
+                <div className="kiosk-alert-success" style={{ marginBottom: '14px', marginTop: '0' }}>
+                  <Check size={16} />
+                  <span>Patient details imported from QR</span>
+                </div>
+              )}
+
               <form onSubmit={handleProfileSubmit} className="kiosk-form">
                 {/* Full Name */}
                 <div className="kiosk-form-group">
@@ -255,16 +297,40 @@ export function PatientDetails() {
                   </div>
 
                   <div className="kiosk-form-group">
-                    <label className="kiosk-form-label">ABHA Card / Number</label>
+                    <div className="flex items-center justify-between">
+                      <label className="kiosk-form-label" style={{ marginBottom: 0 }}>
+                        ABHA Card / Number
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsQrModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 hover:text-emerald-950 bg-emerald-100/80 hover:bg-emerald-200/90 border border-emerald-300/70 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                        title="Scan ABHA / Health QR Code"
+                      >
+                        <QrCode size={13} />
+                        <span>Scan QR</span>
+                      </button>
+                    </div>
                     <input
                       type="text"
-                      className="kiosk-form-input font-mono"
+                      className="kiosk-form-input font-mono mt-1"
                       value={patientData.abhaNumber || ''}
-                      onChange={(e) =>
-                        setPatientData({ ...patientData, abhaNumber: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setPatientData({ ...patientData, abhaNumber: e.target.value });
+                        setIsAbhaFromQr(false);
+                      }}
                       placeholder="e.g. 91-4521-8890-1234"
                     />
+                    {isAbhaFromQr && patientData.abhaNumber && (
+                      <span className="text-[11px] text-emerald-700 font-medium flex items-center gap-1 mt-1">
+                        <Check size={12} /> ABHA number detected from QR
+                      </span>
+                    )}
+                    {patientData.abhaAddress && (
+                      <span className="text-[11px] text-neutral-500 font-mono flex items-center gap-1 mt-0.5">
+                        <AtSign size={12} /> {patientData.abhaAddress}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -292,6 +358,12 @@ export function PatientDetails() {
           </div>
         </section>
       </div>
+
+      <AbhaVerificationModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        onApplyData={handleApplyQrData}
+      />
     </main>
   );
 }

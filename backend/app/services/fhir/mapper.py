@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from app.schemas.clinical_state import ClinicalState
 from app.schemas.fhir import FHIRBundle
+from app.schemas.ayush import AyushAssessment, AyushProvenanceSource, AyushAssessmentStatus
 
 
 def map_clinical_state_to_fhir_r4(
@@ -10,7 +11,8 @@ def map_clinical_state_to_fhir_r4(
     patient_id: str,
     patient_name: str,
     doctor_name: str,
-    state: ClinicalState
+    state: ClinicalState,
+    ayush_assessment: Optional[AyushAssessment] = None,
 ) -> FHIRBundle:
     """
     Transforms confirmed structured clinical data into an official NRCES India Core
@@ -156,8 +158,36 @@ def map_clinical_state_to_fhir_r4(
             }
         })
 
-    # AYUSH Observations
-    if state.ayush:
+    # AYUSH Observations (Physician-Confirmed or Legacy Fallback)
+    if ayush_assessment:
+        defensible_mappings = [
+            ("agni", "Ayurveda Agni Assessment"),
+            ("koshtha", "Ayurveda Koshtha Assessment"),
+            ("prakriti", "Ayurveda Prakriti Assessment"),
+        ]
+        for field_key, obs_title in defensible_mappings:
+            dim_val = getattr(ayush_assessment, field_key, None)
+            if (
+                dim_val
+                and dim_val.value
+                and (
+                    dim_val.source == AyushProvenanceSource.PHYSICIAN_CONFIRMED
+                    or dim_val.status == AyushAssessmentStatus.PHYSICIAN_CONFIRMED
+                )
+            ):
+                entries.append({
+                    "resource": {
+                        "resourceType": "Observation",
+                        "id": f"obs-{field_key}-{uuid.uuid4()}",
+                        "meta": {"profile": ["https://nrces.in/ndhm/fhir/r4/StructureDefinition/Observation"]},
+                        "status": "final",
+                        "code": {"text": obs_title},
+                        "valueString": str(dim_val.value),
+                        "subject": {"reference": f"Patient/{patient_id}"},
+                        "performer": [{"reference": f"Practitioner/{practitioner_id}", "display": doctor_name}],
+                    }
+                })
+    elif state.ayush:
         if state.ayush.agni:
             entries.append({
                 "resource": {

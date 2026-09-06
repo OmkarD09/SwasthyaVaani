@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'wouter';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -9,6 +10,7 @@ import {
   ChevronDown,
   CircleHelp,
   Clock3,
+  Filter,
   Hospital,
   LayoutDashboard,
   LockKeyhole,
@@ -27,6 +29,149 @@ import {
   clearClinicianSession,
   getClinicianSession,
 } from '../lib/clinicianAuth';
+
+function SlideDigit({ char, direction }: { char: string; direction: number }) {
+  const isDigit = /^[0-9]$/.test(char);
+
+  if (!isDigit) {
+    return <span className="inline-block px-0.5">{char}</span>;
+  }
+
+  return (
+    <span
+      className="relative inline-block overflow-hidden align-top text-center tabular-nums"
+      style={{
+        height: '1.2em',
+        lineHeight: '1.2em',
+        minWidth: '0.62em',
+      }}
+    >
+      <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+        <motion.span
+          key={char}
+          custom={direction}
+          variants={{
+            initial: (dir: number) => ({
+              y: dir > 0 ? '100%' : dir < 0 ? '-100%' : '0%',
+              opacity: dir === 0 ? 1 : 0.25,
+            }),
+            animate: {
+              y: '0%',
+              opacity: 1,
+              transition: {
+                type: 'spring',
+                stiffness: 380,
+                damping: 26,
+                mass: 0.65,
+              },
+            },
+            exit: (dir: number) => ({
+              y: dir > 0 ? '-100%' : dir < 0 ? '100%' : '0%',
+              opacity: 0.25,
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              transition: {
+                type: 'spring',
+                stiffness: 380,
+                damping: 26,
+                mass: 0.65,
+              },
+            }),
+          }}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="inline-block w-full"
+        >
+          {char}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+function useSteppedCounter(targetValue: number) {
+  const [displayValue, setDisplayValue] = useState(targetValue);
+  const targetRef = useRef(targetValue);
+  targetRef.current = targetValue;
+  const isInitial = useRef(true);
+
+  useEffect(() => {
+    if (isInitial.current) {
+      isInitial.current = false;
+      if (targetValue > 0) {
+        setDisplayValue(0);
+      } else {
+        return;
+      }
+    }
+
+    if (displayValue === targetValue) return;
+
+    const diff = targetValue - displayValue;
+    const absDiff = Math.abs(diff);
+
+    const totalSteps = Math.min(absDiff, 8);
+    const stepDuration = Math.max(35, Math.min(75, 350 / totalSteps));
+
+    let currentStep = 0;
+    const startVal = displayValue;
+
+    const interval = setInterval(() => {
+      currentStep++;
+      if (currentStep >= totalSteps) {
+        setDisplayValue(targetRef.current);
+        clearInterval(interval);
+      } else {
+        const progress = currentStep / totalSteps;
+        const ease = 1 - (1 - progress) * (1 - progress);
+        const nextVal = Math.round(startVal + diff * ease);
+        setDisplayValue(nextVal);
+      }
+    }, stepDuration);
+
+    return () => clearInterval(interval);
+  }, [targetValue]);
+
+  return displayValue;
+}
+
+function AnimatedCounter({
+  value,
+  pad = 2,
+  suffix = '',
+}: {
+  value: number;
+  pad?: number;
+  suffix?: string;
+}) {
+  const displayValue = useSteppedCounter(value);
+  const prevValRef = useRef(displayValue);
+  const [direction, setDirection] = useState(1);
+
+  useEffect(() => {
+    if (displayValue > prevValRef.current) {
+      setDirection(1);
+    } else if (displayValue < prevValRef.current) {
+      setDirection(-1);
+    }
+    prevValRef.current = displayValue;
+  }, [displayValue]);
+
+  const formattedStr = pad > 0 ? String(displayValue).padStart(pad, '0') : String(displayValue);
+  const chars = formattedStr.split('');
+
+  return (
+    <span className="inline-flex items-baseline font-inherit tabular-nums">
+      {chars.map((char, idx) => (
+        <SlideDigit key={`slot-${idx}-${chars.length}`} char={char} direction={direction} />
+      ))}
+      {suffix && <small className="ml-1 text-[13px] font-medium text-[#657b87]">{suffix}</small>}
+    </span>
+  );
+}
 
 function DoctorPortalSidebar({
   active,
@@ -228,6 +373,8 @@ function sortPatientQueue(patients: any[]): any[] {
   });
 }
 
+type StatFilterType = 'all' | 'priority' | 'reviewed';
+
 export function DoctorPortal() {
   const [, setLocation] = useLocation();
   const [selected, setSelected] = useState(0);
@@ -235,9 +382,22 @@ export function DoctorPortal() {
   const [queue, setQueue] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statFilter, setStatFilter] = useState<StatFilterType>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [now, setNow] = useState<number>(Date.now());
+
+  const clinicianSession = getClinicianSession();
+  const clinicianName = clinicianSession?.display_name
+    ? `Dr. ${clinicianSession.display_name.replace(/^(dr\.?\s*)/i, '')}`
+    : 'Doctor';
+
+  const getGreeting = () => {
+    const hour = new Date(now).getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 5000);
@@ -328,6 +488,11 @@ export function DoctorPortal() {
   const activeQueue = queue ?? [];
   const sortedQueue = sortPatientQueue(activeQueue);
   const filteredQueue = sortedQueue.filter((item) => {
+    if (statFilter === 'priority') {
+      if (getPriorityWeight(item.priority, item.has_red_flags) !== 3) return false;
+    } else if (statFilter === 'reviewed') {
+      if (item.status !== 'CONFIRMED') return false;
+    }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     const nameMatch = (item.name || '').toLowerCase().includes(q);
@@ -336,6 +501,19 @@ export function DoctorPortal() {
     const reasonMatch = (item.reason || '').toLowerCase().includes(q);
     return nameMatch || idMatch || sessionMatch || reasonMatch;
   });
+
+  const waitingCount = activeQueue.length;
+  const highPriorityCount = activeQueue.filter(
+    (item) => getPriorityWeight(item.priority, item.has_red_flags) === 3
+  ).length;
+  const avgWaitTime =
+    activeQueue.length > 0
+      ? Math.round(
+        activeQueue.reduce((acc, curr) => acc + (curr.wait_time_minutes || 0), 0) /
+        activeQueue.length
+      )
+      : 0;
+  const reviewedCount = activeQueue.filter((item) => item.status === 'CONFIRMED').length;
 
   const patient = filteredQueue.length > 0
     ? filteredQueue[Math.min(selected, filteredQueue.length - 1)]
@@ -366,65 +544,152 @@ export function DoctorPortal() {
               >
                 <Menu size={20} />
               </button>
-              <div className="section-kicker">OPD TRIAGE · LIVE CONNECTED</div>
-              <h1>Good morning, Doctor</h1>
-              <p>{currentDate} · Clinical Workspace</p>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-[11px] font-semibold text-emerald-800 tracking-wide">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                  </span>
+                  OPD TRIAGE · LIVE CONNECTED
+                </span>
+                <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full bg-[#edf4f2] text-[11px] font-medium text-[#234d40]">
+                  Consultation Desk · Live Triage
+                </span>
+              </div>
+              <h1>{getGreeting()}, {clinicianName}</h1>
+              <p>{currentDate} · Clinical Workspace · AI-assisted Triage</p>
             </div>
           </div>
           <div className="doctor-stats">
-            <div className="doctor-stat accent">
-              <span className="stat-icon stat-icon-waiting">
+            {/* Card 1: Waiting Now */}
+            <div
+              className={`doctor-stat accent clickable-stat ${statFilter === 'all' ? 'active-filter' : ''}`}
+              onClick={() => {
+                setStatFilter('all');
+                setSelected(0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setStatFilter('all');
+                  setSelected(0);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              title="Click to view all waiting patients"
+              aria-label={`Waiting now: ${waitingCount} patients. Click to view all waiting patients.`}
+            >
+              <span className="stat-icon stat-icon-waiting flex items-center justify-center shrink-0">
                 <Users size={18} />
               </span>
               <div>
                 <span>Waiting now</span>
-                <strong>{String(activeQueue.length).padStart(2, '0')}</strong>
+                <strong>
+                  <AnimatedCounter value={waitingCount} pad={2} />
+                </strong>
+                {statFilter === 'all' && <span className="stat-filter-indicator">All waiting</span>}
               </div>
               <small>Live connected</small>
             </div>
-            <div className="doctor-stat priority-alert-stat">
-              <span className="stat-icon priority-icon">
+
+            {/* Card 2: High Priority */}
+            <div
+              className={`doctor-stat priority-alert-stat clickable-stat ${highPriorityCount > 0 ? 'has-priority-alert' : ''
+                } ${statFilter === 'priority' ? 'active-filter' : ''}`}
+              onClick={() => {
+                setStatFilter((prev) => (prev === 'priority' ? 'all' : 'priority'));
+                setSelected(0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setStatFilter((prev) => (prev === 'priority' ? 'all' : 'priority'));
+                  setSelected(0);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              title={
+                statFilter === 'priority'
+                  ? 'Click to reset filter'
+                  : 'Click to filter queue to high priority patients'
+              }
+              aria-label={`High priority: ${highPriorityCount} patients. Click to toggle high priority filter.`}
+            >
+              <span className="stat-icon priority-icon flex items-center justify-center shrink-0">
                 <AlertTriangle size={18} />
               </span>
               <div>
                 <span>High priority</span>
                 <strong className="priority-number">
-                  {String(
-                    activeQueue.filter(
-                      (item) => getPriorityWeight(item.priority, item.has_red_flags) === 3
-                    ).length
-                  ).padStart(2, '0')}
+                  <AnimatedCounter value={highPriorityCount} pad={2} />
                 </strong>
+                {statFilter === 'priority' ? (
+                  <span className="stat-filter-indicator priority">Filtering Priority</span>
+                ) : highPriorityCount > 0 ? (
+                  <span className="stat-filter-indicator priority">Action needed</span>
+                ) : null}
               </div>
-              <small className="priority-badge-sub">Needs prompt review</small>
+              <small className="priority-badge-sub">
+                {highPriorityCount > 0 ? 'Needs prompt review' : 'All clear'}
+              </small>
             </div>
-            <div className="doctor-stat">
-              <span className="stat-icon stat-icon-wait-time">
+
+            {/* Card 3: Avg Wait Time */}
+            <div
+              className="doctor-stat"
+              title="Average real-time wait duration across current queue"
+              aria-label={`Average wait time: ${avgWaitTime} minutes`}
+            >
+              <span className="stat-icon stat-icon-wait-time flex items-center justify-center shrink-0">
                 <Clock3 size={18} />
               </span>
               <div>
                 <span>Avg. wait time</span>
                 <strong>
-                  {activeQueue.length > 0
-                    ? Math.round(
-                        activeQueue.reduce((acc, curr) => acc + (curr.wait_time_minutes || 0), 0) /
-                          activeQueue.length
-                      )
-                    : 0}{' '}
-                  <small>min</small>
+                  <AnimatedCounter value={avgWaitTime} pad={0} suffix="min" />
                 </strong>
               </div>
-              <small className="good">Real-time calculate</small>
+              <small className="good">
+                {avgWaitTime <= 15 ? 'Optimal flow' : 'Real-time calculate'}
+              </small>
             </div>
-            <div className="doctor-stat">
-              <span className="stat-icon stat-icon-reviewed">
+
+            {/* Card 4: Reviewed Today */}
+            <div
+              className={`doctor-stat clickable-stat ${statFilter === 'reviewed' ? 'active-filter' : ''}`}
+              onClick={() => {
+                setStatFilter((prev) => (prev === 'reviewed' ? 'all' : 'reviewed'));
+                setSelected(0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setStatFilter((prev) => (prev === 'reviewed' ? 'all' : 'reviewed'));
+                  setSelected(0);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              title={
+                statFilter === 'reviewed'
+                  ? 'Click to reset filter'
+                  : 'Click to filter queue to reviewed patients'
+              }
+              aria-label={`Reviewed today: ${reviewedCount} patients. Click to toggle reviewed patients filter.`}
+            >
+              <span className="stat-icon stat-icon-reviewed flex items-center justify-center shrink-0">
                 <CheckCircle2 size={18} />
               </span>
               <div>
                 <span>Reviewed today</span>
                 <strong>
-                  {activeQueue.filter((item) => item.status === 'CONFIRMED').length}
+                  <AnimatedCounter value={reviewedCount} pad={2} />
                 </strong>
+                {statFilter === 'reviewed' && (
+                  <span className="stat-filter-indicator">Filtering Reviewed</span>
+                )}
               </div>
               <small>of {activeQueue.length} total</small>
             </div>
@@ -482,9 +747,8 @@ export function DoctorPortal() {
                   >
                     <RefreshCw
                       size={14}
-                      className={`inline mr-1 transition-transform ${
-                        isRefreshing ? 'animate-spin text-[#1f5b4e]' : ''
-                      }`}
+                      className={`inline mr-1 transition-transform ${isRefreshing ? 'animate-spin text-[#1f5b4e]' : ''
+                        }`}
                     />
                     <span>{isRefreshing ? 'Syncing...' : 'Refresh queue'}</span>
                   </button>
@@ -492,6 +756,33 @@ export function DoctorPortal() {
               </div>
 
               <div className="queue-list">
+                {statFilter !== 'all' && (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 mb-2 rounded-xl bg-[#eef7f4] border border-[#cbe4dc] text-xs text-[#1e4d41] transition-all">
+                    <div className="flex items-center gap-2 font-medium">
+                      <Filter size={13} className="text-[#1f5b4e] shrink-0" />
+                      <span>
+                        Active filter:{' '}
+                        <b>
+                          {statFilter === 'priority'
+                            ? 'High Priority Patients'
+                            : 'Reviewed Patients'}
+                        </b>{' '}
+                        ({filteredQueue.length}{' '}
+                        {filteredQueue.length === 1 ? 'patient' : 'patients'})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatFilter('all');
+                        setSelected(0);
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-[#1f5b4e] hover:text-[#12382f] underline cursor-pointer"
+                    >
+                      <X size={12} /> Clear filter
+                    </button>
+                  </div>
+                )}
                 {queue === null ? (
                   /* Initial loading state */
                   <div className="py-12 px-4 text-center rounded-xl border border-dashed border-[#dce6e9] bg-[#fbfdfd] my-3">
@@ -575,6 +866,25 @@ export function DoctorPortal() {
                       className="mt-3 text-xs font-semibold text-[#1f5b4e] hover:underline cursor-pointer"
                     >
                       Clear search
+                    </button>
+                  </div>
+                ) : statFilter !== 'all' ? (
+                  /* Empty state for active stat filter with no matches */
+                  <div className="py-12 px-4 text-center rounded-xl border border-dashed border-[#dce6e9] bg-[#fbfdfd] my-3">
+                    <Filter size={26} className="mx-auto mb-2 text-[#9bb0ba]" />
+                    <p className="font-semibold text-sm text-[#274457]">No matching patients</p>
+                    <p className="text-xs text-[#758a96] mt-1">
+                      No patients in queue currently match the {statFilter === 'priority' ? 'high priority' : 'reviewed'} filter.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatFilter('all');
+                        setSelected(0);
+                      }}
+                      className="mt-3 text-xs font-semibold text-[#1f5b4e] hover:underline cursor-pointer"
+                    >
+                      Show all waiting patients
                     </button>
                   </div>
                 ) : (

@@ -85,4 +85,8 @@ class Patient(Base):
     gender = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     abha_id = Column(String, unique=True, nullable=True, index=True)
+    abha_address = Column(String, nullable=True, index=True)
+    abha_status = Column(String, nullable=False, default="UNVERIFIED")
+    verification_timestamp = Column(DateTime(timezone=True), nullable=True)
+    consent_recorded = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

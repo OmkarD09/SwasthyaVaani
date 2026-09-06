@@ -1,0 +1,35 @@
+{
+  "session_id": "5fca4764-6337-45c6-aa3f-9dff0991fdf3",
+  "token": "A-EFC107",
+  "question_sequence": [
+    {
+      "target": "open_ayush_exploration",
+      "text": "\u0915\u094d\u092f\u093e \u0906\u092a\u0928\u0947 \u0905\u092c \u0924\u0915 \u0906\u092f\u0941\u0930\u094d\u0935\u0947\u0926\u093f\u0915 \u092f\u093e \u0918\u0930\u0947\u0932\u0942 \u0909\u092a\u093e\u092f\u094b\u0902 \u0938\u0947 \u0930\u093e\u0939\u0924 \u0932\u0947\u0928\u0947 \u0915\u0940 \u0915\u094b\u0936\u093f\u0936 \u0915\u0940 \u0939\u0948?"
+    },
+    {
+      "target": "koshtha",
+      "text": "\u0915\u094d\u092f\u093e \u0906\u092a\u0915\u0940 \u092a\u091a\u0928 \u0936\u0915\u094d\u0924\u093f \u0914\u0930 \u092e\u0932\u0924\u094d\u092f\u093e\u0917 (\u0915\u0949\u0938\u094d\u091f\u093f\u0915) \u0915\u0940 \u0928\u093f\u092f\u092e\u093f\u0924\u0924\u093e \u092d\u0940 \u092a\u094d\u0930\u092d\u093e\u0935\u093f\u0924 \u0939\u0941\u0908 \u0939\u0948?"
+    },
+    {
+      "target": "ahara_vihara",
+      "text": "\u0915\u094d\u092f\u093e \u0906\u092a\u0915\u093e \u092d\u094b\u091c\u0928 \u0938\u092e\u092f \u0938\u0947 \u0939\u094b\u0924\u093e \u0939\u0948 \u0914\u0930 \u0916\u093e\u0928\u0947 \u0915\u0947 \u092c\u093e\u0926 \u092a\u0947\u091f \u092d\u093e\u0930\u0940 \u0932\u0917\u0924\u093e \u0939\u0948?"
+    }
+  ],
+  "results": {
+    "step_1_patient_created": true,
+    "step_2_vaya_demographic_bridge": true,
+    "step_3_adaptive_intake_loop": true,
+    "step_4_expanded_dashavidha_collected": true,
+    "step_5_persistence_verified": true,
+    "step_6_doctor_queue_verified": true,
+    "step_7_doctor_detail_api_verified": true,
+    "step_8_physician_edit_verified": true,
+    "step_9_physician_confirmation_verified": true,
+    "step_10_provenance_granularity_verified": true,
+    "step_11_audit_trail_verified": true,
+    "step_12_fhir_conservative_export_verified": true,
+    "step_13_general_clinical_unaffected": true,
+    "step_14_no_autonomous_treatment_verified": true
+  },
+  "final_verdict": "PASS"
+}

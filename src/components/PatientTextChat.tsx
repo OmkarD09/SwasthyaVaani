@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, ArrowRight, Mic, CheckCircle2, RotateCcw, Sparkles } from 'lucide-react';
 import { getKioskTranslation } from '../lib/kioskTranslations';
 import { recordIntakeAnswer } from '../lib/conversationStore';
+import { getStoredPatientProfile } from '../services/patientApi';
 
 export interface ChatMessage {
   id: string;
@@ -203,14 +204,25 @@ export function PatientTextChat({
   useEffect(() => {
     async function initSession() {
       try {
+        const profile = getStoredPatientProfile();
         const langCode = currentLang === 'हिन्दी' ? 'hi' : currentLang === 'मराठी' ? 'mr' : 'en';
+        // Avoid sending placeholder demo ABHA if neither scanned nor modified
+        const isDefaultDemoAbha = profile?.abhaNumber === '91-4521-8890-1234' && !profile?.isAbhaFromQr;
+        const abhaIdToSend = isDefaultDemoAbha ? null : (profile?.abhaNumber || null);
+        const abhaAddressToSend = isDefaultDemoAbha ? null : (profile?.abhaAddress || null);
+        const phoneToSend = profile?.phone === '9876543210' && !profile?.isAbhaFromQr ? null : (profile?.phone || null);
+
         const res = await fetch('/api/v1/intakes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            patient_name: patientName,
-            patient_age: parseInt(patientAge) || 35,
-            patient_gender: 'FEMALE',
+            patient_name: profile?.name || patientName || 'Patient',
+            patient_age: (profile?.age ? parseInt(profile.age, 10) : null) ?? (parseInt(patientAge, 10) || null),
+            patient_gender: profile?.gender || 'Female',
+            phone: phoneToSend,
+            date_of_birth: profile?.dateOfBirth || null,
+            abha_id: abhaIdToSend,
+            abha_address: abhaAddressToSend,
             language_code: langCode,
             workflow_type: 'GENERAL_CLINICAL',
             interaction_mode: 'TEXT',

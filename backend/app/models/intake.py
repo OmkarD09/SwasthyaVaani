@@ -37,6 +37,8 @@ class IntakeSession(Base):
     red_flags = relationship("RedFlagModel", back_populates="intake_session", cascade="all, delete-orphan")
     contradictions = relationship("ContradictionModel", back_populates="intake_session", cascade="all, delete-orphan")
     physician_review = relationship("PhysicianReviewModel", back_populates="intake_session", uselist=False)
+    ayush_assessment = relationship("AyushAssessmentModel", back_populates="intake_session", uselist=False, cascade="all, delete-orphan")
+
 
 
 class QuestionEvent(Base):
