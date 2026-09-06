@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   FileText,
+  History,
   Leaf,
   Menu,
   BellRing,
@@ -62,7 +63,8 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
 
   const isConversation = location.includes('/conversation');
   const isAyush = location.includes('/ayush');
-  const isSummary = location.includes('/summary') || (!isConversation && !isAyush);
+  const isHistory = location.includes('/history');
+  const isSummary = location.includes('/summary') || (!isConversation && !isAyush && !isHistory);
 
   return (
     <div className="portal-page">
@@ -111,6 +113,18 @@ export function PatientRecordShell({ patientId, children }: PatientRecordShellPr
           >
             <FileText size={18} />
             <span>Clinical Summary</span>
+          </button>
+
+          <button
+            type="button"
+            className={isHistory ? 'active' : ''}
+            onClick={() => {
+              setMobile(false);
+              setLocation(`/doctor/patient/${patientId}/history`);
+            }}
+          >
+            <History size={18} />
+            <span>Clinical History</span>
           </button>
 
           <button

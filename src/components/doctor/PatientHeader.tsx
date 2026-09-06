@@ -47,24 +47,33 @@ export function PatientHeader({
       <div className="flex flex-wrap items-start justify-between gap-4">
         {/* Left: Patient Primary Info */}
         <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-block rounded-md bg-[#eeeade] px-2 py-0.5 font-mono text-xs font-bold text-[#8d6138]">
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <span className="inline-block rounded-md bg-[#eeeade] px-2.5 py-0.5 font-mono text-xs font-bold text-[#8d6138]">
               #{token}
             </span>
             <h1 className="font-serif text-3xl font-bold tracking-tight text-[#173e35] sm:text-4xl">
               {patientName}
             </h1>
-            <div className="flex items-center gap-2 text-sm text-[#668075]">
-              {patientAge ? <span>{patientAge} yrs</span> : null}
-              {patientAge && patientGender ? <span>·</span> : null}
-              {patientGender ? <span>{patientGender}</span> : null}
-              {patientId ? (
-                <>
-                  <span>·</span>
-                  <span className="font-mono text-xs text-[#7c9086]">ID: {patientId}</span>
-                </>
-              ) : null}
-            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[#446658]">
+            <span>
+              <strong className="font-bold text-[#173e35]">AGE:</strong>{' '}
+              {patientAge ? `${patientAge} yrs` : 'Not recorded'}
+            </span>
+            <span>•</span>
+            <span>
+              <strong className="font-bold text-[#173e35]">Gender:</strong>{' '}
+              {patientGender || 'Not recorded'}
+            </span>
+            {patientId ? (
+              <>
+                <span>•</span>
+                <span>
+                  <strong className="font-bold text-[#173e35]">Patient ID:</strong>{' '}
+                  <span className="font-mono text-xs text-[#2c5244]">{patientId}</span>
+                </span>
+              </>
+            ) : null}
           </div>
 
           <div className="mt-1.5 flex items-center gap-3 text-xs text-[#688176]">

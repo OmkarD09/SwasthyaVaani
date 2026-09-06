@@ -58,7 +58,13 @@ export type PatientDetail = {
     }[];
     vitals?: Record<string, any>;
     medications?: string[];
+    medical_history?: string | string[];
+    past_medical_history?: string | string[];
+    allergies?: string | string[];
+    family_history?: string | string[];
+    social_history?: string | string[];
     confidence?: number;
+    [key: string]: unknown;
   };
   submitted_at: string;
   clinician_notes?: string;
