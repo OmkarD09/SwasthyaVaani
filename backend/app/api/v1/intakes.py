@@ -35,7 +35,9 @@ from app.schemas.intake import (
     VoiceAnswerSubmitResponse,
 )
 from app.services.clinical_ai.adaptive_engine import evaluate_next_question
+from app.services.patient_id import generate_next_patient_display_id
 from app.services.providers.factory import get_llm_service, get_speech_service
+from app.core.datetime_utils import ensure_utc_iso
 
 router = APIRouter(prefix="/intakes", tags=["Patient Intake"])
 
@@ -276,6 +278,9 @@ async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(
     if req.submit_now:
         session.status = "SUBMITTED"
         session.submitted_at = datetime.now(timezone.utc)
+        if not patient.display_id:
+            patient.display_id = generate_next_patient_display_id(db)
+            db.flush()
         priority = "NORMAL"
         if init_state.red_flags:
             priority = "URGENT"
@@ -298,7 +303,7 @@ async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(
                     "intake_session_id": session.id,
                     "token": session.token,
                     "priority": priority,
-                    "submitted_at": session.submitted_at.isoformat(),
+                    "submitted_at": ensure_utc_iso(session.submitted_at),
                 }
             )
         except Exception as ws_err:
@@ -310,6 +315,8 @@ async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(
         id=session.id,
         token=session.token,
         patient_id=session.patient_id,
+        patient_display_id=patient.display_id,
+        display_id=patient.display_id,
         patient_name=patient.display_name,
         patient_age=patient.age,
         patient_gender=patient.gender,
@@ -355,6 +362,8 @@ def get_intake_session(intake_id: str, db: Session = Depends(get_db)):
         id=session.id,
         token=session.token,
         patient_id=session.patient_id,
+        patient_display_id=patient.display_id if patient else None,
+        display_id=patient.display_id if patient else None,
         patient_name=patient.display_name if patient else "Patient",
         patient_age=patient.age if patient else None,
         patient_gender=patient.gender if patient else None,
@@ -795,11 +804,18 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
     if not session:
         raise HTTPException(status_code=404, detail="Intake session not found")
 
+    patient = db.query(Patient).filter(Patient.id == session.patient_id).first()
     if session.status == "SUBMITTED" and session.submitted_at:
+        if patient and not patient.display_id:
+            patient.display_id = generate_next_patient_display_id(db)
+            db.commit()
         return IntakeSubmissionResponse(
             intake_session_id=session.id,
             status="SUBMITTED",
             token=session.token,
+            patient_id=session.patient_id,
+            patient_display_id=patient.display_id if patient else None,
+            display_id=patient.display_id if patient else None,
             doctor_id=session.doctor_id,
             submitted_at=session.submitted_at,
             message="Patient intake successfully submitted to clinician queue.",
@@ -807,6 +823,9 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
 
     session.status = "SUBMITTED"
     session.submitted_at = datetime.now(timezone.utc)
+    if patient and not patient.display_id:
+        patient.display_id = generate_next_patient_display_id(db)
+        db.flush()
 
     # Load latest clinical state for triage evaluation
     latest_state_model = (
@@ -845,7 +864,7 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
             "intake_session_id": session.id,
             "token": session.token,
             "priority": priority,
-            "submitted_at": session.submitted_at.isoformat(),
+            "submitted_at": ensure_utc_iso(session.submitted_at),
         }
     )
 
@@ -853,6 +872,9 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
         intake_session_id=session.id,
         status="SUBMITTED",
         token=session.token,
+        patient_id=session.patient_id,
+        patient_display_id=patient.display_id if patient else None,
+        display_id=patient.display_id if patient else None,
         doctor_id=session.doctor_id or "doc_001",
         submitted_at=session.submitted_at,
         message="Patient intake successfully submitted to clinician queue.",

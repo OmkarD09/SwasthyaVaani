@@ -26,14 +26,14 @@ class IntakeSession(Base):
     current_question_index = Column(Integer, default=0)
     question_count = Column(Integer, default=0)
     
-    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    submitted_at = Column(DateTime, nullable=True, index=True)
-    completed_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    submitted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Review status lifecycle: PENDING_REVIEW -> REVIEWED
     review_status = Column(String, default="PENDING_REVIEW", nullable=False, index=True)
     reviewed_by = Column(String, ForeignKey("doctors.id"), nullable=True)
-    reviewed_at = Column(DateTime, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     questions = relationship("QuestionEvent", back_populates="intake_session", cascade="all, delete-orphan")

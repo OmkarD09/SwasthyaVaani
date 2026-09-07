@@ -2,6 +2,8 @@ export type DoctorQueueItem = {
   intake_session_id: string;
   token: string;
   patient_id: string;
+  patient_display_id?: string | null;
+  display_id?: string | null;
   patient_name: string;
   patient_age: number | null;
   patient_gender: string | null;
@@ -25,6 +27,8 @@ export type PatientDetail = {
   intake_session_id: string;
   token: string;
   patient_id: string;
+  patient_display_id?: string | null;
+  display_id?: string | null;
   patient_name: string;
   patient_age: number | null;
   patient_gender: string | null;

@@ -31,6 +31,7 @@ import {
   clearClinicianSession,
   getClinicianSession,
 } from '../lib/clinicianAuth';
+import { formatLocalTime, isTodayLocal } from '../lib/dateUtils';
 
 function SlideDigit({ char, direction }: { char: string; direction: number }) {
   const isDigit = /^[0-9]$/.test(char);
@@ -472,6 +473,15 @@ function sortPatientQueue(patients: any[]): any[] {
   });
 }
 
+function formatWaitDisplay(waitMinutes?: number): string {
+  const mins = Math.max(0, Math.round(waitMinutes || 0));
+  if (mins === 0) return '< 1 min';
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
+}
+
 function formatQueueItems(data: any[]): any[] {
   const colors = ['coral', 'amber', 'mint', 'blue', 'lavender'];
   const langNames: Record<string, string> = {
@@ -492,8 +502,18 @@ function formatQueueItems(data: any[]): any[] {
       .slice(0, 2)
       .toUpperCase() || 'PT';
 
+    const displayId =
+      item.display_id ||
+      item.patient_display_id ||
+      (item.patient_id && /^P\d+$/.test(item.patient_id) ? item.patient_id : null) ||
+      `P${String(idx + 1).padStart(3, '0')}`;
+
+    const waitMins = item.wait_time_minutes || 0;
+
     return {
-      id: item.token || `SV-${item.intake_session_id?.slice(0, 4)}`,
+      id: item.intake_session_id || displayId || `item-${idx}`,
+      display_id: displayId,
+      patient_display_id: item.patient_display_id || displayId,
       token: item.token,
       intake_session_id: item.intake_session_id,
       patient_id: item.patient_id,
@@ -502,12 +522,13 @@ function formatQueueItems(data: any[]): any[] {
       gender: item.patient_gender || 'Not recorded',
       lang: langNames[item.language_code] || item.language_code || 'Language unavailable',
       reason: item.chief_complaint || 'Chief complaint not recorded',
-      wait: `${String(item.wait_time_minutes || 0).padStart(2, '0')} min`,
-      wait_time_minutes: item.wait_time_minutes || 0,
-      priority: item.priority || 'Routine',
+      wait: formatWaitDisplay(waitMins),
+      wait_time_minutes: waitMins,
+      priority: item.priority || (item.has_red_flags ? 'Priority' : 'Routine'),
       initials: initials,
       color: colors[idx % colors.length],
       has_red_flags: Boolean(item.has_red_flags),
+      documents_count: item.documents_count || 0,
       status: item.status,
       review_status: item.review_status,
       reviewed_by: item.reviewed_by,
@@ -518,10 +539,28 @@ function formatQueueItems(data: any[]): any[] {
 
 type StatFilterType = 'all' | 'priority' | 'reviewed';
 
+// Module-level cache to keep queue state across route navigation and tab switches without loading flickers
+let cachedLiveQueue: any[] | null = null;
+let cachedReviewedQueue: any[] | null = null;
+
 export function DoctorPortal() {
   const [location, setLocation] = useLocation();
-  const isReviewedRoute = location === '/doctor/reviewed';
-  const viewMode: 'live' | 'reviewed' = isReviewedRoute ? 'reviewed' : 'live';
+  const [activeTab, setActiveTab] = useState<'live' | 'reviewed'>(() => {
+    return location.startsWith('/doctor/reviewed') || location.includes('/reviewed')
+      ? 'reviewed'
+      : 'live';
+  });
+
+  // Sync activeTab when location changes (e.g. browser back/forward buttons or direct URL)
+  useEffect(() => {
+    const isReviewed = location.startsWith('/doctor/reviewed') || location.includes('/reviewed');
+    const targetTab = isReviewed ? 'reviewed' : 'live';
+    if (activeTab !== targetTab) {
+      setActiveTab(targetTab);
+    }
+  }, [location, activeTab]);
+
+  const viewMode = activeTab;
 
   const [selected, setSelected] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -543,8 +582,8 @@ export function DoctorPortal() {
     });
   };
 
-  const [liveQueue, setLiveQueue] = useState<any[] | null>(null);
-  const [reviewedQueue, setReviewedQueue] = useState<any[] | null>(null);
+  const [liveQueue, setLiveQueue] = useState<any[] | null>(() => cachedLiveQueue);
+  const [reviewedQueue, setReviewedQueue] = useState<any[] | null>(() => cachedReviewedQueue);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statFilter, setStatFilter] = useState<StatFilterType>('all');
@@ -569,10 +608,6 @@ export function DoctorPortal() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    setSelected(0);
-  }, [viewMode]);
-
   const getRelativeUpdatedText = () => {
     const seconds = Math.floor((now - lastUpdated.getTime()) / 1000);
     if (seconds < 10) return 'Updated just now';
@@ -593,23 +628,29 @@ export function DoctorPortal() {
       if (liveRes.ok) {
         const liveData = await liveRes.json();
         if (Array.isArray(liveData)) {
-          setLiveQueue(sortPatientQueue(formatQueueItems(liveData)));
+          const formattedLive = sortPatientQueue(formatQueueItems(liveData));
+          cachedLiveQueue = formattedLive;
+          setLiveQueue(formattedLive);
         } else {
+          cachedLiveQueue = [];
           setLiveQueue([]);
         }
       } else {
-        if (liveQueue === null) setLiveQueue([]);
+        if (liveQueue === null && cachedLiveQueue === null) setLiveQueue([]);
       }
 
       if (reviewedRes.ok) {
         const reviewedData = await reviewedRes.json();
         if (Array.isArray(reviewedData)) {
-          setReviewedQueue(formatQueueItems(reviewedData));
+          const formattedReviewed = formatQueueItems(reviewedData);
+          cachedReviewedQueue = formattedReviewed;
+          setReviewedQueue(formattedReviewed);
         } else {
+          cachedReviewedQueue = [];
           setReviewedQueue([]);
         }
       } else {
-        if (reviewedQueue === null) setReviewedQueue([]);
+        if (reviewedQueue === null && cachedReviewedQueue === null) setReviewedQueue([]);
       }
 
       if (!liveRes.ok && !reviewedRes.ok) {
@@ -621,8 +662,8 @@ export function DoctorPortal() {
     } catch (err: any) {
       console.error('DoctorPortal queues fetch error:', err);
       setError('Unable to connect to backend clinical database.');
-      if (liveQueue === null) setLiveQueue([]);
-      if (reviewedQueue === null) setReviewedQueue([]);
+      if (liveQueue === null && cachedLiveQueue === null) setLiveQueue([]);
+      if (reviewedQueue === null && cachedReviewedQueue === null) setReviewedQueue([]);
     } finally {
       if (manual) {
         setTimeout(() => setIsRefreshing(false), 300);
@@ -630,10 +671,139 @@ export function DoctorPortal() {
     }
   };
 
+  const handleSwitchTab = (tab: 'live' | 'reviewed') => {
+    setActiveTab(tab);
+    setSelected(0);
+    setSearchQuery('');
+    setStatFilter('all');
+    const targetPath = tab === 'reviewed' ? '/doctor/reviewed' : '/doctor';
+    if (location !== targetPath) {
+      setLocation(targetPath);
+    }
+    fetchQueues(false);
+  };
+
+  // Immediate sync and refetch whenever active tab changes
+  useEffect(() => {
+    setSelected(0);
+    setSearchQuery('');
+    fetchQueues(false);
+  }, [activeTab]);
+
   useEffect(() => {
     fetchQueues();
     const interval = setInterval(() => fetchQueues(false), 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Listen for patient review confirmations from clinical summary
+  useEffect(() => {
+    const handlePatientReviewed = (e: any) => {
+      const detail = e.detail;
+      if (!detail) return;
+      const sessionId = detail.intake_session_id;
+
+      // Instantly remove confirmed patient from Live Queue
+      setLiveQueue((prev) => {
+        if (!prev) return prev;
+        const updated = prev.filter((p) => p.intake_session_id !== sessionId && p.id !== sessionId);
+        cachedLiveQueue = updated;
+        return updated;
+      });
+
+      // Instantly add to Reviewed Queue
+      setReviewedQueue((prev) => {
+        const existing = prev ? [...prev] : [];
+        const alreadyReviewed = existing.some((p) => p.intake_session_id === sessionId || p.id === sessionId);
+        if (!alreadyReviewed) {
+          const newItem = {
+            id: detail.display_id || detail.patient_id || `P${String(existing.length + 1).padStart(3, '0')}`,
+            display_id: detail.display_id,
+            patient_display_id: detail.display_id,
+            token: detail.token,
+            intake_session_id: sessionId,
+            patient_id: detail.patient_id,
+            name: detail.name || 'Patient',
+            age: 'Age unavailable',
+            gender: 'Not recorded',
+            lang: 'en',
+            reason: 'Clinical history confirmed',
+            wait: '00 min',
+            wait_time_minutes: 0,
+            priority: 'Routine',
+            initials: (detail.name || 'PT').slice(0, 2).toUpperCase(),
+            color: 'teal',
+            has_red_flags: false,
+            status: 'REVIEWED',
+            review_status: 'REVIEWED',
+            reviewed_by: detail.reviewed_by || 'Clinician',
+            reviewed_at: detail.reviewed_at || new Date().toISOString(),
+          };
+          const updated = [newItem, ...existing];
+          cachedReviewedQueue = updated;
+          return updated;
+        }
+        return existing;
+      });
+
+      // Also trigger network fetch in background to sync fully
+      fetchQueues(false);
+    };
+
+    window.addEventListener('swasthyavaani-patient-reviewed', handlePatientReviewed);
+    return () => {
+      window.removeEventListener('swasthyavaani-patient-reviewed', handlePatientReviewed);
+    };
+  }, []);
+
+  // WebSocket connection for real-time triage queue updates
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let retryTimer: any = null;
+    let isUnmounted = false;
+
+    const connectWs = () => {
+      if (isUnmounted) return;
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        ws = new WebSocket(`${protocol}//${host}/api/v1/doctor/ws`);
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'NEW_PATIENT_INTAKE' || data.event === 'QUEUE_UPDATED') {
+              fetchQueues(false);
+            }
+          } catch {}
+        };
+
+        ws.onclose = () => {
+          if (!isUnmounted) {
+            retryTimer = setTimeout(connectWs, 3000);
+          }
+        };
+
+        ws.onerror = () => {
+          if (ws) ws.close();
+        };
+      } catch {
+        if (!isUnmounted) {
+          retryTimer = setTimeout(connectWs, 5000);
+        }
+      }
+    };
+
+    connectWs();
+
+    return () => {
+      isUnmounted = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
+    };
   }, []);
 
   const activeLiveQueue = liveQueue ?? [];
@@ -650,10 +820,12 @@ export function DoctorPortal() {
     const q = searchQuery.toLowerCase().trim();
     const nameMatch = (item.name || '').toLowerCase().includes(q);
     const idMatch = (item.id || '').toLowerCase().includes(q);
+    const tokenMatch = (item.token || '').toLowerCase().includes(q);
+    const displayIdMatch = (item.display_id || item.patient_display_id || '').toLowerCase().includes(q);
     const sessionMatch = (item.intake_session_id || '').toLowerCase().includes(q);
     const reasonMatch = (item.reason || '').toLowerCase().includes(q);
     const reviewerMatch = (item.reviewed_by || '').toLowerCase().includes(q);
-    return nameMatch || idMatch || sessionMatch || reasonMatch || reviewerMatch;
+    return nameMatch || idMatch || tokenMatch || displayIdMatch || sessionMatch || reasonMatch || reviewerMatch;
   });
 
   const waitingCount = activeLiveQueue.length;
@@ -734,16 +906,14 @@ export function DoctorPortal() {
             <div
               className={`doctor-stat accent clickable-stat ${viewMode === 'live' && statFilter === 'all' ? 'active-filter' : ''}`}
               onClick={() => {
-                setLocation('/doctor');
+                handleSwitchTab('live');
                 setStatFilter('all');
-                setSelected(0);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setLocation('/doctor');
+                  handleSwitchTab('live');
                   setStatFilter('all');
-                  setSelected(0);
                 }
               }}
               role="button"
@@ -770,23 +940,21 @@ export function DoctorPortal() {
                 } ${viewMode === 'live' && statFilter === 'priority' ? 'active-filter' : ''}`}
               onClick={() => {
                 if (viewMode !== 'live') {
-                  setLocation('/doctor');
+                  handleSwitchTab('live');
                   setStatFilter('priority');
                 } else {
                   setStatFilter((prev) => (prev === 'priority' ? 'all' : 'priority'));
                 }
-                setSelected(0);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   if (viewMode !== 'live') {
-                    setLocation('/doctor');
+                    handleSwitchTab('live');
                     setStatFilter('priority');
                   } else {
                     setStatFilter((prev) => (prev === 'priority' ? 'all' : 'priority'));
                   }
-                  setSelected(0);
                 }
               }}
               role="button"
@@ -841,14 +1009,12 @@ export function DoctorPortal() {
             <div
               className={`doctor-stat clickable-stat ${viewMode === 'reviewed' ? 'active-filter' : ''}`}
               onClick={() => {
-                setLocation('/doctor/reviewed');
-                setSelected(0);
+                handleSwitchTab('reviewed');
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setLocation('/doctor/reviewed');
-                  setSelected(0);
+                  handleSwitchTab('reviewed');
                 }
               }}
               role="button"
@@ -878,10 +1044,7 @@ export function DoctorPortal() {
               <div className="flex items-center gap-2 border-b border-[#dce6e9] px-4 pt-3 bg-[#f8faf9] rounded-t-2xl">
                 <button
                   type="button"
-                  onClick={() => {
-                    setLocation('/doctor');
-                    setSelected(0);
-                  }}
+                  onClick={() => handleSwitchTab('live')}
                   className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${viewMode === 'live'
                       ? 'border-[#1f5b4e] text-[#1f5b4e] bg-white rounded-t-lg shadow-2xs'
                       : 'border-transparent text-[#6e828e] hover:text-[#1e394c]'
@@ -901,10 +1064,7 @@ export function DoctorPortal() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setLocation('/doctor/reviewed');
-                    setSelected(0);
-                  }}
+                  onClick={() => handleSwitchTab('reviewed')}
                   className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${viewMode === 'reviewed'
                       ? 'border-[#16a34a] text-[#16a34a] bg-white rounded-t-lg shadow-2xs'
                       : 'border-transparent text-[#6e828e] hover:text-[#1e394c]'
@@ -1043,20 +1203,21 @@ export function DoctorPortal() {
                       <button
                         type="button"
                         className={`queue-row ${selected === index ? 'selected' : ''}`}
-                        key={item.id || item.intake_session_id || index}
+                        key={item.intake_session_id || item.token || item.id || index}
                         onClick={() => {
                           setSelected(index);
                           setLocation(`/doctor/patient/${patientId}`);
                         }}
                         onMouseEnter={() => setSelected(index)}
                         title={`Open clinical record for ${item.name}`}
-                        aria-label={`Open clinical record for ${item.name} (${item.id})`}
+                        aria-label={`Open clinical record for ${item.name} (${item.display_id || item.id})`}
                       >
                         <div className={`queue-avatar ${item.color || 'coral'}`}>{item.initials}</div>
                         <div className="queue-patient">
                           <b>{item.name}</b>
                           <span>
-                            {item.id} · {item.age}
+                            {item.display_id || item.id}
+                            {item.token ? ` · Token ${item.token}` : ''} · {item.age}
                           </span>
                         </div>
                         <div className="queue-reason">
@@ -1090,7 +1251,7 @@ export function DoctorPortal() {
                               <span className="text-[#16a34a] font-bold">Reviewed</span>
                               <b className="text-[11px] font-medium text-[#4b6358]">
                                 {item.reviewed_at
-                                  ? new Intl.DateTimeFormat('en-IN', { timeStyle: 'short' }).format(new Date(item.reviewed_at))
+                                  ? formatLocalTime(item.reviewed_at)
                                   : 'Done'}
                               </b>
                             </>
@@ -1153,10 +1314,7 @@ export function DoctorPortal() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => {
-                        setLocation('/doctor');
-                        setSelected(0);
-                      }}
+                      onClick={() => handleSwitchTab('live')}
                       className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#1f5b4e] hover:underline cursor-pointer"
                     >
                       <ArrowLeft size={13} /> Return to Live Queue
@@ -1207,7 +1365,8 @@ export function DoctorPortal() {
                     <div>
                       <h3>{patient.name}</h3>
                       <span>
-                        {patient.id} · {patient.age} · {patient.lang}
+                        {patient.display_id || patient.id}
+                        {patient.token ? ` · Token ${patient.token}` : ''} · {patient.age} · {patient.lang}
                       </span>
                     </div>
                     {viewMode === 'reviewed' ? (
@@ -1226,7 +1385,7 @@ export function DoctorPortal() {
                         <b>Physician Reviewed & Confirmed</b>
                         <small>
                           {patient.reviewed_by ? `Sign-off by ${patient.reviewed_by}` : 'Clinical verification complete'}
-                          {patient.reviewed_at ? ` · ${new Intl.DateTimeFormat('en-IN', { timeStyle: 'short' }).format(new Date(patient.reviewed_at))}` : ''}
+                          {patient.reviewed_at ? ` · ${formatLocalTime(patient.reviewed_at)}` : ''}
                         </small>
                       </span>
                       <CheckCircle2 size={16} className="text-[#16a34a]" />
@@ -1253,9 +1412,13 @@ export function DoctorPortal() {
                   </div>
                   <div className="summary-block">
                     <span className="summary-block-label">
-                      ATTACHMENTS <small>0</small>
+                      ATTACHMENTS <small>{patient.documents_count || 0}</small>
                     </span>
-                    <p>Document metadata is not available in the current doctor API contract.</p>
+                    <p>
+                      {(patient.documents_count || 0) > 0
+                        ? `${patient.documents_count} medical document(s) uploaded and extracted for this patient.`
+                        : 'No previous prescription or lab report attachments uploaded.'}
+                    </p>
                   </div>
                   <div className="summary-actions">
                     <AppButton

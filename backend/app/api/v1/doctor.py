@@ -34,6 +34,8 @@ from app.schemas.doctor import (
     PhysicianConfirmResponse,
 )
 from app.services.fhir.mapper import map_clinical_state_to_fhir_r4
+from app.services.patient_id import generate_next_patient_display_id
+from app.core.datetime_utils import ensure_utc, ensure_utc_iso
 
 router = APIRouter(prefix="/doctor", tags=["Doctor Portal"])
 
@@ -72,7 +74,7 @@ def get_doctor_queue(
     if doctor_id:
         query = query.filter(IntakeSession.doctor_id == doctor_id)
         
-    sessions = query.order_by(IntakeSession.started_at.desc()).all()
+    sessions = query.order_by(IntakeSession.submitted_at.asc(), IntakeSession.started_at.asc()).all()
     if not sessions:
         return []
 
@@ -102,6 +104,17 @@ def get_doctor_queue(
     for ans in all_answers:
         if ans.intake_session_id not in answers_map:
             answers_map[ans.intake_session_id] = ans
+
+    # 4. Batch fetch document counts in single query
+    doc_records = db.query(DocumentModel.intake_session_id, DocumentModel.patient_id).filter(
+        (DocumentModel.intake_session_id.in_(session_ids)) | (DocumentModel.patient_id.in_(patient_ids))
+    ).all()
+    doc_counts: dict[str, int] = {}
+    for d_sess_id, d_pat_id in doc_records:
+        if d_sess_id:
+            doc_counts[d_sess_id] = doc_counts.get(d_sess_id, 0) + 1
+        elif d_pat_id:
+            doc_counts[d_pat_id] = doc_counts.get(d_pat_id, 0) + 1
 
     now_utc = datetime.now(timezone.utc)
     queue_items: list[DoctorQueueItem] = []
@@ -137,11 +150,24 @@ def get_doctor_queue(
         status_tone = "red" if has_red_flags else "teal" if s.status == "SUBMITTED" else "amber"
         queue_status = "PRIORITY_REVIEW" if has_red_flags else "HISTORY_READY" if s.status in ["SUBMITTED", "READY_TO_SUBMIT"] else "WAITING"
 
+        display_id = patient.display_id if patient else None
+        if not display_id and patient and s.status in ["SUBMITTED", "IN_REVIEW", "READY_TO_SUBMIT"]:
+            display_id = generate_next_patient_display_id(db)
+            patient.display_id = display_id
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+
+        session_doc_count = doc_counts.get(s.id, doc_counts.get(s.patient_id or "", 0))
+
         queue_items.append(
             DoctorQueueItem(
                 intake_session_id=s.id,
                 token=s.token,
                 patient_id=s.patient_id,
+                patient_display_id=display_id,
+                display_id=display_id,
                 patient_name=patient.display_name if patient else "Patient",
                 patient_age=patient.age if patient else None,
                 patient_gender=patient.gender if patient else None,
@@ -156,6 +182,7 @@ def get_doctor_queue(
                 wait_time_minutes=wait_mins,
                 abha_id=patient.abha_id if patient else None,
                 abha_status=patient.abha_status if patient else None,
+                documents_count=session_doc_count,
                 review_status=s.review_status or "PENDING_REVIEW",
                 reviewed_by=s.reviewed_by,
                 reviewed_at=s.reviewed_at,
@@ -219,6 +246,17 @@ def get_reviewed_patients(
         if ans.intake_session_id not in answers_map:
             answers_map[ans.intake_session_id] = ans
 
+    # 5. Batch fetch document counts in single query
+    doc_records = db.query(DocumentModel.intake_session_id, DocumentModel.patient_id).filter(
+        (DocumentModel.intake_session_id.in_(session_ids)) | (DocumentModel.patient_id.in_(patient_ids))
+    ).all()
+    doc_counts: dict[str, int] = {}
+    for d_sess_id, d_pat_id in doc_records:
+        if d_sess_id:
+            doc_counts[d_sess_id] = doc_counts.get(d_sess_id, 0) + 1
+        elif d_pat_id:
+            doc_counts[d_pat_id] = doc_counts.get(d_pat_id, 0) + 1
+
     now_utc = datetime.now(timezone.utc)
     queue_items: list[DoctorQueueItem] = []
 
@@ -248,11 +286,24 @@ def get_reviewed_patients(
             doc_obj = doctors_map.get(s.doctor_id)
             reviewer_name = doc_obj.display_name if doc_obj else s.doctor_id
 
+        display_id = patient.display_id if patient else None
+        if not display_id and patient:
+            display_id = generate_next_patient_display_id(db)
+            patient.display_id = display_id
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+
+        session_doc_count = doc_counts.get(s.id, doc_counts.get(s.patient_id or "", 0))
+
         queue_items.append(
             DoctorQueueItem(
                 intake_session_id=s.id,
                 token=s.token,
                 patient_id=s.patient_id,
+                patient_display_id=display_id,
+                display_id=display_id,
                 patient_name=patient.display_name if patient else "Patient",
                 patient_age=patient.age if patient else None,
                 patient_gender=patient.gender if patient else None,
@@ -267,6 +318,7 @@ def get_reviewed_patients(
                 wait_time_minutes=0,
                 abha_id=patient.abha_id if patient else None,
                 abha_status=patient.abha_status if patient else None,
+                documents_count=session_doc_count,
                 review_status="REVIEWED",
                 reviewed_by=reviewer_name,
                 reviewed_at=s.reviewed_at,
@@ -289,10 +341,19 @@ def get_patient_clinical_detail(
     
     session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
     if not session:
-        # Fallback to search by token or patient_id
-        session = db.query(IntakeSession).filter(
-            (IntakeSession.token == intake_id) | (IntakeSession.patient_id == intake_id)
-        ).first()
+        # Fallback to search by patient display_id (e.g. P001), token, or patient_id
+        matching_pat = db.query(Patient).filter(Patient.display_id == intake_id).first()
+        if matching_pat:
+            session = (
+                db.query(IntakeSession)
+                .filter(IntakeSession.patient_id == matching_pat.id)
+                .order_by(IntakeSession.started_at.desc())
+                .first()
+            )
+        if not session:
+            session = db.query(IntakeSession).filter(
+                (IntakeSession.token == intake_id) | (IntakeSession.patient_id == intake_id)
+            ).first()
         
     if not session:
         raise HTTPException(status_code=404, detail="Intake session not found")
@@ -450,7 +511,7 @@ def get_patient_clinical_detail(
                 "document_type": doc.document_type or "PRESCRIPTION",
                 "status": doc.status or "PENDING",
                 "failure_code": doc.failure_code,
-                "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+                "uploaded_at": ensure_utc_iso(doc.uploaded_at),
                 "uploadedAt": uploaded_str,
                 "url": f"/api/v1/documents/{doc.id}/view",
                 "storage_url": f"/api/v1/documents/{doc.id}/view",
@@ -480,10 +541,22 @@ def get_patient_clinical_detail(
     if not ayush_assessment and state.ayush:
         ayush_assessment = ayush_state_to_assessment(state.ayush, system="AYURVEDA")
 
+    display_id = patient.display_id if patient else None
+    if not display_id and patient and session.status in ["SUBMITTED", "IN_REVIEW", "CONFIRMED", "READY_TO_SUBMIT"]:
+        display_id = generate_next_patient_display_id(db)
+        patient.display_id = display_id
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+
+
     detail = DoctorPatientDetail(
         intake_session_id=session.id,
         token=session.token or "",
         patient_id=session.patient_id or "",
+        patient_display_id=display_id,
+        display_id=display_id,
         patient_name=(patient.display_name if patient and patient.display_name else "Patient"),
         patient_age=patient.age if patient else None,
         patient_gender=patient.gender if patient else None,
@@ -553,7 +626,7 @@ def get_patient_conversation_timeline(
             "originalPatientText": ans.raw_text,
             "originalLanguage": ans.language_code or "en",
             "inputMode": ans.input_mode.lower() if ans.input_mode else "text",
-            "timestamp": ans.created_at.isoformat() if ans.created_at else None,
+            "timestamp": ensure_utc_iso(ans.created_at),
         })
 
     return {"intake_session_id": session.id, "exchanges": exchanges}

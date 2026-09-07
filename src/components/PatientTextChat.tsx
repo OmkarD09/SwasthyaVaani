@@ -506,7 +506,7 @@ export function PatientTextChat({
             </div>
             <h3>Intake Responses Recorded</h3>
             <p>
-              Your symptoms and medical context have been prepared for Dr. Ananya Rao. You can now attach any
+              Your symptoms and medical context have been prepared for your Doctor. You can now attach any
               previous reports or prescriptions.
             </p>
             <div className="chat-completed-actions">

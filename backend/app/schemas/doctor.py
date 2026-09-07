@@ -1,14 +1,18 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.schemas.clinical_state import ClinicalState, RedFlag, Contradiction, Medication, Investigation
 from app.schemas.ayush import AyushAssessment
+from app.core.datetime_utils import ensure_utc
+
 
 
 class DoctorQueueItem(BaseModel):
     intake_session_id: str
     token: str
     patient_id: str
+    patient_display_id: Optional[str] = None
+    display_id: Optional[str] = None
     patient_name: str
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None
@@ -28,11 +32,18 @@ class DoctorQueueItem(BaseModel):
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
 
+    @field_validator("submitted_at", "reviewed_at", mode="before")
+    @classmethod
+    def validate_utc_timestamps(cls, v):
+        return ensure_utc(v)
+
 
 class DoctorPatientDetail(BaseModel):
     intake_session_id: str
     token: Optional[str] = ""
     patient_id: Optional[str] = ""
+    patient_display_id: Optional[str] = None
+    display_id: Optional[str] = None
     patient_name: Optional[str] = "Patient"
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None
@@ -57,6 +68,11 @@ class DoctorPatientDetail(BaseModel):
     timeline: List[Dict[str, Any]] = Field(default_factory=list)
     clinician_notes: Optional[str] = None
     submitted_at: Optional[datetime] = None
+
+    @field_validator("submitted_at", "reviewed_at", mode="before")
+    @classmethod
+    def validate_utc_timestamps(cls, v):
+        return ensure_utc(v)
 
 
 class PhysicianEditPayload(BaseModel):
@@ -83,3 +99,8 @@ class PhysicianConfirmResponse(BaseModel):
     reviewed_at: Optional[datetime] = None
     fhir_bundle_id: Optional[str] = None
     message: str
+
+    @field_validator("confirmed_at", "reviewed_at", mode="before")
+    @classmethod
+    def validate_utc_timestamps(cls, v):
+        return ensure_utc(v)

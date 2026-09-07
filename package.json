@@ -76,6 +76,7 @@
     "zod": "^3.25.76"
   },
   "dependencies": {
-    "html5-qrcode": "^2.3.8"
+    "html5-qrcode": "^2.3.8",
+    "lenis": "^1.3.26"
   }
 }

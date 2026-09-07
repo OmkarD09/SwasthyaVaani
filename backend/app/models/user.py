@@ -78,6 +78,7 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id = Column(String, primary_key=True, default=generate_uuid)
+    display_id = Column(String, unique=True, nullable=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     display_name = Column(String, nullable=False)
     date_of_birth = Column(String, nullable=True)

@@ -40,7 +40,7 @@ from app.schemas.admin import (
 )
 from app.seed.seed_data import reset_demo_database, _seed_scenario_a027, _seed_scenario_a021, _seed_scenario_sv2048
 
-router = APIRouter(prefix="/admin", tags=["Administrator & QA Suite"])
+router = APIRouter(prefix="/admin", tags=["Administrator & QA Suite"], dependencies=[Depends(require_admin)])
 
 
 # ---------------------------------------------------------------------------

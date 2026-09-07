@@ -74,9 +74,6 @@ function ShellNav() {
         ))}
       </nav>
       <div className="nav-actions">
-        <button className="login-link" onClick={() => setLocation('/clinician/login')}>
-          Portal login <ArrowRight size={15} />
-        </button>
         <AppButton onClick={() => setLocation('/patient')} className="nav-cta">
           Start intake <ArrowRight size={15} />
         </AppButton>
@@ -364,9 +361,6 @@ export function HomePage() {
             SwasthyaVaani turns the minutes before a consultation into meaningful clinical context—without taking
             control away from the physician.
           </p>
-          <AppButton variant="outline" onClick={() => setLocation('/admin')}>
-            Explore the hospital portal <ArrowRight size={16} />
-          </AppButton>
         </div>
         <div className="opd-metrics">
           <div className="metric-main">
@@ -471,9 +465,33 @@ export function HomePage() {
           </AppButton>
         </div>
         <div className="footer-bottom">
-          <span>SIH 2026 · PS 26047</span>
-          <span>Ministry of AYUSH</span>
-          <span>ABDM-ready architecture</span>
+          <a
+            href="https://drive.google.com/file/d/1mQ6Qp2MKL8JXdL2kJYqV-SFqcfbxSvrd/view?usp=drive_link"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-[#77dccc] transition-colors underline-offset-2 hover:underline cursor-pointer"
+            title="SIH 2026 Problem Statement Document (PS 26047)"
+          >
+            SIH 2026 · PS 26047
+          </a>
+          <a
+            href="https://www.ayush.gov.in/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-[#77dccc] transition-colors underline-offset-2 hover:underline cursor-pointer"
+            title="Ministry of AYUSH, Government of India"
+          >
+            Ministry of AYUSH
+          </a>
+          <a
+            href="https://abdm.gov.in/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-[#77dccc] transition-colors underline-offset-2 hover:underline cursor-pointer"
+            title="Ayushman Bharat Digital Mission (ABDM)"
+          >
+            ABDM Web
+          </a>
           <span>Privacy & security</span>
           <span>© 2026 SwasthyaVaani</span>
         </div>

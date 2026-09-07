@@ -2,10 +2,14 @@ import pytest
 from app.seed.seed_data import seed_database
 
 
-def test_admin_dashboard_stats(client, db):
-    """Verify admin overview stats endpoint."""
+def _admin_headers(auth_headers):
+    return auth_headers("ADMIN")
+
+
+def test_admin_dashboard_stats(client, db, auth_headers):
+    """Verify admin overview stats endpoint with admin auth."""
     seed_database(db)
-    response = client.get("/api/v1/admin/stats")
+    response = client.get("/api/v1/admin/stats", headers=_admin_headers(auth_headers))
     assert response.status_code == 200
     data = response.json()
     assert "total_patients" in data
@@ -15,10 +19,10 @@ def test_admin_dashboard_stats(client, db):
     assert len(data["common_complaints"]) > 0
 
 
-def test_admin_ai_monitoring_oversight(client, db):
+def test_admin_ai_monitoring_oversight(client, db, auth_headers):
     """Verify AI monitoring oversight telemetry and clinical safety framing."""
     seed_database(db)
-    response = client.get("/api/v1/admin/ai-monitoring")
+    response = client.get("/api/v1/admin/ai-monitoring", headers=_admin_headers(auth_headers))
     assert response.status_code == 200
     data = response.json()
     assert data["total_assessments"] >= 0
@@ -29,10 +33,10 @@ def test_admin_ai_monitoring_oversight(client, db):
     assert len(data["override_breakdown"]) > 0
 
 
-def test_admin_emergency_cases(client, db):
+def test_admin_emergency_cases(client, db, auth_headers):
     """Verify critical red-flag emergency queue endpoint."""
     seed_database(db)
-    response = client.get("/api/v1/admin/emergency-cases")
+    response = client.get("/api/v1/admin/emergency-cases", headers=_admin_headers(auth_headers))
     assert response.status_code == 200
     cases = response.json()
     assert isinstance(cases, list)
@@ -43,24 +47,25 @@ def test_admin_emergency_cases(client, db):
         assert "escalation_reason" in first
 
 
-def test_admin_audit_trail_filtering(client, db):
+def test_admin_audit_trail_filtering(client, db, auth_headers):
     """Verify security audit logs endpoint with filtering."""
     seed_database(db)
-    response = client.get("/api/v1/admin/audit?limit=20")
+    response = client.get("/api/v1/admin/audit?limit=20", headers=_admin_headers(auth_headers))
     assert response.status_code == 200
     events = response.json()
     assert isinstance(events, list)
 
     # Test filtering by event type
-    login_resp = client.get("/api/v1/admin/audit?event_type=LOGIN")
+    login_resp = client.get("/api/v1/admin/audit?event_type=LOGIN", headers=_admin_headers(auth_headers))
     assert login_resp.status_code == 200
 
 
-def test_doctor_and_department_onboarding(client, db):
+def test_doctor_and_department_onboarding(client, db, auth_headers):
     """Verify onboarding new doctors and departments."""
     seed_database(db)
+    headers = _admin_headers(auth_headers)
     # List departments
-    dept_resp = client.get("/api/v1/admin/departments")
+    dept_resp = client.get("/api/v1/admin/departments", headers=headers)
     assert dept_resp.status_code == 200
     depts = dept_resp.json()
     assert len(depts) > 0
@@ -75,7 +80,7 @@ def test_doctor_and_department_onboarding(client, db):
         "contact": "+91 99887 76655",
         "working_hours": "08:00 AM - 04:00 PM"
     }
-    doc_create_resp = client.post("/api/v1/admin/doctors", json=new_doc_payload)
+    doc_create_resp = client.post("/api/v1/admin/doctors", json=new_doc_payload, headers=headers)
     assert doc_create_resp.status_code == 201
     created_doc = doc_create_resp.json()
     assert created_doc["display_name"] == "Dr. Rohan Patel"
@@ -83,26 +88,27 @@ def test_doctor_and_department_onboarding(client, db):
 
     # Update doctor
     update_payload = {"is_active": False, "working_hours": "10:00 AM - 06:00 PM"}
-    doc_update_resp = client.put(f"/api/v1/admin/doctors/{doc_id}", json=update_payload)
+    doc_update_resp = client.put(f"/api/v1/admin/doctors/{doc_id}", json=update_payload, headers=headers)
     assert doc_update_resp.status_code == 200
     assert doc_update_resp.json()["is_active"] is False
 
 
-def test_staff_rbac_management(client, db):
+def test_staff_rbac_management(client, db, auth_headers):
     """Verify staff role creation and modification with server-side validation."""
     seed_database(db)
+    headers = _admin_headers(auth_headers)
     new_user_payload = {
         "email": "test.nurse.qa@district-hospital.in",
         "display_name": "Sister Kavita",
         "role": "NURSE",
         "phone": "+91 91234 56789"
     }
-    create_resp = client.post("/api/v1/admin/users", json=new_user_payload)
+    create_resp = client.post("/api/v1/admin/users", json=new_user_payload, headers=headers)
     assert create_resp.status_code in [201, 409]
 
     if create_resp.status_code == 201:
         user_id = create_resp.json()["id"]
-        role_resp = client.put(f"/api/v1/admin/users/{user_id}/role", json={"role": "HOSPITAL_ADMIN"})
+        role_resp = client.put(f"/api/v1/admin/users/{user_id}/role", json={"role": "HOSPITAL_ADMIN"}, headers=headers)
         assert role_resp.status_code == 200
         assert role_resp.json()["role"] == "HOSPITAL_ADMIN"
 
@@ -111,21 +117,21 @@ def test_staff_rbac_management(client, db):
         "email": "invalid@test.in",
         "display_name": "Invalid Role User",
         "role": "HACKER"
-    })
+    }, headers=headers)
     assert invalid_resp.status_code == 400
 
 
-def test_demo_scenario_loading(client, db):
+def test_demo_scenario_loading(client, db, auth_headers):
     """Verify one-click demo scenario injection."""
     seed_database(db)
-    resp = client.post("/api/v1/admin/seed/scenario/A-027")
+    resp = client.post("/api/v1/admin/seed/scenario/A-027", headers=_admin_headers(auth_headers))
     assert resp.status_code == 200
     assert resp.json()["status"] == "LOADED"
 
 
-def test_service_status_probe(client, db):
+def test_service_status_probe(client, db, auth_headers):
     """Verify all integration service health probes."""
-    resp = client.get("/api/v1/admin/services/status")
+    resp = client.get("/api/v1/admin/services/status", headers=_admin_headers(auth_headers))
     assert resp.status_code == 200
     data = resp.json()
     assert data["database"]["status"] == "ONLINE"
@@ -134,9 +140,9 @@ def test_service_status_probe(client, db):
     assert data["ocr_service"]["status"] == "ONLINE"
 
 
-def test_qa_run_tests_endpoint(client, db):
+def test_qa_run_tests_endpoint(client, db, auth_headers):
     """Verify triggering QA regression test suite endpoint."""
-    resp = client.post("/api/v1/admin/qa/run-tests")
+    resp = client.post("/api/v1/admin/qa/run-tests", headers=_admin_headers(auth_headers))
     assert resp.status_code == 200
     result = resp.json()
     assert "total_tests" in result
