@@ -113,7 +113,8 @@ export type AyushProvenanceSource =
   | 'PATIENT_STATED'
   | 'AI_INFERRED'
   | 'DOCUMENT'
-  | 'PHYSICIAN_CONFIRMED';
+  | 'PHYSICIAN_CONFIRMED'
+  | 'SYSTEM_DERIVED';
 
 export type AyushAssessmentStatus =
   | 'INCOMPLETE'
@@ -126,7 +127,7 @@ export type AyushDimensionData = {
   value?: any;
   status: AyushAssessmentStatus;
   confidence?: number;
-  source: AyushProvenanceSource;
+  source?: AyushProvenanceSource | null;
   source_id?: string;
   evidence?: string[];
   last_updated_turn?: number;

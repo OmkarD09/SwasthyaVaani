@@ -528,7 +528,7 @@ Do not create duplicate storage models without a concrete persistence requiremen
 
 # 16. AYUSH Assessment
 
-The target richer AYUSH assessment is an additive structure.
+The richer AYUSH assessment is implemented additively via `AyushAssessmentModel` (`backend/app/models/ayush.py`).
 
 ```text
 AyushAssessmentModel
@@ -542,7 +542,7 @@ created_at
 updated_at
 ```
 
-The richer logical object should support:
+The richer logical object supports:
 
 ```text
 system
@@ -555,7 +555,7 @@ overall_status
 physician_review_state
 ```
 
-The current `ClinicalState.ayush` remains the adaptive working representation until migration is complete.
+The existing `ClinicalState.ayush` representation remains compatible, operating alongside `AyushAssessmentModel`.
 
 ---
 
@@ -1412,6 +1412,7 @@ AuditEvent
 Documents
 OCR runs/evidence
 Document candidates/evidence links
+AyushAssessmentModel
 KnowledgeDocuments
 KnowledgeChunks
 ```
@@ -1419,7 +1420,6 @@ KnowledgeChunks
 ## Target refinements
 
 ```text
-richer AyushAssessmentModel
 stronger AYUSH evidence links
 expanded Dashavidha fields
 native PostgreSQL vector storage

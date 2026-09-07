@@ -397,7 +397,21 @@ def is_field_already_resolved(field_name: str, state: ClinicalState) -> bool:
         return bool(state.radiation) or any(w in combined_snippets for w in ["radiat", "left arm", "shoulder", "jaw", "neck", "haath me"])
 
     elif canon == "vomiting":
-        return bool(state.hydration_status) or any(w in combined_snippets for w in ["vomit", "nausea", "ulti", "jeemichlana", "vomited twice", "vomited 3 times", "no vomit", "no nausea"])
+        if state.canonical_dimensions.get("vomiting") and state.canonical_dimensions["vomiting"].status in ["KNOWN_TRUE", "KNOWN_FALSE", "KNOWN_WITH_VALUE"]:
+            return True
+        if "vomiting" in state.negated_symptoms:
+            return True
+        indic_vomiting_terms = [
+            "vomit", "nausea", "ulti", "jeemichlana", "vomited twice",
+            "vomited 3 times", "no vomit", "no nausea", "not vomiting",
+            "उलटी", "उल्टी", "मळमळ", "जी मिचलाना", "उलटी नाही", "उल्टी नहीं"
+        ]
+        has_in_snippets = any(w in combined_snippets for w in indic_vomiting_terms)
+        has_in_associated = any(
+            any(t in str(s).lower() for t in ["vomiting", "vomit", "nausea", "ulti", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"])
+            for s in (state.associated_symptoms + state.symptoms)
+        )
+        return bool(state.hydration_status) or has_in_snippets or has_in_associated
 
     elif canon == "food_exposure":
         if state.food_exposure:
@@ -528,9 +542,19 @@ def score_candidate_dimensions(
 
     # Determine negated symptoms
     negated: Set[str] = set(state.negated_symptoms)
+    # Prefer structured canonical dimension state
+    for dim_name, dim_state in state.canonical_dimensions.items():
+        if dim_state.status == "KNOWN_FALSE":
+            negated.add(dim_name)
+
     if any(n in combined_text for n in ["no pain", "dard nahi", "no ache", "pain: no"]):
         negated.add("pain")
-    if any(n in combined_text for n in ["no vomiting", "ulti nahi", "no nausea"]):
+    if any(n in combined_text for n in [
+        "no vomiting", "not vomiting", "i am not vomiting", "i'm not vomiting",
+        "haven't vomited", "have not vomited", "without vomiting",
+        "vomit: no", "vomiting: no", "no vomit", "not vomit", "no nausea", "not nauseous",
+        "ulti nahi", "उलटी नाही", "उल्टी नहीं", "उलट्या नाहीत", "उलट्या होत नाहीत", "मळमळ नाही"
+    ]):
         negated.add("vomiting")
     if any(n in combined_text for n in ["no fever", "bukhar nahi", "taap nahi"]):
         negated.add("fever")
@@ -545,7 +569,26 @@ def score_candidate_dimensions(
     has_dark_stool = bool(state.dark_stool) or any(w in combined_text for w in ["dark stool", "black stool", "kala dast"])
     has_dizziness = bool(state.dizziness) or any(w in combined_text for w in ["dizzy", "dizziness", "chakkar", "lightheaded"])
     has_weakness = bool(state.weakness) or any(w in combined_text for w in ["weak", "weakness", "kamzori", "fatigue"])
-    has_vomiting = any(w in combined_text for w in ["vomit", "ulti"]) and "vomiting" not in negated
+    indic_vomit_keys = ["vomit", "ulti", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"]
+    is_canon_false_vomit = bool(
+        state.canonical_dimensions.get("vomiting")
+        and state.canonical_dimensions["vomiting"].status == "KNOWN_FALSE"
+    )
+    has_vomiting = (
+        not is_canon_false_vomit
+        and "vomiting" not in negated
+        and (
+            any(w in combined_text for w in indic_vomit_keys)
+            or any(
+                any(t in str(s).lower() for t in indic_vomit_keys)
+                for s in (state.associated_symptoms + state.symptoms)
+            )
+            or (
+                state.canonical_dimensions.get("vomiting")
+                and state.canonical_dimensions["vomiting"].status in ["KNOWN_TRUE", "KNOWN_WITH_VALUE"]
+            )
+        )
+    )
     has_diarrhea = any(w in combined_text for w in ["loose motion", "dast", "diarrhea", "watery"]) and "diarrhea" not in negated
     has_blurred_vision = state.is_dimension_sufficiently_known("blurred_vision") or "blur" in combined_text
 

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,6 +43,7 @@ from app.services.document_extraction import (
     DocumentCandidateValidationError,
     DocumentExtractorConfigurationError,
     DocumentExtractorProviderError,
+    DocumentExtractorRateLimitError,
     build_document_extraction_input,
     extract_and_persist_candidates,
     get_configured_document_extractor,
@@ -379,23 +381,70 @@ def get_document_status(document_id: str, db: Session = Depends(get_db)):
     }
 
 
+_PROCESSING_LOCK = asyncio.Lock()
+_ACTIVE_DOCUMENT_PROCESSING: set[str] = set()
+_BACKGROUND_PROCESSING_TASKS: set[asyncio.Task] = set()
+
+
+def _build_in_flight_extraction_result(db: Session, doc: DocumentModel) -> DocumentExtractionResult:
+    latest_ocr_run = (
+        db.query(DocumentOCRRunModel)
+        .filter_by(document_id=doc.id)
+        .order_by(DocumentOCRRunModel.created_at.desc())
+        .first()
+    )
+    review_candidates = (
+        _load_review_candidates(db, doc.id, latest_ocr_run.id)
+        if latest_ocr_run
+        else []
+    )
+    facts = _review_candidates_as_extracted_facts(db, review_candidates)
+    status = doc.status if doc.status in ("NEEDS_REVIEW", "PROCESSING_FAILED", "PROCESSING") else "PROCESSING"
+    return DocumentExtractionResult(
+        document_id=doc.id,
+        status=status,
+        extracted_facts=facts,
+        review_candidates=review_candidates,
+        raw_ocr_text=latest_ocr_run.raw_text if latest_ocr_run else "",
+    )
+
+
 async def run_document_processing(
     document_id: str,
     db: Session,
     ocr: Optional[AbstractOCRProvider] = None,
+    force_reprocess: bool = False,
 ) -> DocumentExtractionResult:
-    """Core document processing pipeline: OCR, candidate extraction, and persistence."""
-    doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+    """Core document processing pipeline: OCR, candidate extraction, and persistence with concurrency protection."""
+    async with _PROCESSING_LOCK:
+        if document_id in _ACTIVE_DOCUMENT_PROCESSING:
+            logger.info("Document %s is already in active processing, skipping duplicate execution", document_id)
+            doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+            if not doc:
+                raise HTTPException(status_code=404, detail="Document not found")
+            return _build_in_flight_extraction_result(db, doc)
 
-    doc.status = "PROCESSING"
-    db.commit()
+        doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
 
-    if ocr is None:
-        ocr = get_ocr_service()
+        if doc.status == "PROCESSING":
+            logger.info("Document %s status is already PROCESSING in DB, skipping duplicate task", document_id)
+            return _build_in_flight_extraction_result(db, doc)
+
+        if doc.status in ("NEEDS_REVIEW", "COMPLETED") and not force_reprocess:
+            logger.info("Document %s already processed (%s), returning existing result", document_id, doc.status)
+            return _build_in_flight_extraction_result(db, doc)
+
+        doc.status = "PROCESSING"
+        doc.failure_code = None
+        db.commit()
+        _ACTIVE_DOCUMENT_PROCESSING.add(document_id)
 
     try:
+        if ocr is None:
+            ocr = get_ocr_service()
+
         file_bytes = load_private_file(doc.storage_object_id)
         result = await ocr.process_document(file_bytes, doc.file_name, doc.mime_type)
 
@@ -443,6 +492,7 @@ async def run_document_processing(
                 )
             )
         doc.status = "NEEDS_REVIEW"
+        doc.failure_code = None
         doc.processed_at = datetime.now(timezone.utc)
         db.commit()
         return DocumentExtractionResult(
@@ -457,16 +507,26 @@ async def run_document_processing(
         doc = db.query(DocumentModel).filter(DocumentModel.id == document_id).first()
         if doc:
             doc.status = "PROCESSING_FAILED"
-            err_msg = str(exc).lower()
+            cause = getattr(exc, "__cause__", None)
+            all_err_text = f"{exc!r} {cause!r}".lower()
+
             if isinstance(exc, (OCRProviderConfigurationError, OCRInferenceError, OCRUnsupportedDocumentError)):
                 doc.failure_code = "OCR_FAILED"
-            elif "413" in str(exc) or "rate_limit" in err_msg or "too large" in err_msg or "tokens per minute" in err_msg:
+            elif (
+                isinstance(exc, DocumentExtractorRateLimitError)
+                or isinstance(cause, DocumentExtractorRateLimitError)
+                or "429" in all_err_text
+                or "rate_limit" in all_err_text
+                or "rate limit" in all_err_text
+                or "tokens per minute" in all_err_text
+                or "tpm" in all_err_text
+            ):
                 doc.failure_code = "EXTRACTION_RATE_LIMITED"
-            elif isinstance(exc, DocumentCandidateValidationError):
+            elif isinstance(exc, DocumentCandidateValidationError) or isinstance(cause, DocumentCandidateValidationError):
                 doc.failure_code = "VALIDATION_FAILED"
-            elif isinstance(exc, DocumentExtractorConfigurationError):
+            elif isinstance(exc, DocumentExtractorConfigurationError) or isinstance(cause, DocumentExtractorConfigurationError):
                 doc.failure_code = "EXTRACTOR_CONFIG_ERROR"
-            elif isinstance(exc, DocumentExtractorProviderError):
+            elif isinstance(exc, DocumentExtractorProviderError) or isinstance(cause, DocumentExtractorProviderError):
                 doc.failure_code = "EXTRACTION_FAILED"
             else:
                 doc.failure_code = type(exc).__name__
@@ -474,6 +534,9 @@ async def run_document_processing(
             db.commit()
         logger.exception("Failed processing document %s", document_id)
         raise exc
+    finally:
+        async with _PROCESSING_LOCK:
+            _ACTIVE_DOCUMENT_PROCESSING.discard(document_id)
 
 
 async def _background_process_document(document_id: str) -> None:
@@ -503,7 +566,12 @@ async def process_document_ocr(
         raise HTTPException(status_code=404, detail="Document not found")
 
     try:
-        return await run_document_processing(document_id, db, ocr)
+        return await run_document_processing(
+            document_id,
+            db,
+            ocr,
+            force_reprocess=(doc.status == "PROCESSING_FAILED"),
+        )
     except HTTPException:
         raise
     except Exception as exc:

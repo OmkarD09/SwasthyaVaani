@@ -26,7 +26,8 @@ def extract_clinical_facts_from_answer(
     # 0. Check for Non-Informative / Confused / Frustrated responses
     non_info_phrases = [
         "wtf", "what the fuck", "idk", "i don't know", "i dont know", "what", "what?", "what do you mean",
-        "kya", "samajh nahi aaya", "???", "leave it", "skip", "whatever", "why ask again", "stop asking"
+        "kya", "samajh nahi aaya", "pata nahi", "nahi pata", "malum nahi", "not sure", "unsure",
+        "???", "leave it", "skip", "whatever", "why ask again", "stop asking"
     ]
     if text in non_info_phrases or any(text == p for p in non_info_phrases):
         updated_state.last_non_informative_response = raw_answer.strip()
@@ -214,19 +215,45 @@ def extract_clinical_facts_from_answer(
         extracted["eye_laterality"] = lat_val
         progress = True
 
-    is_neg_vomit = any(w in text for w in ["no vomit", "no vomiting", "without vomiting", "ulti nahi", "vomiting: no", "vomit: no"]) or (text in ["no", "nahi"] and target_field in ["vomiting", "nausea_vomiting"])
-    if is_neg_vomit:
-        updated_state.set_canonical_dimension("vomiting", "KNOWN_FALSE")
-        if "vomiting" not in updated_state.negated_symptoms:
-            updated_state.negated_symptoms.append("vomiting")
-        extracted["negated_symptoms"] = updated_state.negated_symptoms
-        progress = True
-    elif any(w in text for w in ["vomiting", "vomit", "ulti", "nausea", "emesis"]):
-        updated_state.set_canonical_dimension("vomiting", "KNOWN_TRUE", value="Vomiting present")
-        if "Vomiting" not in updated_state.associated_symptoms:
-            updated_state.associated_symptoms.append("Vomiting")
-        extracted["vomiting"] = "Present"
-        progress = True
+    neg_vomit_terms = [
+        "no vomit", "no vomiting", "not vomiting", "not vomit",
+        "i am not vomiting", "i'm not vomiting", "haven't vomited", "have not vomited",
+        "without vomiting", "vomiting: no", "vomit: no", "no nausea", "not nauseous",
+        "ulti nahi", "ulti nahit", "उलटी नाही", "उल्टी नहीं", "उलट्या नाहीत",
+        "उलट्या होत नाहीत", "मळमळ नाही"
+    ]
+    is_neg_vomit = any(w in text for w in neg_vomit_terms) or (
+        target_field in ["vomiting", "nausea_vomiting"]
+        and text in ["no", "nope", "nahi", "nahin", "nahi hai", "नाही", "नाहीत", "नहीं", "नहीं है"]
+    )
+    is_uncertain_vomit = any(u in text for u in [
+        "not sure", "unsure", "don't know", "dont know", "can't say", "cannot say",
+        "cant say", "pata nahi", "malum nahi", "samajh nahi"
+    ])
+
+    if not is_uncertain_vomit:
+        if is_neg_vomit:
+            updated_state.set_canonical_dimension("vomiting", "KNOWN_FALSE", value=False)
+            if "vomiting" not in updated_state.negated_symptoms:
+                updated_state.negated_symptoms.append("vomiting")
+            # Remove any conflicting positive vomiting from associated_symptoms
+            updated_state.associated_symptoms = [
+                s for s in updated_state.associated_symptoms
+                if not any(t in str(s).lower() for t in ["vomiting", "vomit", "ulti", "उलटी", "उल्टी", "मळमळ"])
+            ]
+            extracted["negated_symptoms"] = updated_state.negated_symptoms
+            progress = True
+        elif any(w in text for w in ["vomiting", "vomit", "ulti", "nausea", "emesis", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"]):
+            updated_state.set_canonical_dimension("vomiting", "KNOWN_TRUE", value=True)
+            if "Vomiting" not in updated_state.associated_symptoms:
+                updated_state.associated_symptoms.append("Vomiting")
+            # Positive and negative facts cannot silently coexist
+            updated_state.negated_symptoms = [
+                ns for ns in updated_state.negated_symptoms
+                if not any(t in str(ns).lower() for t in ["vomiting", "vomit", "ulti", "उलटी", "उल्टी", "मळमळ"])
+            ]
+            extracted["vomiting"] = "Present"
+            progress = True
 
     food_keywords = ["vadapav", "vada pav", "samosa", "panipuri", "street food", "outside food", "hotel", "snack", "bahar ka", "bhojan"]
     if any(fk in text for fk in food_keywords) or (target_field == "food_exposure" and any(w in text for w in ["yes", "ha", "haan", "ate", "khaya"])):

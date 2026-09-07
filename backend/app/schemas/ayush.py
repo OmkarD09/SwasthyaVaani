@@ -17,6 +17,7 @@ class AyushProvenanceSource(str, Enum):
     AI_INFERRED = "AI_INFERRED"
     DOCUMENT = "DOCUMENT"
     PHYSICIAN_CONFIRMED = "PHYSICIAN_CONFIRMED"
+    SYSTEM_DERIVED = "SYSTEM_DERIVED"
 
 
 class AyushAssessmentStatus(str, Enum):
@@ -42,6 +43,7 @@ AYUSH_TO_GENERIC_PROVENANCE_MAP: Dict[AyushProvenanceSource, str] = {
     AyushProvenanceSource.AI_INFERRED: "AI_DERIVED",
     AyushProvenanceSource.DOCUMENT: "DOCUMENT",
     AyushProvenanceSource.PHYSICIAN_CONFIRMED: "PHYSICIAN",
+    AyushProvenanceSource.SYSTEM_DERIVED: "AI_DERIVED",
 }
 
 GENERIC_TO_AYUSH_PROVENANCE_MAP: Dict[str, AyushProvenanceSource] = {
@@ -49,6 +51,7 @@ GENERIC_TO_AYUSH_PROVENANCE_MAP: Dict[str, AyushProvenanceSource] = {
     "AI_DERIVED": AyushProvenanceSource.AI_INFERRED,
     "DOCUMENT": AyushProvenanceSource.DOCUMENT,
     "PHYSICIAN": AyushProvenanceSource.PHYSICIAN_CONFIRMED,
+    "SYSTEM_DERIVED": AyushProvenanceSource.SYSTEM_DERIVED,
     "UNKNOWN": AyushProvenanceSource.AI_INFERRED,
 }
 
@@ -59,13 +62,17 @@ class AyushDimensionValue(BaseModel):
     value: Optional[Any] = None
     status: AyushAssessmentStatus = AyushAssessmentStatus.PRELIMINARY
     confidence: Optional[float] = Field(default=1.0, ge=0.0, le=1.0)
-    source: AyushProvenanceSource = AyushProvenanceSource.PATIENT_STATED
+    source: Optional[AyushProvenanceSource] = None
     source_id: Optional[str] = Field(default=None, description="Linked question_event_id, answer_id, doc_id, or actor_id")
     evidence: List[str] = Field(default_factory=list, description="IDs or snippets of supporting evidence")
     last_updated_turn: Optional[int] = None
 
     def to_generic_provenance(self) -> Provenance:
-        source_type = AYUSH_TO_GENERIC_PROVENANCE_MAP.get(self.source, "AI_DERIVED")
+        source_type = (
+            AYUSH_TO_GENERIC_PROVENANCE_MAP.get(self.source, "AI_DERIVED")
+            if self.source
+            else "UNKNOWN"
+        )
         return Provenance(
             source_type=source_type,  # type: ignore[arg-type]
             source_id=self.source_id or f"ayush-dim-{self.dimension}",

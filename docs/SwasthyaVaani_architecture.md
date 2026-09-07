@@ -865,7 +865,7 @@ AyushAssessment
 
 The existing `ClinicalState.ayush` representation remains compatible with this direction.
 
-A richer `AyushAssessmentModel` can evolve additively rather than replacing working state.
+The richer `AyushAssessmentModel` is implemented additively (`backend/app/models/ayush.py`) and persists alongside the working clinical state.
 
 ---
 
@@ -1236,6 +1236,7 @@ Do not:
 🟢 Document OCR/evidence pipeline
 🟢 Doctor queue and review
 🟢 Baseline AYUSH workflow
+🟢 Rich AyushAssessmentModel
 🟢 AYUSH RAG
 🟢 FHIR/ABDM mapping paths
 🟢 Provider abstraction
@@ -1244,7 +1245,6 @@ Do not:
 ## Refinement / Target
 
 ```text
-🟡 Rich AyushAssessmentModel
 🟡 Expanded Dashavidha implementation
 🟡 Full evidence-linked AYUSH review experience
 🟡 Native vector indexing

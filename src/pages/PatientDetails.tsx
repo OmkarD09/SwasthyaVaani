@@ -16,9 +16,8 @@ import { Brand, AppButton } from '../components/Brand';
 import { AbhaVerificationModal } from '../components/AbhaVerificationModal';
 import { type ParsedQrPatientData } from '../utils/parseAbhaQr';
 import { getKioskTranslation } from '../lib/kioskTranslations';
-import {
-  getStoredLanguage,
-} from '../lib/kioskState';
+import { getStoredLanguage } from '../lib/kioskState';
+import { clearConversationStore } from '../lib/conversationStore';
 import { patientApi, type PatientProfileData } from '../services/patientApi';
 
 export function PatientDetails() {
@@ -97,6 +96,16 @@ export function PatientDetails() {
       ...patientData,
       isAbhaFromQr: isAbhaFromQr || Boolean(patientData.isAbhaFromQr),
     });
+
+    // New patient profile submitted: clear stale session and conversation data
+    localStorage.removeItem('swasthya_active_intake_id');
+    localStorage.removeItem('swasthya_active_token');
+    localStorage.removeItem('swasthya_active_patient_id');
+    localStorage.removeItem('swasthya_last_submission');
+    localStorage.removeItem('swasthya_chat_history');
+    localStorage.removeItem('swasthya_uploaded_doc_name');
+    clearConversationStore();
+
     setSavedNotice(true);
 
     setTimeout(() => {

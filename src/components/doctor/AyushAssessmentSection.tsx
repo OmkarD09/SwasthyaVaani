@@ -34,7 +34,7 @@ export interface AyushAssessmentSectionProps {
 }
 
 // Provenance Badge Component
-function ProvenanceBadge({ source }: { source?: AyushProvenanceSource | string }) {
+function ProvenanceBadge({ source }: { source?: AyushProvenanceSource | string | null }) {
   switch (source) {
     case 'PHYSICIAN_CONFIRMED':
       return (
@@ -54,11 +54,23 @@ function ProvenanceBadge({ source }: { source?: AyushProvenanceSource | string }
           <FileText size={11} /> Document OCR
         </span>
       );
+    case 'SYSTEM_DERIVED':
+    case 'DERIVED_FROM_DEMOGRAPHICS':
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-[#cbd5cc] bg-[#f0f4f1] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#3d594b]">
+          <Clock size={11} /> Derived from Demographics
+        </span>
+      );
     case 'PATIENT_STATED':
-    default:
       return (
         <span className="inline-flex items-center gap-1 rounded-full border border-[#c4ded2] bg-[#f0f9f4] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#1e614a]">
           <User size={11} /> Patient Stated
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-[#cbd5cc] bg-[#f5f8f5] px-2 py-0.5 font-mono text-[10px] font-medium text-[#71887d]">
+          Unassessed
         </span>
       );
   }
@@ -118,7 +130,7 @@ export function AyushAssessmentSection({
   const rawPrakriti = ayushAssessment?.prakriti?.value ?? ayushData?.prakriti;
   const rawVikriti = ayushAssessment?.vikriti?.value ?? ayushData?.vikriti;
   const rawAharaVihara = ayushAssessment?.ahara_vihara?.value ?? ayushData?.ahara_vihara;
-  const doshas = ayushAssessment?.doshas ?? ayushData?.doshas ?? [33, 33, 34];
+  const doshas = ayushAssessment?.doshas ?? ayushData?.doshas ?? null;
 
   const overallStatus: AyushAssessmentStatus = confirmed
     ? 'PHYSICIAN_CONFIRMED'
@@ -275,7 +287,7 @@ export function AyushAssessmentSection({
                         Prakriti (Constitution)
                       </span>
                       <ProvenanceBadge
-                        source={pendingEdits['prakriti'] ? 'PHYSICIAN_CONFIRMED' : ayushAssessment?.prakriti?.source}
+                        source={pendingEdits['prakriti'] ? 'PHYSICIAN_CONFIRMED' : (rawPrakriti ? ayushAssessment?.prakriti?.source : undefined)}
                       />
                     </div>
                     {editingField === 'prakriti' ? (
@@ -305,8 +317,8 @@ export function AyushAssessmentSection({
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-2 text-sm font-semibold text-[#183f33]">
-                        {pendingEdits['prakriti'] || rawPrakriti || 'Vata-Pitta'}
+                      <p className={`mt-2 text-sm font-semibold ${pendingEdits['prakriti'] || rawPrakriti ? 'text-[#183f33]' : 'italic text-[#789387]'}`}>
+                        {pendingEdits['prakriti'] || rawPrakriti || 'Not assessed'}
                         {pendingEdits['prakriti'] && (
                           <span className="ml-1 text-[10px] font-normal italic text-[#1f5b4e]">(edited)</span>
                         )}
@@ -316,9 +328,11 @@ export function AyushAssessmentSection({
                   {editingField !== 'prakriti' && (
                     <div className="mt-3 flex items-center justify-between border-t border-[#edf2ea] pt-2 text-[11px]">
                       <span className="text-[#789387]">
-                        {ayushAssessment?.prakriti?.confidence
-                          ? `Conf: ${Math.round(ayushAssessment.prakriti.confidence * 100)}%`
-                          : 'Baseline observation'}
+                        {pendingEdits['prakriti'] || rawPrakriti
+                          ? (ayushAssessment?.prakriti?.confidence
+                              ? `Conf: ${Math.round(ayushAssessment.prakriti.confidence * 100)}%`
+                              : 'Baseline observation')
+                          : 'Pending clinical examination'}
                       </span>
                       <button
                         type="button"
@@ -339,7 +353,7 @@ export function AyushAssessmentSection({
                         Vikriti (Imbalance)
                       </span>
                       <ProvenanceBadge
-                        source={pendingEdits['vikriti'] ? 'PHYSICIAN_CONFIRMED' : ayushAssessment?.vikriti?.source}
+                        source={pendingEdits['vikriti'] ? 'PHYSICIAN_CONFIRMED' : (rawVikriti ? ayushAssessment?.vikriti?.source : undefined)}
                       />
                     </div>
                     {editingField === 'vikriti' ? (
@@ -369,8 +383,8 @@ export function AyushAssessmentSection({
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-2 text-sm font-semibold text-[#183f33]">
-                        {pendingEdits['vikriti'] || rawVikriti || 'Vata Dushti'}
+                      <p className={`mt-2 text-sm font-semibold ${pendingEdits['vikriti'] || rawVikriti ? 'text-[#183f33]' : 'italic text-[#789387]'}`}>
+                        {pendingEdits['vikriti'] || rawVikriti || 'Not assessed'}
                         {pendingEdits['vikriti'] && (
                           <span className="ml-1 text-[10px] font-normal italic text-[#1f5b4e]">(edited)</span>
                         )}
@@ -379,7 +393,11 @@ export function AyushAssessmentSection({
                   </div>
                   {editingField !== 'vikriti' && (
                     <div className="mt-3 flex items-center justify-between border-t border-[#edf2ea] pt-2 text-[11px]">
-                      <span className="text-[#789387]">Active pathological state</span>
+                      <span className="text-[#789387]">
+                        {pendingEdits['vikriti'] || rawVikriti
+                          ? 'Active pathological state'
+                          : 'Pending clinical examination'}
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleStartEdit('vikriti', String(pendingEdits['vikriti'] || rawVikriti || ''))}
@@ -399,7 +417,7 @@ export function AyushAssessmentSection({
                         Agni (Digestive Fire)
                       </span>
                       <ProvenanceBadge
-                        source={pendingEdits['agni'] ? 'PHYSICIAN_CONFIRMED' : ayushAssessment?.agni?.source}
+                        source={pendingEdits['agni'] ? 'PHYSICIAN_CONFIRMED' : (rawAgni ? ayushAssessment?.agni?.source : undefined)}
                       />
                     </div>
                     {editingField === 'agni' ? (
@@ -432,8 +450,8 @@ export function AyushAssessmentSection({
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-2 text-sm font-semibold text-[#183f33]">
-                        {pendingEdits['agni'] || rawAgni || 'Samagni (Normal)'}
+                      <p className={`mt-2 text-sm font-semibold ${pendingEdits['agni'] || rawAgni ? 'text-[#183f33]' : 'italic text-[#789387]'}`}>
+                        {pendingEdits['agni'] || rawAgni || 'Not assessed'}
                         {pendingEdits['agni'] && (
                           <span className="ml-1 text-[10px] font-normal italic text-[#1f5b4e]">(edited)</span>
                         )}
@@ -442,7 +460,11 @@ export function AyushAssessmentSection({
                   </div>
                   {editingField !== 'agni' && (
                     <div className="mt-3 flex items-center justify-between border-t border-[#edf2ea] pt-2 text-[11px]">
-                      <span className="text-[#789387]">Digestive capacity</span>
+                      <span className="text-[#789387]">
+                        {pendingEdits['agni'] || rawAgni
+                          ? 'Digestive capacity'
+                          : 'Pending clinical examination'}
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleStartEdit('agni', String(pendingEdits['agni'] || rawAgni || ''))}
@@ -462,7 +484,7 @@ export function AyushAssessmentSection({
                         Koshtha (Bowel Habit)
                       </span>
                       <ProvenanceBadge
-                        source={pendingEdits['koshtha'] ? 'PHYSICIAN_CONFIRMED' : ayushAssessment?.koshtha?.source}
+                        source={pendingEdits['koshtha'] ? 'PHYSICIAN_CONFIRMED' : (rawKoshtha ? ayushAssessment?.koshtha?.source : undefined)}
                       />
                     </div>
                     {editingField === 'koshtha' ? (
@@ -494,8 +516,8 @@ export function AyushAssessmentSection({
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-2 text-sm font-semibold text-[#183f33]">
-                        {pendingEdits['koshtha'] || rawKoshtha || 'Madhyam (Regular)'}
+                      <p className={`mt-2 text-sm font-semibold ${pendingEdits['koshtha'] || rawKoshtha ? 'text-[#183f33]' : 'italic text-[#789387]'}`}>
+                        {pendingEdits['koshtha'] || rawKoshtha || 'Not assessed'}
                         {pendingEdits['koshtha'] && (
                           <span className="ml-1 text-[10px] font-normal italic text-[#1f5b4e]">(edited)</span>
                         )}
@@ -504,7 +526,11 @@ export function AyushAssessmentSection({
                   </div>
                   {editingField !== 'koshtha' && (
                     <div className="mt-3 flex items-center justify-between border-t border-[#edf2ea] pt-2 text-[11px]">
-                      <span className="text-[#789387]">Bowel evacuation</span>
+                      <span className="text-[#789387]">
+                        {pendingEdits['koshtha'] || rawKoshtha
+                          ? 'Bowel evacuation'
+                          : 'Pending clinical examination'}
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleStartEdit('koshtha', String(pendingEdits['koshtha'] || rawKoshtha || ''))}
@@ -541,7 +567,7 @@ export function AyushAssessmentSection({
                       Ahara & Vihara Observations
                     </span>
                     <ProvenanceBadge
-                      source={pendingEdits['ahara_vihara'] ? 'PHYSICIAN_CONFIRMED' : ayushAssessment?.ahara_vihara?.source}
+                      source={pendingEdits['ahara_vihara'] ? 'PHYSICIAN_CONFIRMED' : (rawAharaVihara ? ayushAssessment?.ahara_vihara?.source : undefined)}
                     />
                   </div>
                   {editingField === 'ahara_vihara' ? (
@@ -571,10 +597,10 @@ export function AyushAssessmentSection({
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs leading-relaxed text-[#2c4b3f]">
+                    <p className={`text-xs leading-relaxed ${pendingEdits['ahara_vihara'] || rawAharaVihara ? 'text-[#2c4b3f]' : 'italic text-[#789387]'}`}>
                       {pendingEdits['ahara_vihara'] ||
                         rawAharaVihara ||
-                        'Dietary habits, meal regularity, and circadian lifestyle patterns recorded during clinical intake.'}
+                        'Not recorded during clinical intake.'}
                     </p>
                   )}
                 </div>
@@ -668,7 +694,11 @@ export function AyushAssessmentSection({
                         {!isEditing && (
                           <div className="mt-2 flex items-center justify-between border-t border-[#f0f4ee] pt-1.5 text-[10px]">
                             <span className="text-[#789387]">
-                              {dim.data?.confidence ? `Conf: ${Math.round(dim.data.confidence * 100)}%` : 'Stated'}
+                              {dim.data?.source === 'SYSTEM_DERIVED'
+                                ? 'Derived'
+                                : dim.data?.confidence
+                                ? `Conf: ${Math.round(dim.data.confidence * 100)}%`
+                                : 'Stated'}
                             </span>
                             <button
                               type="button"

@@ -22,7 +22,7 @@ SwasthyaVaani is a functioning hybrid web application and clinical pre-consultat
 8. **Automated Test Coverage**: 181 backend unit and integration tests passing in 4m 43s (`pytest`), covering adaptive selection, modality equivalence, safety rules, document extraction, RAG, auth, and doctor endpoints.
 
 ### What the Main Architecture Currently Looks Like
-- **Frontend**: Next.js/React 18 single-page application using Vite, TypeScript, Tailwind CSS, Lucide React, and Radix UI components. Client-side routing managed via `wouter`.
+- **Frontend**: React 19 single-page application using Vite, TypeScript, Tailwind CSS v4, Lucide React, and Radix UI components. Client-side routing managed via `wouter` (no Next.js).
 - **Backend**: FastAPI modular monolith running on Python 3.12 (uvicorn). Divided into modular routers under `/api/v1/` (`auth`, `intakes`, `doctor`, `documents`, `admin`, `speech`, `rag`, `fhir`, `abdm`).
 - **Database & Persistence**: Relational storage via SQLAlchemy ORM. Configured out-of-the-box with local SQLite (`swasthyavaani.db`) with complete schema compatibility for PostgreSQL/Supabase. Migrations managed via Alembic.
 - **AI/ML Layer**: Interface-driven Provider Abstraction Layer (`AbstractLLMProvider`, `AbstractSpeechProvider`, `AbstractOCRProvider`, `AbstractEmbeddingProvider`). Pluggable adapters support Groq (`qwen/qwen3.8-27b`), Google Gemini (`gemini-3.5-flash-lite`), PaddleOCR, Sarvam Speech, Bhashini, and high-fidelity Mock providers.
@@ -379,6 +379,7 @@ erDiagram
     IntakeSessions ||--o{ QuestionEvents : records
     IntakeSessions ||--o{ Answers : receives
     IntakeSessions ||--o{ ClinicalStateModels : tracks_versioned
+    IntakeSessions ||--o| AyushAssessmentModels : records_assessment
     IntakeSessions ||--o{ RedFlagModels : triggers
     IntakeSessions ||--o{ ContradictionModels : identifies
     IntakeSessions ||--o| PhysicianReviewModels : reviewed_by
@@ -402,10 +403,11 @@ erDiagram
 | `users`<br>(`User`) | `id`, `role`, `display_name`, `email`, `password_hash`, `is_active` | 1:1 with `Doctor` or `Patient` | `seed_data.py`, `admin.py` | `admin.py` | `auth.py:login()` | 🟢 Active (RBAC) |
 | `doctors`<br>(`Doctor`) | `id`, `user_id`, `hospital_id`, `department_id`, `display_name`, `specialization` | `hospital`, `department` | `seed_data.py`, `admin.py` | `admin.py` | `doctor.py`, `intakes.py` | 🟢 Active |
 | `patients`<br>(`Patient`) | `id`, `user_id`, `display_name`, `age`, `gender`, `abha_id` | `intake_sessions`, `documents` | `intakes.py:create_intake_session()`, `seed_data.py` | Kiosk / Admin | `doctor.py`, `intakes.py` | 🟢 Active |
-| `intake_sessions`<br>(`IntakeSession`) | `id`, `token`, `patient_id`, `hospital_id`, `doctor_id`, `status`, `question_count`, `started_at`, `submitted_at` | `questions`, `answers`, `clinical_states`, `red_flags`, `review` | `intakes.py:create_intake_session()` | `intakes.py` (`submit`, `process_answer`) | `doctor.py:queue`, `admin.py` | 🟢 Primary Core Table |
+| `intake_sessions`<br>(`IntakeSession`) | `id`, `token`, `patient_id`, `hospital_id`, `doctor_id`, `status`, `question_count`, `started_at`, `submitted_at` | `questions`, `answers`, `clinical_states`, `ayush_assessment`, `red_flags`, `review` | `intakes.py:create_intake_session()` | `intakes.py` (`submit`, `process_answer`) | `doctor.py:queue`, `admin.py` | 🟢 Primary Core Table |
 | `question_events`<br>(`QuestionEvent`) | `id`, `intake_session_id`, `sequence_number`, `question_text`, `target_field`, `decision_action`, `reason` | `intake_session`, `answer` | `intakes.py:process_intake_answer_core()` | Read-only | `doctor.py:conversation`, `adaptive_engine.py` | 🟢 Active (Provenance) |
 | `answers`<br>(`Answer`) | `id`, `question_event_id`, `intake_session_id`, `raw_text`, `input_mode`, `language_code` | `intake_session`, `question_event` | `intakes.py:process_intake_answer_core()` | Read-only | `doctor.py:conversation`, `adaptive_engine.py` | 🟢 Active (Provenance) |
 | `clinical_states`<br>(`ClinicalStateModel`) | `id`, `intake_session_id`, `version`, `state_json`, `created_at` | `intake_session` | `intakes.py` (Version increment per turn) | Immutable append | `doctor.py`, `intakes.py`, `fhir.py` | 🟢 Immutable State History |
+| `ayush_assessments`<br>(`AyushAssessmentModel`) | `id`, `intake_session_id`, `system`, `status`, `assessment_json`, `created_at`, `updated_at` | `intake_session` | `intakes.py:create_intake_session()` | `doctor.py:confirm_patient_history()` | `doctor.py`, `abdm.py` | 🟢 Active (AYUSH Persistence) |
 | `red_flags`<br>(`RedFlagModel`) | `id`, `intake_session_id`, `rule_id`, `title`, `reason`, `severity`, `status` | `intake_session` | `intakes.py:submit_intake_for_review()` | Doctor confirm | `doctor.py`, `admin.py:emergency` | 🟢 Active (Safety) |
 | `contradictions`<br>(`ContradictionModel`) | `id`, `intake_session_id`, `field_name`, `value_a_json`, `value_b_json`, `status` | `intake_session` | `intakes.py` via `detect_contradictions()` | Doctor review | `doctor.py:patient_detail` | 🟢 Active (Safety) |
 | `physician_reviews`<br>(`PhysicianReviewModel`) | `id`, `intake_session_id`, `doctor_id`, `status`, `notes`, `confirmed_at` | `intake_session`, `edits` | `doctor.py:confirm_patient_history()` | `doctor.py` | `doctor.py`, `admin.py` | 🟢 Active (Sign-off) |
@@ -516,12 +518,12 @@ Implemented in `backend/app/services/safety/contradictions.py:detect_contradicti
 2. **Validation**: `document_intelligence.py:validate_document()` verifies file size ($\le 10$ MB), page count ($\le 20$), MIME type (`application/pdf`, `image/png`, `image/jpeg`), and computes SHA-256 hash. Rejects duplicates within same session with HTTP 409.
 3. **Storage**: File is stored in `private_uploads/<doc_type>/<year>/<uuid>.<ext>` using local private disk storage.
 4. **Database Record**: Created in `documents` (`DocumentModel`) with status `PENDING`.
-5. **Background OCR**: `_background_process_document()` invokes `run_document_processing()`.
-6. **OCR Execution**: PaddleOCR / MockOCR executes, generating `DocumentOCRRunModel` and chunked spatial text blocks in `DocumentOCREvidenceModel`.
-7. **Candidate Extraction**: `DocumentExtractor` (Groq `openai/gpt-oss-120b` or Gemini `gemini-2.5-flash-lite`) extracts medications, lab tests, and clinical history into `DocumentCandidateModel`.
-8. **Grounding Verification**: `validate_candidate_evidence()` verifies that every extracted candidate string literally exists within the supporting OCR blocks.
-9. **Doctor Retrieval**: Doctor views patient dossier via `GET /api/v1/doctor/patients/{id}`. `doctor.py` loads all linked `DocumentModel` records, builds inline view URLs (`/api/v1/documents/{id}/view`), and returns all extracted medication/lab candidate records in `medical_records`.
-10. **Frontend Display**: `PatientAttachments.tsx` in `DoctorPatientSummary.tsx` renders attached files, enables inline PDF/image viewing, and allows the doctor to inspect OCR extractions.
+5. **Decoupled Background Task Enqueue**: When `DOCUMENT_AUTO_PROCESS = True`, `upload_medical_document()` enqueues `_background_process_document()` via FastAPI `BackgroundTasks`. The upload HTTP endpoint responds immediately (< 1.5s) with HTTP 202 Accepted.
+6. **Patient Submission Decoupling**: **The patient NEVER waits for OCR or LLM extraction.** Patient clicks Submit (`POST /api/v1/intakes/{id}/submit`), which saves answers, records red flags, assigns a queue token, broadcasts to WebSocket, and returns in **< 5s** (benchmarked at 4.67s with OCR running concurrently).
+7. **Concurrency-Guarded OCR Execution**: `run_document_processing()` uses `_ACTIVE_DOCUMENT_PROCESSING` concurrency locks to prevent duplicate background runs. PaddleOCR CPU inference is offloaded to a worker thread via `asyncio.to_thread` and locked with `_engine_lock` so Uvicorn event-loop responsiveness is completely preserved (10ms latency).
+8. **Candidate Extraction with Quota Fallback**: `FallbackDocumentExtractor` queries Groq (`openai/gpt-oss-120b`). If Groq hits 8,000 TPM rate limits (HTTP 429), it automatically falls back seamlessly to Google Gemini (`gemini-2.5-flash-lite`), extracting medications and lab tests into `DocumentCandidateModel`.
+9. **Grounding Verification**: `validate_candidate_evidence()` strictly verifies that every extracted candidate string literally exists within supporting OCR text blocks before status is set to `NEEDS_REVIEW`.
+10. **Doctor Retrieval & Display**: Doctor views patient dossier via `GET /api/v1/doctor/patients/{id}`. `DoctorPatientSummary.tsx` renders attached files, displays live `Processing...` spinner while background OCR runs, inline PDF/image viewing, and offers an explicit "Retry" button if processing encountered a rate limit or failure.
 
 ---
 

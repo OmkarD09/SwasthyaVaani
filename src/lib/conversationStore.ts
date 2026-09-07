@@ -66,6 +66,18 @@ export function getUnifiedConversation(): UnifiedMessage[] {
 }
 
 /**
+ * Explicitly clear conversation and answers storage for a new patient journey.
+ */
+export function clearConversationStore(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY_ANSWERS);
+    localStorage.removeItem(STORAGE_KEY_CONVERSATION);
+  } catch (e) {
+    console.warn('Error clearing conversation store:', e);
+  }
+}
+
+/**
  * Save a question-and-answer pair into the unified conversation store.
  * Supports both text and voice modes, merging into a unified structured dataset.
  */

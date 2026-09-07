@@ -47,10 +47,13 @@ function getFailureBadge(code?: string): string {
     case 'VALIDATION_FAILED':
       return 'Validation Incomplete';
     case 'EXTRACTION_FAILED':
+    case 'DocumentExtractorProviderError':
       return 'Extraction Failed';
     case 'OCR_FAILED':
     case 'OCR_SERVICE_UNAVAILABLE':
       return 'OCR Failed';
+    case 'EXTRACTOR_CONFIG_ERROR':
+      return 'Config Error';
     default:
       return 'Processing Incomplete';
   }
@@ -84,17 +87,16 @@ export function DoctorPatientSummary() {
   const [queue, setQueue] = useState<any[]>([]);
 
   const handleRunOcr = async (docId: string) => {
-    if (!docId) return;
+    if (!docId || processingDocId === docId) return;
     setProcessingDocId(docId);
     try {
-      const res = await authorizedClinicianFetch(`/api/v1/documents/${docId}/process`, {
+      await authorizedClinicianFetch(`/api/v1/documents/${docId}/process`, {
         method: 'POST',
       });
-      if (res.ok) {
-        await refresh();
-      }
+      await refresh();
     } catch (err) {
       console.error('Failed to run OCR processing:', err);
+      await refresh();
     } finally {
       setProcessingDocId(null);
     }
@@ -607,9 +609,9 @@ export function DoctorPatientSummary() {
                 <div className="space-y-2.5">
                   {attachedFiles.map((doc, idx) => {
                     const isProcessing = processingDocId === doc.id || doc.status === 'PROCESSING';
-                    const isProcessed = doc.status === 'NEEDS_REVIEW' || doc.status === 'COMPLETED';
-                    const isFailed = doc.status === 'PROCESSING_FAILED';
-                    const isPending = doc.status === 'PENDING' || (!doc.status && !doc.localOnly);
+                    const isProcessed = (doc.status === 'NEEDS_REVIEW' || doc.status === 'COMPLETED') && !isProcessing;
+                    const isFailed = doc.status === 'PROCESSING_FAILED' && !isProcessing;
+                    const isPending = (doc.status === 'PENDING' || (!doc.status && !doc.localOnly)) && !isProcessing;
 
                     return (
                       <div
@@ -652,13 +654,13 @@ export function DoctorPatientSummary() {
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {(isPending || isFailed) && doc.id && (
+                            {(isPending || isFailed) && doc.id && !isProcessing && (
                               <button
                                 type="button"
                                 onClick={() => handleRunOcr(doc.id)}
                                 disabled={isProcessing}
-                                className="inline-flex items-center gap-1 rounded-lg border border-[#a2d4ba] bg-[#ecfdf5] px-2 py-1 text-xs font-extrabold text-[#065f46] hover:bg-[#065f46] hover:text-white transition cursor-pointer disabled:opacity-50"
-                                title="Run OCR extraction"
+                                className="inline-flex items-center gap-1 rounded-lg border border-[#a2d4ba] bg-[#ecfdf5] px-2 py-1 text-xs font-extrabold text-[#065f46] hover:bg-[#065f46] hover:text-white transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={isFailed ? 'Retry OCR & Extraction' : 'Run OCR extraction'}
                               >
                                 <RefreshCw size={11} className={isProcessing ? 'animate-spin' : ''} />
                                 <span>{isFailed ? 'Retry' : 'Run OCR'}</span>

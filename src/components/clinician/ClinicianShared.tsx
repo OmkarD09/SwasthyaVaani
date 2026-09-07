@@ -80,11 +80,24 @@ export function ClinicianButton({
 }
 
 export function DoshaArcGauge({
-  doshas = [33, 33, 34],
+  doshas,
 }: {
-  doshas?: [number, number, number] | number[];
+  doshas?: [number, number, number] | number[] | null;
 }) {
-  const [vata = 33, pitta = 33, kapha = 34] = doshas || [33, 33, 34];
+  if (!doshas || doshas.length < 3) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#d8ddd3] bg-[#fbfaf4] p-5 text-center">
+        <p className="font-mono text-xs text-[#71877c]">
+          Tri-Dosha balance not evaluated during intake
+        </p>
+        <p className="mt-1 text-[11px] text-[#93a79d]">
+          Pending clinical examination or physician assessment
+        </p>
+      </div>
+    );
+  }
+
+  const [vata, pitta, kapha] = doshas;
   const items = [
     { label: 'Vata', val: vata, color: '#0ea5e9' },
     { label: 'Pitta', val: pitta, color: '#f59e0b' },

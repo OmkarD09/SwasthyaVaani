@@ -856,7 +856,7 @@ ClinicalState.ayush
 
 remains compatible as the adaptive working representation.
 
-The richer assessment should be added additively.
+The richer assessment is implemented additively via `AyushAssessmentModel` (`backend/app/models/ayush.py`).
 
 ---
 

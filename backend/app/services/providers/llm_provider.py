@@ -30,7 +30,9 @@ class ClinicalExtractionSchema(BaseModel):
     location: str | None = Field(None, description="Anatomical site of symptom")
     radiation: str | None = Field(None, description="Radiation direction, e.g. left arm, neck, back")
     associated_symptoms: list[str] = Field(default_factory=list, description="Other accompanying symptoms")
+    negated_symptoms: list[str] = Field(default_factory=list, description="Explicitly absent, denied, or ruled-out symptoms (e.g., 'not vomiting', 'no fever', 'no diarrhea', 'उलटी नाही', 'उल्टी नहीं')")
     has_meaningful_progress: bool = Field(True, description="Whether new clinical information was provided")
+    is_non_informative: bool = Field(False, description="Whether the patient statement was non-informative, confused, or expressing uncertainty (e.g., 'idk', 'what?', 'pata nahi', 'samajh nahi aaya', 'not sure')")
 
     # AYUSH Core Dimensions
     agni: str | None = Field(None, description="Digestive fire/appetite: Tikshna (sharp), Manda (sluggish), Vishama (irregular), Sama (balanced)")
@@ -83,6 +85,8 @@ class MockLLMProvider(AbstractLLMProvider):
             c_dim = updated_st.canonical_dimensions.get(dim)
             if c_dim and c_dim.value:
                 facts[dim] = c_dim.value
+        if facts.get("non_informative") or updated_st.last_non_informative_response:
+            facts["is_non_informative"] = True
         return ExtractionResult(
             extracted_facts=facts,
             confidence=0.95,
@@ -344,7 +348,10 @@ class GroqLLMProvider(AbstractLLMProvider):
 
         system_prompt = """You are SwasthyaVaani's clinical pre-consultation intake extractor for SIH Problem Statement 26047.
 Extract structured clinical facts from the patient's statement into a JSON object with these exact keys:
-chief_complaint (string or null), onset (string or null), duration (string or null), severity (integer 1-10 or null), location (string or null), radiation (string or null), associated_symptoms (array of strings),
+chief_complaint (string or null), onset (string or null), duration (string or null), severity (integer 1-10 or null), location (string or null), radiation (string or null),
+associated_symptoms (array of strings: positive accompanying symptoms),
+negated_symptoms (array of strings: symptoms explicitly DENIED, ABSENT, or stated as NO like 'not vomiting', 'no fever', 'no pain', 'उलटी नाही', 'उल्टी नहीं'),
+is_non_informative (boolean: true if patient reply is vague, confused, non-informative, or expressing uncertainty like 'idk', 'I don't know', 'what?', 'pata nahi', 'samajh nahi aaya', 'not sure', 'leave it', 'skip', otherwise false),
 agni (string or null: Manda, Tikshna, Vishama, Sama), koshtha (string or null: Mridu, Krura, Madhyam), ahara_vihara (string or null),
 sara (string or null), samhanana (string or null), pramana (string or null), satmya (string or null),
 sattva (string or null: Pravara, Madhyama, Avara), ahara_shakti (string or null), vyayama_shakti (string or null), vaya (string or null: Bala, Madhya, Vriddha).
@@ -354,6 +361,8 @@ CLINICAL SAFETY RULES:
 2. Extract ONLY factual symptom characteristics and patient-reported AYUSH dimensions.
 3. If a field was not mentioned by patient, return null.
 4. Fully support Indic expressions (e.g., 'chhati mein dard', 'chakkar', 'tez bukhar', 'jalan', 'saans phulna', 'agnimandya', 'koshtha', 'kamzori', 'bhookh').
+5. If the patient expresses confusion, uncertainty, or lack of knowledge ('idk', 'not sure', 'what?', 'samajh nahi aaya', 'pata nahi'), set is_non_informative: true.
+6. If a symptom is explicitly denied, absent, or negated ('no vomiting', 'I am not vomiting', 'no fever', 'nahi hai', 'nahi', 'उलटी नाही', 'उल्टी नहीं'), place it in negated_symptoms, NEVER in associated_symptoms.
 Output ONLY valid JSON."""
 
         user_prompt = f"""Target Field Being Answered: {target_field}
@@ -503,6 +512,8 @@ RULES:
 2. Extract only factual symptom characteristics (SOCRATES framework & AYUSH metrics).
 3. If a field is not mentioned, leave it null.
 4. Support both English and Indic language terms (e.g., 'chhati mein dard', 'sir dard', 'tez bukhar', 'chakkar', 'jalan', 'saans phulna', 'agnimandya', 'koshtha').
+5. If the patient reply is non-informative, confused, or expressing uncertainty (e.g., 'idk', 'I don't know', 'what?', 'pata nahi', 'samajh nahi aaya', 'not sure'), set is_non_informative to true.
+6. If a symptom is explicitly denied, absent, or negated ('no vomiting', 'I am not vomiting', 'no fever', 'nahi hai', 'nahi', 'उलटी नाही', 'उल्टी नहीं'), place it in negated_symptoms, NEVER in associated_symptoms.
 
 Target Field Being Answered: {target_field}
 Current State Summary: {current_state}

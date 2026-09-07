@@ -158,22 +158,29 @@ const INTAKE_QUESTIONS: QuestionConfig[] = [
   },
 ];
 
+import { resolveChipsForTargetField } from '../utils/chipResolver';
+export { resolveChipsForTargetField };
+
 export function PatientTextChat({
   language,
   patientName = 'Ananya Sharma',
   patientAge = '34',
+  intakeSessionId: propIntakeSessionId,
   onComplete,
   onSwitchToVoice,
 }: {
   language: string;
   patientName?: string;
   patientAge?: string;
+  intakeSessionId?: string | null;
   onComplete: () => void;
   onSwitchToVoice: () => void;
 }) {
   const currentLang = language || 'English';
   const t = getKioskTranslation(currentLang);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isSubmittingRef = useRef<boolean>(false);
+  const sessionInitPromiseRef = useRef<Promise<string | null> | null>(null);
 
   const getLocalizedText = (dict: Record<string, string>) => {
     return dict[currentLang] || dict['English'] || Object.values(dict)[0];
@@ -197,12 +204,20 @@ export function PatientTextChat({
   const [inputText, setInputText] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const [intakeSessionId, setIntakeSessionId] = useState<string | null>(null);
+  const [intakeSessionId, setIntakeSessionId] = useState<string | null>(propIntakeSessionId || null);
   const [currentQuestionEventId, setCurrentQuestionEventId] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function initSession() {
+  const ensureSession = async (): Promise<string | null> => {
+    // Return existing confirmed session ID for this intake flow if available
+    if (intakeSessionId) return intakeSessionId;
+    if (propIntakeSessionId) {
+      setIntakeSessionId(propIntakeSessionId);
+      return propIntakeSessionId;
+    }
+    if (sessionInitPromiseRef.current) return sessionInitPromiseRef.current;
+
+    sessionInitPromiseRef.current = (async () => {
       try {
         const profile = getStoredPatientProfile();
         const langCode = currentLang === 'हिन्दी' ? 'hi' : currentLang === 'मराठी' ? 'mr' : 'en';
@@ -235,12 +250,21 @@ export function PatientTextChat({
           localStorage.setItem('swasthya_active_intake_id', data.id);
           localStorage.setItem('swasthya_active_token', data.token || '');
           localStorage.setItem('swasthya_active_patient_id', data.patient_id || '');
+          return data.id as string;
         }
       } catch (err) {
-        console.warn('Text session note:', err);
+        console.warn('[PatientTextChat] Session init note:', err);
+      } finally {
+        sessionInitPromiseRef.current = null;
       }
-    }
-    initSession();
+      return null;
+    })();
+
+    return sessionInitPromiseRef.current;
+  };
+
+  useEffect(() => {
+    ensureSession();
   }, [patientName, patientAge, currentLang]);
 
   useEffect(() => {
@@ -248,7 +272,8 @@ export function PatientTextChat({
   }, [messages, isThinking]);
 
   const handlePatientResponse = async (answerText: string) => {
-    if (!answerText.trim() || isThinking || isFinished) return;
+    if (isSubmittingRef.current || !answerText.trim() || isThinking || isFinished) return;
+    isSubmittingRef.current = true;
 
     const trimmedAnswer = answerText.trim();
     const lastAiMessage = [...messages].reverse().find((m) => m.sender === 'ai');
@@ -266,10 +291,14 @@ export function PatientTextChat({
     setIsThinking(true);
     setApiError(null);
 
-    const activeId = intakeSessionId || localStorage.getItem('swasthya_active_intake_id');
     const langCode = currentLang === 'हिन्दी' ? 'hi' : currentLang === 'मराठी' ? 'mr' : 'en';
 
     try {
+      let activeId = intakeSessionId;
+      if (!activeId) {
+        activeId = await ensureSession();
+      }
+
       if (activeId) {
         const res = await fetch(`/api/v1/intakes/${activeId}/answers`, {
           method: 'POST',
@@ -323,11 +352,13 @@ export function PatientTextChat({
           }
 
           if (decision?.action === 'ASK' && decision?.question) {
+            const dynamicChips = resolveChipsForTargetField(decision.target_field, currentLang);
             const nextAiMessage: ChatMessage = {
               id: `msg-ai-${Date.now()}`,
               sender: 'ai',
               text: decision.question,
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              chips: dynamicChips,
             };
             setMessages((prev) => [...prev, nextAiMessage]);
             setCurrentStepIndex((prev) => prev + 1);
@@ -345,8 +376,10 @@ export function PatientTextChat({
       console.warn('[PatientTextChat] Backend intake response error:', err);
       setApiError(err instanceof Error ? err.message : 'Unable to submit this answer. Please retry.');
       setInputText(trimmedAnswer);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsThinking(false);
     }
-    setIsThinking(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

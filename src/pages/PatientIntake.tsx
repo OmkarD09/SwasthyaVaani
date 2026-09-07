@@ -396,7 +396,7 @@ export function PatientIntake() {
                     </span>
                     <span>
                       <b>{uploadedDocName}</b>
-                      <small>{t.recordReadySub}</small>
+                      <small>Document uploaded. Processing will continue in the background.</small>
                     </span>
                     <button onClick={handleFileRemove}>
                       <X size={15} />
@@ -508,6 +508,11 @@ export function PatientIntake() {
                       <FileText size={15} /> {t.summaryRecords}
                     </span>
                     <b>{uploaded && uploadedDocName ? uploadedDocName : t.summaryNoneAdded}</b>
+                    {uploaded && (
+                      <small className="text-xs text-[#2a5c4d] block mt-0.5 font-medium">
+                        Document uploaded. Processing will continue in the background.
+                      </small>
+                    )}
                   </div>
                 </div>
 

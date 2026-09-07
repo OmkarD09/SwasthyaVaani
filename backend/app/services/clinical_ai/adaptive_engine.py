@@ -64,10 +64,13 @@ def _assess_information_sufficiency(
         return False, None
 
     # 2. Check active clinical symptom complications that MUST be characterized before stopping
+    indic_vomit_keys = ["vomit", "ulti", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"]
     has_vomiting = (
         "vomiting" in state.associated_symptoms
         or "Vomiting" in state.associated_symptoms
-        or any(w in snippets for w in ["vomit", "ulti"])
+        or any(w in snippets for w in indic_vomit_keys)
+        or any(any(t in str(s).lower() for t in indic_vomit_keys) for s in state.associated_symptoms)
+        or (state.canonical_dimensions.get("vomiting") and state.canonical_dimensions["vomiting"].status in ["KNOWN_TRUE", "KNOWN_WITH_VALUE"])
     ) and "vomiting" not in state.negated_symptoms
 
     has_diarrhea = (

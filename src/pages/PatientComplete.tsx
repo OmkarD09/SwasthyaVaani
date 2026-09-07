@@ -67,7 +67,7 @@ const SUCCESS_TRANSLATIONS: Record<string, {
   closeBtn: string;
 }> = {
   English: {
-    heading: 'Your information has been submitted',
+    heading: 'Your intake has been submitted successfully.',
     subheading: 'Your health information and uploaded records have been securely shared with your healthcare team.',
     tokenLabel: 'Queue Token Number',
     tokenHelp: 'Please note down your token number or wait for it to be displayed in the OPD waiting area.',

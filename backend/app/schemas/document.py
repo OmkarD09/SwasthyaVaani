@@ -69,7 +69,7 @@ class DocumentReviewCandidate(BaseModel):
 
 class DocumentExtractionResult(BaseModel):
     document_id: str
-    status: Literal["NEEDS_REVIEW", "PROCESSING_FAILED"]
+    status: Literal["NEEDS_REVIEW", "PROCESSING_FAILED", "PROCESSING"]
     extracted_facts: list[ExtractedFact] = Field(default_factory=list)
     review_candidates: list[DocumentReviewCandidate] = Field(default_factory=list)
     raw_ocr_text: str | None = None

@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import math
+import threading
 from importlib.metadata import PackageNotFoundError, version
 from numbers import Real
 from typing import Any
@@ -103,6 +105,7 @@ class PaddleOCRProvider(AbstractOCRProvider):
         self._engine_factory = engine_factory
         self._image_decoder = image_decoder
         self._ocr_engine = None
+        self._engine_lock = threading.Lock()
 
     def _init_engine(self):
         if self._ocr_engine is None:
@@ -295,7 +298,7 @@ class PaddleOCRProvider(AbstractOCRProvider):
         except PackageNotFoundError:
             return "unknown"
 
-    async def process_document(
+    def _process_document_sync(
         self, file_bytes: bytes, filename: str, mime_type: str
     ) -> OCRExtractionResult:
         if mime_type == "application/pdf":
@@ -303,27 +306,28 @@ class PaddleOCRProvider(AbstractOCRProvider):
         else:
             images = [self._decode_image(file_bytes, mime_type)]
 
-        engine = self._init_engine()
-        blocks = []
-        for page_number, image in enumerate(images, start=1):
-            try:
-                if hasattr(engine, "predict"):
-                    result = engine.predict(image)
-                elif hasattr(engine, "ocr"):
-                    result = engine.ocr(image, cls=True)
-                else:
-                    raise OCRProviderConfigurationError(
-                        "Configured PaddleOCR engine exposes no supported inference method"
-                    )
-            except OCRProviderError:
-                raise
-            except Exception as exc:
-                raise OCRInferenceError("PaddleOCR inference failed") from exc
+        with self._engine_lock:
+            engine = self._init_engine()
+            blocks = []
+            for page_number, image in enumerate(images, start=1):
+                try:
+                    if hasattr(engine, "predict"):
+                        result = engine.predict(image)
+                    elif hasattr(engine, "ocr"):
+                        result = engine.ocr(image, cls=True)
+                    else:
+                        raise OCRProviderConfigurationError(
+                            "Configured PaddleOCR engine exposes no supported inference method"
+                        )
+                except OCRProviderError:
+                    raise
+                except Exception as exc:
+                    raise OCRInferenceError("PaddleOCR inference failed") from exc
 
-            page_blocks = self._normalize_result(result)
-            for block in page_blocks:
-                block["page"] = page_number
-            blocks.extend(page_blocks)
+                page_blocks = self._normalize_result(result)
+                for block in page_blocks:
+                    block["page"] = page_number
+                blocks.extend(page_blocks)
 
         nonempty_blocks = [block for block in blocks if block["text"].strip()]
         confidence = (
@@ -341,4 +345,11 @@ class PaddleOCRProvider(AbstractOCRProvider):
             provider_version=self._provider_version(),
             raw_text="\n".join(block["text"] for block in nonempty_blocks),
             text_blocks=nonempty_blocks,
+        )
+
+    async def process_document(
+        self, file_bytes: bytes, filename: str, mime_type: str
+    ) -> OCRExtractionResult:
+        return await asyncio.to_thread(
+            self._process_document_sync, file_bytes, filename, mime_type
         )

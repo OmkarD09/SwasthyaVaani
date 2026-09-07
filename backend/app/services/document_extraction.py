@@ -1,7 +1,10 @@
 import json
+import logging
 import re
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -51,7 +54,11 @@ class DocumentExtractorConfigurationError(DocumentExtractorError):
 
 
 class DocumentExtractorProviderError(DocumentExtractorError):
-    """Raised when Gemini transport fails or returns no structured result."""
+    """Raised when Gemini/Groq transport fails or returns no structured result."""
+
+
+class DocumentExtractorRateLimitError(DocumentExtractorProviderError):
+    """Raised specifically when an extraction provider encounters an HTTP 429 or quota rate limit."""
 
 
 class DocumentCandidateValidationError(DocumentExtractorError):
@@ -234,6 +241,19 @@ class GroqDocumentExtractor(AbstractDocumentExtractor):
                 temperature=0,
             )
         except Exception as exc:
+            err_msg = str(exc).lower()
+            is_rate_limit = (
+                "429" in str(exc)
+                or "rate_limit" in err_msg
+                or "rate limit" in err_msg
+                or "tokens per minute" in err_msg
+                or "tpm" in err_msg
+                or getattr(exc, "status_code", None) == 429
+            )
+            if is_rate_limit:
+                raise DocumentExtractorRateLimitError(
+                    f"Groq document extraction rate limit reached: {exc}"
+                ) from exc
             raise DocumentExtractorProviderError(
                 "Groq document extraction request failed"
             ) from exc
@@ -273,6 +293,44 @@ class GroqDocumentExtractor(AbstractDocumentExtractor):
         return result
 
 
+class FallbackDocumentExtractor(GroqDocumentExtractor):
+    """Orchestrates extraction by trying a primary extractor and falling back to a secondary on rate limit."""
+
+    def __init__(
+        self,
+        primary: AbstractDocumentExtractor,
+        fallback: AbstractDocumentExtractor,
+    ):
+        self.primary = primary
+        self.fallback = fallback
+        self.provider_name = primary.provider_name
+        self.model_name = primary.model_name
+        self._api_key = getattr(primary, "_api_key", None)
+        self._transport = getattr(primary, "_transport", None)
+
+    async def extract_candidates(
+        self, extraction_input: DocumentExtractionInput
+    ) -> DocumentCandidateExtractionResult:
+        try:
+            result = await self.primary.extract_candidates(extraction_input)
+            self.provider_name = self.primary.provider_name
+            self.model_name = self.primary.model_name
+            return result
+        except DocumentExtractorRateLimitError as rle:
+            logger.warning(
+                "Primary document extractor (%s/%s) rate limited: %s. Falling back to (%s/%s).",
+                self.primary.provider_name,
+                self.primary.model_name,
+                rle,
+                self.fallback.provider_name,
+                self.fallback.model_name,
+            )
+            result = await self.fallback.extract_candidates(extraction_input)
+            self.provider_name = self.fallback.provider_name
+            self.model_name = self.fallback.model_name
+            return result
+
+
 def serialize_extraction_input_for_llm(extraction_input: DocumentExtractionInput) -> str:
     """Serialize minimal payload for semantic extraction without coordinates or duplicate text."""
     payload = {
@@ -300,7 +358,11 @@ def get_document_extractor(
 ) -> AbstractDocumentExtractor:
     selected = provider_name.strip().lower()
     if selected == "groq":
-        return GroqDocumentExtractor(groq_api_key, groq_model)
+        groq_extractor = GroqDocumentExtractor(groq_api_key, groq_model)
+        if gemini_api_key:
+            gemini_extractor = GeminiDocumentExtractor(gemini_api_key, gemini_model)
+            return FallbackDocumentExtractor(groq_extractor, gemini_extractor)
+        return groq_extractor
     if selected == "gemini":
         return GeminiDocumentExtractor(gemini_api_key, gemini_model)
     raise DocumentExtractorConfigurationError(
