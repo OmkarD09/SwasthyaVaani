@@ -1,6 +1,10 @@
+import json
+import logging
 import re
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -50,7 +54,11 @@ class DocumentExtractorConfigurationError(DocumentExtractorError):
 
 
 class DocumentExtractorProviderError(DocumentExtractorError):
-    """Raised when Gemini transport fails or returns no structured result."""
+    """Raised when Gemini/Groq transport fails or returns no structured result."""
+
+
+class DocumentExtractorRateLimitError(DocumentExtractorProviderError):
+    """Raised specifically when an extraction provider encounters an HTTP 429 or quota rate limit."""
 
 
 class DocumentCandidateValidationError(DocumentExtractorError):
@@ -61,10 +69,12 @@ SYSTEM_INSTRUCTION = """You extract untrusted candidates from OCR evidence only.
 Extract only facts explicitly stated in the supplied blocks. Never diagnose, prescribe,
 infer diseases, calculate lab interpretations, or add unsupported medical details.
 Preserve missing information as null. Every candidate must cite one or more supplied
-evidence IDs that support every populated field. Preserve source-backed string values
-exactly as written in OCR evidence: do not normalize, reformat, translate, or infer
-numeric date ordering. For example, keep 01-09-2026 as 01-09-2026, never 2026-09-01.
-Return schema-valid structured output only. Every result is a candidate
+evidence IDs that support every populated field. When an entity or instruction spans
+across multiple consecutive lines or blocks (such as a medicine name on one line and
+strength/frequency on the next), cite ALL relevant evidence IDs in source_evidence.
+Preserve source-backed string values exactly as written in OCR evidence: do not normalize,
+reformat, translate, or infer numeric date ordering. For example, keep 01-09-2026 as 01-09-2026,
+never 2026-09-01. Return schema-valid structured output only. Every result is a candidate
 requiring physician review; never mark anything confirmed or processed. Do not provide
 reasoning or chain-of-thought."""
 
@@ -92,8 +102,12 @@ def validate_candidate_evidence(
             raise DocumentCandidateValidationError(
                 "Candidate referenced evidence outside the supplied OCR run"
             )
+        sorted_reference_ids = sorted(
+            reference_ids,
+            key=lambda rid: getattr(evidence[rid], "block_index", 0),
+        )
         supporting_text = _normalized(
-            " ".join(evidence[reference_id].text for reference_id in reference_ids)
+            " ".join(evidence[reference_id].text for reference_id in sorted_reference_ids)
         )
         for value in _candidate_values(candidate):
             if _normalized(value) not in supporting_text:
@@ -118,7 +132,7 @@ class GeminiDocumentExtractor(AbstractDocumentExtractor):
                 "Gemini document extraction requires KUNAL_GEMINI_API_KEY"
             )
         self.model_name = model_name
-        self._api_key = api_key
+        self._api_key = api_key.strip().strip("<>").strip()
         self._transport = transport or self._google_transport
 
     async def _google_transport(
@@ -155,7 +169,7 @@ class GeminiDocumentExtractor(AbstractDocumentExtractor):
     async def extract_candidates(
         self, extraction_input: DocumentExtractionInput
     ) -> DocumentCandidateExtractionResult:
-        contents = extraction_input.model_dump_json(exclude_none=False)
+        contents = serialize_extraction_input_for_llm(extraction_input)
         try:
             payload = await self._transport(
                 SYSTEM_INSTRUCTION, contents, DocumentCandidateExtractionResult
@@ -227,6 +241,19 @@ class GroqDocumentExtractor(AbstractDocumentExtractor):
                 temperature=0,
             )
         except Exception as exc:
+            err_msg = str(exc).lower()
+            is_rate_limit = (
+                "429" in str(exc)
+                or "rate_limit" in err_msg
+                or "rate limit" in err_msg
+                or "tokens per minute" in err_msg
+                or "tpm" in err_msg
+                or getattr(exc, "status_code", None) == 429
+            )
+            if is_rate_limit:
+                raise DocumentExtractorRateLimitError(
+                    f"Groq document extraction rate limit reached: {exc}"
+                ) from exc
             raise DocumentExtractorProviderError(
                 "Groq document extraction request failed"
             ) from exc
@@ -240,10 +267,11 @@ class GroqDocumentExtractor(AbstractDocumentExtractor):
     async def extract_candidates(
         self, extraction_input: DocumentExtractionInput
     ) -> DocumentCandidateExtractionResult:
+        contents = serialize_extraction_input_for_llm(extraction_input)
         try:
             payload = await self._transport(
                 SYSTEM_INSTRUCTION,
-                extraction_input.model_dump_json(exclude_none=False),
+                contents,
                 DocumentCandidateExtractionResult,
             )
             result = (
@@ -265,6 +293,61 @@ class GroqDocumentExtractor(AbstractDocumentExtractor):
         return result
 
 
+class FallbackDocumentExtractor(GroqDocumentExtractor):
+    """Orchestrates extraction by trying a primary extractor and falling back to a secondary on rate limit."""
+
+    def __init__(
+        self,
+        primary: AbstractDocumentExtractor,
+        fallback: AbstractDocumentExtractor,
+    ):
+        self.primary = primary
+        self.fallback = fallback
+        self.provider_name = primary.provider_name
+        self.model_name = primary.model_name
+        self._api_key = getattr(primary, "_api_key", None)
+        self._transport = getattr(primary, "_transport", None)
+
+    async def extract_candidates(
+        self, extraction_input: DocumentExtractionInput
+    ) -> DocumentCandidateExtractionResult:
+        try:
+            result = await self.primary.extract_candidates(extraction_input)
+            self.provider_name = self.primary.provider_name
+            self.model_name = self.primary.model_name
+            return result
+        except DocumentExtractorRateLimitError as rle:
+            logger.warning(
+                "Primary document extractor (%s/%s) rate limited: %s. Falling back to (%s/%s).",
+                self.primary.provider_name,
+                self.primary.model_name,
+                rle,
+                self.fallback.provider_name,
+                self.fallback.model_name,
+            )
+            result = await self.fallback.extract_candidates(extraction_input)
+            self.provider_name = self.fallback.provider_name
+            self.model_name = self.fallback.model_name
+            return result
+
+
+def serialize_extraction_input_for_llm(extraction_input: DocumentExtractionInput) -> str:
+    """Serialize minimal payload for semantic extraction without coordinates or duplicate text."""
+    payload = {
+        "document_type_hint": extraction_input.document_type_hint,
+        "file_name": extraction_input.file_name,
+        "evidence_blocks": [
+            {
+                "evidence_id": block.evidence_id,
+                "page": block.page_number,
+                "text": block.text,
+            }
+            for block in extraction_input.evidence_blocks
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False)
+
+
 def get_document_extractor(
     provider_name: str,
     *,
@@ -275,7 +358,11 @@ def get_document_extractor(
 ) -> AbstractDocumentExtractor:
     selected = provider_name.strip().lower()
     if selected == "groq":
-        return GroqDocumentExtractor(groq_api_key, groq_model)
+        groq_extractor = GroqDocumentExtractor(groq_api_key, groq_model)
+        if gemini_api_key:
+            gemini_extractor = GeminiDocumentExtractor(gemini_api_key, gemini_model)
+            return FallbackDocumentExtractor(groq_extractor, gemini_extractor)
+        return groq_extractor
     if selected == "gemini":
         return GeminiDocumentExtractor(gemini_api_key, gemini_model)
     raise DocumentExtractorConfigurationError(
@@ -318,7 +405,7 @@ def build_document_extraction_input(
                 text=block.text,
                 ocr_confidence=block.confidence,
                 page_number=block.page_number,
-                bounding_box=block.bounding_box_json,
+                bounding_box=None,
                 provider_name=run.provider_name,
                 provider_version=run.provider_version,
                 processed_at=run.created_at,

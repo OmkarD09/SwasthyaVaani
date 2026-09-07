@@ -64,10 +64,13 @@ def _assess_information_sufficiency(
         return False, None
 
     # 2. Check active clinical symptom complications that MUST be characterized before stopping
+    indic_vomit_keys = ["vomit", "ulti", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"]
     has_vomiting = (
         "vomiting" in state.associated_symptoms
         or "Vomiting" in state.associated_symptoms
-        or any(w in snippets for w in ["vomit", "ulti"])
+        or any(w in snippets for w in indic_vomit_keys)
+        or any(any(t in str(s).lower() for t in indic_vomit_keys) for s in state.associated_symptoms)
+        or (state.canonical_dimensions.get("vomiting") and state.canonical_dimensions["vomiting"].status in ["KNOWN_TRUE", "KNOWN_WITH_VALUE"])
     ) and "vomiting" not in state.negated_symptoms
 
     has_diarrhea = (
@@ -182,6 +185,21 @@ def _assess_information_sufficiency(
             has_swelling_or_trauma = is_field_already_resolved("swelling_warmth", state) or is_field_already_resolved("injury_history", state) or "other_symptoms" in state.negated_symptoms
             if has_loc or has_swelling_or_trauma:
                 return True, "Minimum Sufficient History: Information sufficient for Musculoskeletal presentation: location, duration, and joint mobility characterized."
+
+        # J. AYUSH Presentation Sufficiency
+        elif primary_domain == ClinicalDomain.AYUSH:
+            has_core_ayush = (
+                is_field_already_resolved("agni", state)
+                or is_field_already_resolved("koshtha", state)
+                or is_field_already_resolved("ahara_vihara", state)
+                or is_field_already_resolved("open_ayush_exploration", state)
+                or "other_symptoms" in state.negated_symptoms
+            )
+            top_gain = viable_candidates[0].get("score", 0) if viable_candidates else 0
+            # Shared information-gain logic remains authoritative:
+            # Terminate only when minimum sufficient history is reached AND remaining candidate information gain is low (< 70)
+            if has_core_ayush and top_gain < 70:
+                return True, "Minimum Sufficient History: Information sufficient for AYUSH intake (core constitutional parameters established and remaining candidate information gain is low)."
 
     # 4. If Open Exploration or High-Yield Targeted Dimension (score >= 65) is pending, don't stop
     top_candidate = viable_candidates[0]

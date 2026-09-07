@@ -1,16 +1,30 @@
+import asyncio
+import logging
 import re
 import uuid
 from datetime import datetime, timezone
 
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.database import get_db
 from app.core.events import ws_manager
+from app.models.ayush import AyushAssessmentModel
 from app.models.intake import Answer, ClinicalStateModel, IntakeSession, QuestionEvent
 from app.models.safety import RedFlagModel
 from app.models.user import Patient
+from app.schemas.ayush import (
+    AyushAssessment,
+    AyushAssessmentStatus,
+    AyushDimensionValue,
+    AyushProvenanceSource,
+    ayush_state_to_assessment,
+    format_vaya_from_age,
+)
 from app.schemas.clinical_state import ClinicalState
 from app.schemas.intake import (
     AnswerSubmitRequest,
@@ -137,6 +151,8 @@ async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(
         db.add(patient)
         db.flush()
 
+    resolved_age = patient.age if (patient and patient.age is not None) else req.patient_age
+
     token = generate_token()
     session = IntakeSession(
         id=str(uuid.uuid4()),
@@ -154,13 +170,18 @@ async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(
     db.add(session)
     db.flush()
 
-    # Initialize ClinicalState (with submitted data if provided)
+    # Initialize ClinicalState with known demographic vaya if age is available
     init_state = ClinicalState()
+    if resolved_age is not None:
+        init_state.set_canonical_dimension(
+            "vaya", "KNOWN_WITH_VALUE", value=format_vaya_from_age(resolved_age)
+        )
+
     if req.clinical_state and isinstance(req.clinical_state, dict):
         try:
             init_state = ClinicalState(**req.clinical_state)
         except Exception:
-            init_state = ClinicalState()
+            pass
     else:
         if req.chief_complaint:
             init_state.chief_complaint = req.chief_complaint
@@ -224,6 +245,7 @@ async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(
                     init_state.raw_transcript_snippets.append(content)
         session.question_count = question_count
 
+
     state_model = ClinicalStateModel(
         id=str(uuid.uuid4()),
         intake_session_id=session.id,
@@ -231,6 +253,25 @@ async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(
         state_json=init_state.model_dump(mode="json"),
     )
     db.add(state_model)
+
+    if req.workflow_type == "AYUSH":
+        base_assessment = ayush_state_to_assessment(None, system="AYURVEDA")
+        if resolved_age is not None:
+            base_assessment.set_dimension(
+                AyushDimensionValue(
+                    dimension="vaya",
+                    value=format_vaya_from_age(resolved_age),
+                    source=AyushProvenanceSource.SYSTEM_DERIVED,
+                    status=AyushAssessmentStatus.PRELIMINARY,
+                )
+            )
+        ayush_model = AyushAssessmentModel(
+            intake_session_id=session.id,
+            system="AYURVEDA",
+            status=base_assessment.overall_status.value,
+            assessment_json=base_assessment.model_dump(mode="json"),
+        )
+        db.add(ayush_model)
 
     if req.submit_now:
         session.status = "SUBMITTED"
@@ -362,6 +403,14 @@ async def process_intake_answer_core(
         **(latest_state_model.state_json if latest_state_model else {})
     )
 
+    # Bridge patient demographic age to vaya for existing sessions if known and not yet resolved
+    if not current_state.is_dimension_sufficiently_known("vaya") and session.patient_id:
+        patient = db.query(Patient).filter(Patient.id == session.patient_id).first()
+        if patient and patient.age is not None:
+            current_state.set_canonical_dimension(
+                "vaya", "KNOWN_WITH_VALUE", value=format_vaya_from_age(patient.age)
+            )
+
     question_event = None
     if question_event_id:
         question_event = (
@@ -407,8 +456,12 @@ async def process_intake_answer_core(
         target_field=target_field or "chief_complaint",
     )
 
-    extracted_facts = extraction_res.extracted_facts
-    has_progress = len(extracted_facts) > 0
+    extracted_facts = dict(extraction_res.extracted_facts)
+    is_non_info = bool(
+        extracted_facts.pop("is_non_informative", None)
+        or extracted_facts.pop("non_informative", None)
+    )
+    has_progress = any(v is not None for v in extracted_facts.values()) and not is_non_info
 
     # 5. Merge extracted facts into current clinical state
     updated_dict = current_state.model_dump()
@@ -426,10 +479,97 @@ async def process_intake_answer_core(
             else:
                 updated_dict[k] = v
     updated_state = ClinicalState(**updated_dict)
+    if is_non_info and raw_text:
+        updated_state.last_non_informative_response = raw_text.strip()
     if raw_text and raw_text not in updated_state.raw_transcript_snippets:
         updated_state.raw_transcript_snippets.append(raw_text)
     if not updated_state.chief_complaint and raw_text:
         updated_state.chief_complaint = raw_text.strip()
+
+    # Sync any extracted AYUSH core facts to updated_state.ayush and canonical tracking
+    ayush_core = ["agni", "koshtha", "ahara_vihara"]
+    for af in ayush_core:
+        if af in extracted_facts and extracted_facts[af] is not None:
+            from app.schemas.clinical_state import AyushState
+            if not updated_state.ayush:
+                updated_state.ayush = AyushState()
+            setattr(updated_state.ayush, af, str(extracted_facts[af]))
+            updated_state.set_canonical_dimension(af, "KNOWN_WITH_VALUE", value=str(extracted_facts[af]))
+
+    # Sync any extracted Dashavidha facts to canonical tracking
+    dashavidha_fields = ["sara", "samhanana", "pramana", "satmya", "sattva", "ahara_shakti", "vyayama_shakti", "vaya"]
+    for df in dashavidha_fields:
+        if df in extracted_facts and extracted_facts[df] is not None:
+            updated_state.set_canonical_dimension(df, "KNOWN_WITH_VALUE", value=str(extracted_facts[df]))
+
+    # Sync explicit negation for vomiting to canonical tracking as KNOWN_FALSE
+    indic_negated_vomiting_terms = {
+        "vomiting", "vomit", "nausea", "ulti", "not vomiting", "no vomiting",
+        "i am not vomiting", "i'm not vomiting", "haven't vomited", "have not vomited",
+        "without vomiting", "ulti nahi", "उलटी नाही", "उल्टी नहीं", "उलट्या नाहीत",
+        "उलट्या होत नाहीत", "मळमळ नाही"
+    }
+    has_negated_vomit = any(
+        any(term in str(ns).lower() for term in indic_negated_vomiting_terms)
+        for ns in updated_state.negated_symptoms
+    ) or any(
+        term in raw_text.lower()
+        for term in [
+            "no vomiting", "not vomiting", "i am not vomiting", "i'm not vomiting",
+            "haven't vomited", "have not vomited", "without vomiting",
+            "उलटी नाही", "उल्टी नहीं", "उलट्या नाहीत", "उलट्या होत नाहीत", "मळमळ नाही"
+        ]
+    ) or (
+        target_field in ["vomiting", "nausea_vomiting"]
+        and raw_text.strip().lower() in ["no", "nope", "nahi", "nahin", "nahi hai", "नाही", "नाहीत", "नहीं", "नहीं है"]
+    )
+
+    if has_negated_vomit:
+        existing_vomit = updated_state.canonical_dimensions.get("vomiting")
+        # Do not overwrite an existing confirmed positive fact incorrectly
+        if not existing_vomit or existing_vomit.status not in ["KNOWN_TRUE", "KNOWN_WITH_VALUE"]:
+            updated_state.set_canonical_dimension(
+                "vomiting",
+                "KNOWN_FALSE",
+                value=False,
+                turn=session.question_count + 1
+            )
+            if "vomiting" not in updated_state.negated_symptoms:
+                updated_state.negated_symptoms.append("vomiting")
+            # Remove any conflicting positive vomiting from associated_symptoms / symptoms
+            updated_state.associated_symptoms = [
+                s for s in updated_state.associated_symptoms
+                if not any(t in str(s).lower() for t in ["vomiting", "vomit", "ulti", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"])
+            ]
+            updated_state.symptoms = [
+                s for s in updated_state.symptoms
+                if not any(t in str(s).lower() for t in ["vomiting", "vomit", "ulti", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"])
+            ]
+
+    # Sync confirmed vomiting indicators from associated_symptoms / symptoms to canonical tracking
+    indic_vomiting_indicators = {"vomiting", "vomit", "nausea", "ulti", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"}
+    has_confirmed_vomit = (
+        not has_negated_vomit
+        and any(
+            any(ind in str(s).lower() for ind in indic_vomiting_indicators)
+            for s in (updated_state.associated_symptoms + updated_state.symptoms)
+        )
+    )
+
+    if has_confirmed_vomit:
+        existing_vomit = updated_state.canonical_dimensions.get("vomiting")
+        if not existing_vomit or existing_vomit.status not in ["KNOWN_TRUE", "KNOWN_WITH_VALUE"]:
+            updated_state.set_canonical_dimension(
+                "vomiting",
+                "KNOWN_TRUE",
+                value=True,
+                turn=session.question_count + 1
+            )
+            # Positive and negative facts cannot silently coexist
+            updated_state.negated_symptoms = [
+                ns for ns in updated_state.negated_symptoms
+                if not any(t in str(ns).lower() for t in ["vomiting", "vomit", "ulti", "उलटी", "उल्टी", "मळमळ"])
+            ]
 
     # Update session metrics
     session.question_count += 1
@@ -479,6 +619,69 @@ async def process_intake_answer_core(
             state_json=updated_state.model_dump(mode="json"),
         )
     )
+
+    # Sync to AyushAssessmentModel if AYUSH workflow or AYUSH data present
+    has_ayush_data = bool(updated_state.ayush) or any(df in extracted_facts for df in dashavidha_fields)
+    if session.workflow_type == "AYUSH" or has_ayush_data:
+        ayush_record = (
+            db.query(AyushAssessmentModel)
+            .filter(AyushAssessmentModel.intake_session_id == session.id)
+            .first()
+        )
+        if not ayush_record:
+            base_assessment = ayush_state_to_assessment(updated_state.ayush, system="AYURVEDA")
+            ayush_record = AyushAssessmentModel(
+                intake_session_id=session.id,
+                system="AYURVEDA",
+                status=base_assessment.overall_status.value,
+                assessment_json=base_assessment.model_dump(mode="json"),
+            )
+            db.add(ayush_record)
+            db.flush()
+
+        assessment_obj = AyushAssessment(**ayush_record.assessment_json)
+        if updated_state.ayush:
+            for af in ["prakriti", "vikriti", "agni", "koshtha", "ahara_vihara"]:
+                v = getattr(updated_state.ayush, af, None)
+                if v:
+                    dim_src = (
+                        AyushProvenanceSource.AI_INFERRED
+                        if af in ["prakriti", "vikriti"]
+                        else AyushProvenanceSource.PATIENT_STATED
+                    )
+                    assessment_obj.set_dimension(
+                        AyushDimensionValue(
+                            dimension=af,
+                            value=v,
+                            source=dim_src,
+                            source_id=answer.id,
+                        )
+                    )
+        for df in dashavidha_fields:
+            if df in extracted_facts and extracted_facts[df] is not None:
+                assessment_obj.set_dimension(
+                    AyushDimensionValue(
+                        dimension=df,
+                        value=str(extracted_facts[df]),
+                        source=AyushProvenanceSource.PATIENT_STATED,
+                        source_id=answer.id,
+                    )
+                )
+
+        vaya_dim = updated_state.canonical_dimensions.get("vaya")
+        if vaya_dim and vaya_dim.value and "vaya" not in assessment_obj.get_all_dimensions():
+            assessment_obj.set_dimension(
+                AyushDimensionValue(
+                    dimension="vaya",
+                    value=str(vaya_dim.value),
+                    source=AyushProvenanceSource.SYSTEM_DERIVED,
+                    status=AyushAssessmentStatus.PRELIMINARY,
+                )
+            )
+
+        ayush_record.status = assessment_obj.overall_status.value
+        ayush_record.assessment_json = assessment_obj.model_dump(mode="json")
+        flag_modified(ayush_record, "assessment_json")
 
     decision.question_event_id = next_question_event_id
     db.commit()
@@ -559,10 +762,13 @@ async def submit_voice_answer(
     audio_base64 = None
     if result.decision.action == "ASK" and result.decision.question:
         try:
-            audio_base64 = await speech.text_to_speech(
-                result.decision.question, detected_language
+            audio_base64 = await asyncio.wait_for(
+                speech.text_to_speech(
+                    result.decision.question, detected_language
+                ),
+                timeout=2.0
             )
-        except Exception:  # noqa: BLE001 - optional TTS must not discard saved intake data
+        except Exception:  # noqa: BLE001 - optional TTS timeout or error must not discard saved intake data
             audio_base64 = None
 
     return VoiceAnswerSubmitResponse(

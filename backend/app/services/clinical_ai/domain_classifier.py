@@ -70,9 +70,6 @@ def classify_clinical_domains(state: ClinicalState, workflow_type: str = "GENERA
     workflow selection, chief complaint, reported symptoms, and natural language transcript snippets.
     Returns prioritized list of matching domains.
     """
-    if workflow_type == "AYUSH":
-        return [ClinicalDomain.AYUSH, ClinicalDomain.GASTROINTESTINAL, ClinicalDomain.GENERAL]
-
     # Aggregate all text signals from clinical state
     text_corpus: List[str] = []
     if state.chief_complaint:
@@ -106,5 +103,8 @@ def classify_clinical_domains(state: ClinicalState, workflow_type: str = "GENERA
     # Default to GENERAL if no specific domain triggers
     if not domains:
         domains = [ClinicalDomain.GENERAL]
+
+    if workflow_type == "AYUSH":
+        return [ClinicalDomain.AYUSH] + [d for d in domains if d != ClinicalDomain.AYUSH]
 
     return domains

@@ -30,7 +30,24 @@ class ClinicalExtractionSchema(BaseModel):
     location: str | None = Field(None, description="Anatomical site of symptom")
     radiation: str | None = Field(None, description="Radiation direction, e.g. left arm, neck, back")
     associated_symptoms: list[str] = Field(default_factory=list, description="Other accompanying symptoms")
+    negated_symptoms: list[str] = Field(default_factory=list, description="Explicitly absent, denied, or ruled-out symptoms (e.g., 'not vomiting', 'no fever', 'no diarrhea', 'उलटी नाही', 'उल्टी नहीं')")
     has_meaningful_progress: bool = Field(True, description="Whether new clinical information was provided")
+    is_non_informative: bool = Field(False, description="Whether the patient statement was non-informative, confused, or expressing uncertainty (e.g., 'idk', 'what?', 'pata nahi', 'samajh nahi aaya', 'not sure')")
+
+    # AYUSH Core Dimensions
+    agni: str | None = Field(None, description="Digestive fire/appetite: Tikshna (sharp), Manda (sluggish), Vishama (irregular), Sama (balanced)")
+    koshtha: str | None = Field(None, description="Bowel habit: Mridu (soft/frequent), Krura (hard/constipated), Madhyam (regular)")
+    ahara_vihara: str | None = Field(None, description="Dietary and lifestyle habits")
+
+    # Expanded Dashavidha Pariksha Dimensions
+    sara: str | None = Field(None, description="Tissue excellence / constitutional vitality")
+    samhanana: str | None = Field(None, description="Body build / compactness / symmetry")
+    pramana: str | None = Field(None, description="Bodily proportions / anthropometry")
+    satmya: str | None = Field(None, description="Habituation / dietary & environmental adaptability")
+    sattva: str | None = Field(None, description="Mental temperament / emotional resilience: Pravara (superior), Madhyama (moderate), Avara (feeble)")
+    ahara_shakti: str | None = Field(None, description="Food intake and digestive capacity")
+    vyayama_shakti: str | None = Field(None, description="Physical strength and exercise/work tolerance")
+    vaya: str | None = Field(None, description="Age stage / biological age characteristics: Bala, Madhya, Vriddha")
 
 
 class MockLLMProvider(AbstractLLMProvider):
@@ -57,6 +74,19 @@ class MockLLMProvider(AbstractLLMProvider):
             facts["character"] = updated_st.character
         if updated_st.associated_symptoms:
             facts["associated_symptoms"] = updated_st.associated_symptoms
+        if updated_st.ayush:
+            if updated_st.ayush.agni:
+                facts["agni"] = updated_st.ayush.agni
+            if updated_st.ayush.koshtha:
+                facts["koshtha"] = updated_st.ayush.koshtha
+            if updated_st.ayush.ahara_vihara:
+                facts["ahara_vihara"] = updated_st.ayush.ahara_vihara
+        for dim in ["sara", "samhanana", "pramana", "satmya", "sattva", "ahara_shakti", "vyayama_shakti", "vaya"]:
+            c_dim = updated_st.canonical_dimensions.get(dim)
+            if c_dim and c_dim.value:
+                facts[dim] = c_dim.value
+        if facts.get("non_informative") or updated_st.last_non_informative_response:
+            facts["is_non_informative"] = True
         return ExtractionResult(
             extracted_facts=facts,
             confidence=0.95,
@@ -136,7 +166,20 @@ class MockLLMProvider(AbstractLLMProvider):
                 "associated_symptoms": "क्या आपको इसके अलावा कोई और लक्षण जैसे चक्कर या सांस लेने में परेशानी है?",
                 "appetite": "आपकी भूख (अग्नि) कैसी है, क्या खाना ठीक से पच रहा है?",
                 "bowel_habits": "आपका पेट (कोष्ठ) नियमित साफ होता है या कब्ज रहती है?",
-                "sleep_pattern": "रात में नींद (निद्रा) कैसी आती है, कोई बेचैनी तो नहीं होती?"
+                "sleep_pattern": "रात में नींद (निद्रा) कैसी आती है, कोई बेचैनी तो नहीं होती?",
+                # AYUSH Core Dimensions
+                "agni": "आपकी भूख और पाचन क्रिया (अग्नि) कैसी है — सामान्य, मंद या बहुत तेज?",
+                "koshtha": "आपका पेट साफ होने की आदत (कोष्ठ) कैसी है — नियमित, कब्ज या पतला शौच?",
+                "ahara_vihara": "आपकी खान-पान और दिनचर्या की आदतें (आहार-विहार) कैसी हैं, क्या तैलीय/मसालेदार खाना ज्यादा खाते हैं?",
+                # AYUSH Expanded Dashavidha Dimensions
+                "sara": "शारीरिक शक्ति, त्वचा की चमक और सामान्य ऊर्जा (सार) के मामले में आप खुद को कैसा महसूस करते हैं?",
+                "samhanana": "आपकी शारीरिक बनावट (संहनन) कैसी है — हल्की, मध्यम या सुगठित/मजबूत?",
+                "pramana": "क्या आपका शारीरिक वजन और कद-काठी (प्रमाण) संतुलित और सामान्य रहता है?",
+                "satmya": "कौन-सा खान-पान या मौसम आपके शरीर को अनुकूल (सात्म्य) रहता है, या क्या किसी चीज से तुरंत परेशानी होती है?",
+                "sattva": "मानसिक तनाव, चिंता या विपरीत परिस्थितियों में आपका मन और धैर्य (सत्त्व) कैसा रहता है?",
+                "ahara_shakti": "आपकी भूख और भोजन पचाने की क्षमता (आहार शक्ति) कैसी है?",
+                "vyayama_shakti": "रोजमर्रा की मेहनत, काम या व्यायाम करने में आपकी शारीरिक ताकत और सहनशक्ति (व्यायाम शक्ति) कैसी रहती है?",
+                "vaya": "अपनी उम्र और अवस्था (वय) के अनुसार क्या आपने ऊर्जा या सेहत में कोई खास बदलाव देखा है?"
             }
             return questions.get(target_field, "कृपया अपने लक्षणों के बारे में थोड़ा और विस्तार से बताएं।")
         elif "mr" in language_code.lower():
@@ -187,9 +230,22 @@ class MockLLMProvider(AbstractLLMProvider):
                 "duration": "हा त्रास तुम्हाला किती दिवसांपासून होत आहे?",
                 "severity": "1 ते 10 च्या प्रमाणात वेदना किंवा त्रास किती तीव्र आहे?",
                 "radiation": "ही वेदना शरीराच्या इतर भागात पसरते का?",
-                "associated_symptoms": "याव्यतिरिक्त चक्कर किंवा इतर काही लक्षणे जाणवतात का?",
                 "appetite": "तुमची भूक कशी आहे, जेवण व्यवस्थित पचते का?",
-                "bowel_habits": "पोट नियमित साफ होते का, काही तक्रार आहे का?"
+                "bowel_habits": "पोट नियमित साफ होते का, काही तक्रार आहे का?",
+                # AYUSH Core Dimensions
+                "agni": "तुमची भूक आणि पचनशक्ती (अग्नि) कशी आहे — सामान्य, मंद की खूप भूक लागते?",
+                "koshtha": "पोट साफ होण्याची सवय (कोष्ठ) कशी आहे — नियमित, बद्धकोष्ठता की पातळ शौच?",
+                "ahara_vihara": "तुमचा रोजचा आहार आणि दिनचर्या (आहार-विहार) कशी आहे, मसालेदार किंवा तेलकट अन्न जास्त खाता का?",
+                "sleep_pattern": "रात्री झोप (निद्रा) कशी लागते, रात्री बेचैनी होते का?",
+                # AYUSH Expanded Dashavidha Dimensions
+                "sara": "शारीरिक ताकद, त्वचेचा पोत आणि एकूणच जीवनशक्ती (सार) याबाबत तुम्हाला कसे वाटते?",
+                "samhanana": "तुमची शारीरिक बांधणी (संहनन) कशी आहे — हलकी, मध्यम की मजबूत/सुदृढ?",
+                "pramana": "तुमचे शरीराचे वजन आणि प्रमाण (प्रमाण) सामान्य आणि संतुलित वाटते का?",
+                "satmya": "कोणते अन्न किंवा हवामान तुमच्या प्रकृतीला मानवते (सात्म्य) आणि कशाचा लगेच त्रास होतो?",
+                "sattva": "मानसिक ताणतणाव, काळजी किंवा कठीण प्रसंगात तुमचे मनोधैर्य आणि संयम (सत्त्व) कसा असतो?",
+                "ahara_shakti": "तुमची जेवणाची क्षमता आणि पचनशक्ती (आहार शक्ती) कशी आहे?",
+                "vyayama_shakti": "रोजच्या कामातील मेहनत किंवा व्यायाम सहन करण्याची तुमची शारीरिक क्षमता (व्यायाम शक्ती) कशी आहे?",
+                "vaya": "तुमच्या वयानुसार (वय) शरीराच्या ताकदीत किंवा ऊर्जेत काही बदल जाणवत आहेत का?"
             }
             return questions.get(target_field, "कृपया तुमच्या लक्षणांबद्दल थोडे अधिक सांगा.")
         else:
@@ -259,7 +315,16 @@ class MockLLMProvider(AbstractLLMProvider):
                 "agni": "How is your appetite (Agni) and digestion pattern after meals?",
                 "koshtha": "How are your bowel habits (Koshtha) — regular, loose, or constipated?",
                 "ahara_vihara": "What are your usual dietary habits — do you frequently consume oily or spicy foods?",
-                "sleep_pattern": "How is your sleep quality (Nidra), and do you wake up feeling refreshed?"
+                "sleep_pattern": "How is your sleep quality (Nidra), and do you wake up feeling refreshed?",
+                # AYUSH Expanded Dashavidha Dimensions
+                "sara": "How would you describe your overall physical vitality and skin/tissue strength (Sara)?",
+                "samhanana": "How would you describe your general physical build and body frame (Samhanana) — light, medium, or sturdy?",
+                "pramana": "Do you feel your body weight and physical proportions (Pramana) have been normal and balanced?",
+                "satmya": "Are there specific foods, climates, or habits that suit you best or cause you discomfort (Satmya)?",
+                "sattva": "How do you generally handle mental stress, anxiety, or difficult situations (Sattva)?",
+                "ahara_shakti": "How is your food intake capacity and how easily do you digest full meals (Ahara Shakti)?",
+                "vyayama_shakti": "How is your physical stamina and tolerance for daily physical exertion or exercise (Vyayama Shakti)?",
+                "vaya": "Considering your age and life stage (Vaya), have you noticed any recent changes in your overall energy?"
             }
             return questions.get(target_field, "Could you share a little more detail regarding that?")
 
@@ -283,13 +348,21 @@ class GroqLLMProvider(AbstractLLMProvider):
 
         system_prompt = """You are SwasthyaVaani's clinical pre-consultation intake extractor for SIH Problem Statement 26047.
 Extract structured clinical facts from the patient's statement into a JSON object with these exact keys:
-chief_complaint (string or null), onset (string or null), duration (string or null), severity (integer 1-10 or null), location (string or null), radiation (string or null), associated_symptoms (array of strings).
+chief_complaint (string or null), onset (string or null), duration (string or null), severity (integer 1-10 or null), location (string or null), radiation (string or null),
+associated_symptoms (array of strings: positive accompanying symptoms),
+negated_symptoms (array of strings: symptoms explicitly DENIED, ABSENT, or stated as NO like 'not vomiting', 'no fever', 'no pain', 'उलटी नाही', 'उल्टी नहीं'),
+is_non_informative (boolean: true if patient reply is vague, confused, non-informative, or expressing uncertainty like 'idk', 'I don't know', 'what?', 'pata nahi', 'samajh nahi aaya', 'not sure', 'leave it', 'skip', otherwise false),
+agni (string or null: Manda, Tikshna, Vishama, Sama), koshtha (string or null: Mridu, Krura, Madhyam), ahara_vihara (string or null),
+sara (string or null), samhanana (string or null), pramana (string or null), satmya (string or null),
+sattva (string or null: Pravara, Madhyama, Avara), ahara_shakti (string or null), vyayama_shakti (string or null), vaya (string or null: Bala, Madhya, Vriddha).
 
 CLINICAL SAFETY RULES:
 1. NEVER output diagnoses or prescriptions.
-2. Extract ONLY factual symptom characteristics.
+2. Extract ONLY factual symptom characteristics and patient-reported AYUSH dimensions.
 3. If a field was not mentioned by patient, return null.
-4. Fully support Indic expressions (e.g., 'chhati mein dard', 'chakkar', 'tez bukhar', 'jalan', 'saans phulna', 'agnimandya', 'koshtha').
+4. Fully support Indic expressions (e.g., 'chhati mein dard', 'chakkar', 'tez bukhar', 'jalan', 'saans phulna', 'agnimandya', 'koshtha', 'kamzori', 'bhookh').
+5. If the patient expresses confusion, uncertainty, or lack of knowledge ('idk', 'not sure', 'what?', 'samajh nahi aaya', 'pata nahi'), set is_non_informative: true.
+6. If a symptom is explicitly denied, absent, or negated ('no vomiting', 'I am not vomiting', 'no fever', 'nahi hai', 'nahi', 'उलटी नाही', 'उल्टी नहीं'), place it in negated_symptoms, NEVER in associated_symptoms.
 Output ONLY valid JSON."""
 
         user_prompt = f"""Target Field Being Answered: {target_field}
@@ -439,6 +512,8 @@ RULES:
 2. Extract only factual symptom characteristics (SOCRATES framework & AYUSH metrics).
 3. If a field is not mentioned, leave it null.
 4. Support both English and Indic language terms (e.g., 'chhati mein dard', 'sir dard', 'tez bukhar', 'chakkar', 'jalan', 'saans phulna', 'agnimandya', 'koshtha').
+5. If the patient reply is non-informative, confused, or expressing uncertainty (e.g., 'idk', 'I don't know', 'what?', 'pata nahi', 'samajh nahi aaya', 'not sure'), set is_non_informative to true.
+6. If a symptom is explicitly denied, absent, or negated ('no vomiting', 'I am not vomiting', 'no fever', 'nahi hai', 'nahi', 'उलटी नाही', 'उल्टी नहीं'), place it in negated_symptoms, NEVER in associated_symptoms.
 
 Target Field Being Answered: {target_field}
 Current State Summary: {current_state}

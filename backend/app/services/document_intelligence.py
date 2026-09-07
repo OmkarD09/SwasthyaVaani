@@ -107,8 +107,17 @@ def create_storage_key(document_type: str, extension: str) -> str:
     return f"{category}/{year}/{uuid.uuid4()}{extension}"
 
 
+def get_private_storage_root() -> Path:
+    """Return an absolute Path to the private storage root, independent of process CWD."""
+    base = Path(settings.DOCUMENT_STORAGE_DIR)
+    if not base.is_absolute():
+        backend_dir = Path(__file__).resolve().parents[2]
+        base = (backend_dir / base).resolve()
+    return base
+
+
 def store_private_file(file_bytes: bytes, storage_key: str) -> Path:
-    root = Path(settings.DOCUMENT_STORAGE_DIR).resolve()
+    root = get_private_storage_root()
     target = (root / storage_key).resolve()
     if root != target and root not in target.parents:
         raise DocumentValidationError(
@@ -120,7 +129,7 @@ def store_private_file(file_bytes: bytes, storage_key: str) -> Path:
 
 
 def load_private_file(storage_key: str) -> bytes:
-    root = Path(settings.DOCUMENT_STORAGE_DIR).resolve()
+    root = get_private_storage_root()
     target = (root / storage_key).resolve()
     if root != target and root not in target.parents:
         raise DocumentValidationError(

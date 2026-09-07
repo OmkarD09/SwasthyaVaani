@@ -103,11 +103,19 @@ MAP_TO_CANONICAL: Dict[str, str] = {
     "spread_progression": "spread_progression",
     "rash_skin": "rash_character",
 
-    # AYUSH
+    # AYUSH Core and Dashavidha Dimensions
     "agni": "agni",
     "koshtha": "koshtha",
     "ahara_vihara": "ahara_vihara",
-    "sleep_pattern": "sleep_pattern"
+    "sleep_pattern": "sleep_pattern",
+    "sara": "sara",
+    "samhanana": "samhanana",
+    "pramana": "pramana",
+    "satmya": "satmya",
+    "sattva": "sattva",
+    "ahara_shakti": "ahara_shakti",
+    "vyayama_shakti": "vyayama_shakti",
+    "vaya": "vaya"
 }
 
 
@@ -125,6 +133,14 @@ SEMANTIC_CLUSTERS: Dict[str, Set[str]] = {
     "eye_watering": {"eye_watering", "watering_eyes", "tearing", "epiphora"},
     "eye_discharge": {"eye_discharge", "discharge", "discharge_eyes", "pus_discharge"},
     "problem_clarification": {"problem_clarification", "clarify_problem"},
+    "sara": {"sara", "dhatu_sara", "tissue_vitality", "vitality"},
+    "samhanana": {"samhanana", "body_build", "compactness", "body_frame"},
+    "pramana": {"pramana", "anthropometry", "proportions", "body_proportions"},
+    "satmya": {"satmya", "homologation", "adaptability", "habituation", "food_tolerance"},
+    "sattva": {"sattva", "mental_strength", "temperament", "psyche", "emotional_resilience"},
+    "ahara_shakti": {"ahara_shakti", "intake_capacity", "digestive_power", "eating_capacity"},
+    "vyayama_shakti": {"vyayama_shakti", "physical_strength", "exercise_tolerance", "stamina"},
+    "vaya": {"vaya", "age_stage", "chronological_age", "biological_age"},
     "open_exploration": {
         "open_gi_exploration", "open_headache_exploration", "open_respiratory_exploration",
         "open_cardiac_exploration", "open_fever_exploration", "open_msk_exploration",
@@ -257,6 +273,15 @@ DOMAIN_DIMENSIONS: Dict[str, List[Dict[str, Any]]] = {
         {"field": "ahara_vihara", "label": "Ahara-Vihara (Dietary habits, spicy/oily food, sleep routine)", "priority": "HIGH"},
         {"field": "sleep_pattern", "label": "Nidra (Sleep quality, night-time restlessness)", "priority": "MEDIUM"},
         {"field": "relieving_factors", "label": "Upashaya (What lifestyle/dietary factors give relief)", "priority": "MEDIUM"},
+        # Expanded Dashavidha Pariksha Dimensions
+        {"field": "sattva", "label": "Sattva (Mental temperament, emotional resilience, stress response)", "priority": "MEDIUM"},
+        {"field": "ahara_shakti", "label": "Ahara Shakti (Food intake & digestion capacity)", "priority": "MEDIUM"},
+        {"field": "vyayama_shakti", "label": "Vyayama Shakti (Physical strength, stamina & fatigue)", "priority": "MEDIUM"},
+        {"field": "satmya", "label": "Satmya (Habituation, food adaptability & tolerance)", "priority": "MEDIUM"},
+        {"field": "sara", "label": "Sara (Tissue excellence, constitutional vitality)", "priority": "LOW"},
+        {"field": "samhanana", "label": "Samhanana (Body build, compactness & symmetry)", "priority": "LOW"},
+        {"field": "pramana", "label": "Pramana (Bodily proportions & anthropometry)", "priority": "LOW"},
+        {"field": "vaya", "label": "Vaya (Age stage & physiological age characteristics)", "priority": "LOW"},
     ],
     ClinicalDomain.GENERAL: [
         {"field": "open_general_exploration", "label": "Open Exploration: Any other unusual symptoms or bodily changes", "priority": "HIGH"},
@@ -372,7 +397,21 @@ def is_field_already_resolved(field_name: str, state: ClinicalState) -> bool:
         return bool(state.radiation) or any(w in combined_snippets for w in ["radiat", "left arm", "shoulder", "jaw", "neck", "haath me"])
 
     elif canon == "vomiting":
-        return bool(state.hydration_status) or any(w in combined_snippets for w in ["vomit", "nausea", "ulti", "jeemichlana", "vomited twice", "vomited 3 times", "no vomit", "no nausea"])
+        if state.canonical_dimensions.get("vomiting") and state.canonical_dimensions["vomiting"].status in ["KNOWN_TRUE", "KNOWN_FALSE", "KNOWN_WITH_VALUE"]:
+            return True
+        if "vomiting" in state.negated_symptoms:
+            return True
+        indic_vomiting_terms = [
+            "vomit", "nausea", "ulti", "jeemichlana", "vomited twice",
+            "vomited 3 times", "no vomit", "no nausea", "not vomiting",
+            "उलटी", "उल्टी", "मळमळ", "जी मिचलाना", "उलटी नाही", "उल्टी नहीं"
+        ]
+        has_in_snippets = any(w in combined_snippets for w in indic_vomiting_terms)
+        has_in_associated = any(
+            any(t in str(s).lower() for t in ["vomiting", "vomit", "nausea", "ulti", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"])
+            for s in (state.associated_symptoms + state.symptoms)
+        )
+        return bool(state.hydration_status) or has_in_snippets or has_in_associated
 
     elif canon == "food_exposure":
         if state.food_exposure:
@@ -429,16 +468,44 @@ def is_field_already_resolved(field_name: str, state: ClinicalState) -> bool:
         return any(w in combined_snippets for w in ["itching", "khujli", "pruritus", "scratching"])
 
     elif canon == "agni":
-        return bool(state.ayush and state.ayush.agni)
+        return bool(state.ayush and state.ayush.agni) or state.is_dimension_sufficiently_known("agni")
 
     elif canon == "koshtha":
-        return bool(state.ayush and state.ayush.koshtha)
+        return bool(state.ayush and state.ayush.koshtha) or state.is_dimension_sufficiently_known("koshtha")
 
     elif canon == "ahara_vihara":
-        return bool(state.ayush and state.ayush.ahara_vihara)
+        return bool(state.ayush and state.ayush.ahara_vihara) or state.is_dimension_sufficiently_known("ahara_vihara")
 
     elif canon == "sleep_pattern":
         return any(w in combined_snippets for w in ["sleep", "neend", "insomnia"])
+
+    elif canon == "sara":
+        return state.is_dimension_sufficiently_known("sara") or "sara" in state.resolved_dimensions
+
+    elif canon == "samhanana":
+        return state.is_dimension_sufficiently_known("samhanana") or "samhanana" in state.resolved_dimensions
+
+    elif canon == "pramana":
+        return state.is_dimension_sufficiently_known("pramana") or "pramana" in state.resolved_dimensions
+
+    elif canon == "satmya":
+        return state.is_dimension_sufficiently_known("satmya") or "satmya" in state.resolved_dimensions
+
+    elif canon == "sattva":
+        # Contextual keywords influence candidate relevance only; never mark sattva resolved here without explicit evaluation
+        return state.is_dimension_sufficiently_known("sattva") or "sattva" in state.resolved_dimensions
+
+    elif canon == "ahara_shakti":
+        # Satisfied by explicit aharashakti, or clustered if both agni and ahara_vihara are resolved
+        return state.is_dimension_sufficiently_known("ahara_shakti") or "ahara_shakti" in state.resolved_dimensions or (
+            bool(state.ayush and state.ayush.agni and state.ayush.ahara_vihara)
+        )
+
+    elif canon == "vyayama_shakti":
+        return state.is_dimension_sufficiently_known("vyayama_shakti") or "vyayama_shakti" in state.resolved_dimensions
+
+    elif canon == "vaya":
+        return state.is_dimension_sufficiently_known("vaya") or "vaya" in state.resolved_dimensions
 
     elif field_name == "associated_symptoms":
         return len(state.associated_symptoms) > 0
@@ -475,9 +542,19 @@ def score_candidate_dimensions(
 
     # Determine negated symptoms
     negated: Set[str] = set(state.negated_symptoms)
+    # Prefer structured canonical dimension state
+    for dim_name, dim_state in state.canonical_dimensions.items():
+        if dim_state.status == "KNOWN_FALSE":
+            negated.add(dim_name)
+
     if any(n in combined_text for n in ["no pain", "dard nahi", "no ache", "pain: no"]):
         negated.add("pain")
-    if any(n in combined_text for n in ["no vomiting", "ulti nahi", "no nausea"]):
+    if any(n in combined_text for n in [
+        "no vomiting", "not vomiting", "i am not vomiting", "i'm not vomiting",
+        "haven't vomited", "have not vomited", "without vomiting",
+        "vomit: no", "vomiting: no", "no vomit", "not vomit", "no nausea", "not nauseous",
+        "ulti nahi", "उलटी नाही", "उल्टी नहीं", "उलट्या नाहीत", "उलट्या होत नाहीत", "मळमळ नाही"
+    ]):
         negated.add("vomiting")
     if any(n in combined_text for n in ["no fever", "bukhar nahi", "taap nahi"]):
         negated.add("fever")
@@ -492,7 +569,26 @@ def score_candidate_dimensions(
     has_dark_stool = bool(state.dark_stool) or any(w in combined_text for w in ["dark stool", "black stool", "kala dast"])
     has_dizziness = bool(state.dizziness) or any(w in combined_text for w in ["dizzy", "dizziness", "chakkar", "lightheaded"])
     has_weakness = bool(state.weakness) or any(w in combined_text for w in ["weak", "weakness", "kamzori", "fatigue"])
-    has_vomiting = any(w in combined_text for w in ["vomit", "ulti"]) and "vomiting" not in negated
+    indic_vomit_keys = ["vomit", "ulti", "उलटी", "उल्टी", "मळमळ", "जी मिचलाना"]
+    is_canon_false_vomit = bool(
+        state.canonical_dimensions.get("vomiting")
+        and state.canonical_dimensions["vomiting"].status == "KNOWN_FALSE"
+    )
+    has_vomiting = (
+        not is_canon_false_vomit
+        and "vomiting" not in negated
+        and (
+            any(w in combined_text for w in indic_vomit_keys)
+            or any(
+                any(t in str(s).lower() for t in indic_vomit_keys)
+                for s in (state.associated_symptoms + state.symptoms)
+            )
+            or (
+                state.canonical_dimensions.get("vomiting")
+                and state.canonical_dimensions["vomiting"].status in ["KNOWN_TRUE", "KNOWN_WITH_VALUE"]
+            )
+        )
+    )
     has_diarrhea = any(w in combined_text for w in ["loose motion", "dast", "diarrhea", "watery"]) and "diarrhea" not in negated
     has_blurred_vision = state.is_dimension_sufficiently_known("blurred_vision") or "blur" in combined_text
 
@@ -583,6 +679,21 @@ def score_candidate_dimensions(
                     score += 85
                 if (has_vomiting or has_diarrhea) and field_name == "food_exposure":
                     score += 50
+            elif domain == ClinicalDomain.AYUSH:
+                if field_name in ["agni", "koshtha", "ahara_vihara"]:
+                    score += 25
+                # Contextual relevance boost for sattva (STRICTLY candidate relevance, NOT clinical inference)
+                if field_name == "sattva" and any(w in combined_text for w in ["stress", "anxiety", "tanaav", "chinta", "disturbed sleep", "tension", "worry", "restless"]):
+                    score += 35
+                # Contextual relevance boost for vyayama_shakti
+                if field_name == "vyayama_shakti" and any(w in combined_text for w in ["weakness", "kamzori", "fatigue", "thakan", "tired", "exhaustion", "low energy"]):
+                    score += 35
+                # Contextual relevance boost for ahara_shakti
+                if field_name == "ahara_shakti" and any(w in combined_text for w in ["appetite", "bhookh", "heavy meal", "can't eat", "digestion", "indigestion"]):
+                    score += 30
+                # Contextual relevance boost for satmya
+                if field_name == "satmya" and any(w in combined_text for w in ["allergy", "suits", "reaction", "weather", "habits"]):
+                    score += 30
 
             # 6. Irrelevant Sub-system Questionnaire Penalties
             # If not in GI domain, penalize unprompted stool/bowel questions
@@ -593,6 +704,12 @@ def score_candidate_dimensions(
 
             # If not in Ophthalmic, penalize eye specific questions
             if domain != ClinicalDomain.OPHTHALMIC and field_name in ["blurred_vision", "eye_watering", "eye_discharge", "eye_laterality", "foreign_body_sensation"]:
+                score -= 500
+
+            # If not in AYUSH domain, penalize AYUSH specific questions
+            if domain != ClinicalDomain.AYUSH and field_name in [
+                "sara", "samhanana", "pramana", "satmya", "sattva", "ahara_shakti", "vyayama_shakti", "vaya", "open_ayush_exploration"
+            ]:
                 score -= 500
 
             # 7. Semantic Cluster Deduplication

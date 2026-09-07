@@ -5,14 +5,15 @@ clinical intake platform for SIH Problem Statement 26047.
 
 Before modifying code, read these documents in this order:
 
-1. docs/PRD.md
-2. docs/TRD.md
-3. docs/architecture.md
-4. docs/backend_schema.md
-5. docs/rules.md
-6. docs/appflow.md
-7. docs/UI_UX_Design_Brief.md
-8. docs/implementation_plan.md
+1. docs/SwasthyaVaani_PRD.md
+2. docs/SwasthyaVaani_TRD.md
+3. docs/SwasthyaVaani_architecture.md
+4. docs/SwasthyaVaani_backend_schema.md
+5. docs/SwasthyaVaani_rules.md
+6. docs/SwasthyaVaani_appflow.md
+7. docs/SwasthyaVaani_AYUSH_Specification.md
+8. docs/SwasthyaVaani_Current_Project_State.md
+9. docs/SwasthyaVaani_UI_UX_Design_Brief.md
 
 These documents are the project specifications.
 
@@ -82,7 +83,7 @@ The application controls:
 - fallback;
 - escalation.
 
-Use the deterministic fallback described in docs/rules.md.
+Use the deterministic fallback described in docs/SwasthyaVaani_rules.md.
 
 ## Existing Prototype
 
@@ -99,11 +100,13 @@ Do not rebuild everything from scratch unless explicitly requested.
 Use the approved stack:
 
 Frontend:
-Next.js + React + TypeScript
+React 19 + Vite + Wouter + TypeScript
+- Tailwind CSS v4
 - shadcn/ui
 - Radix UI
 - Lucide React
 - Framer Motion
+- TanStack React Query
 
 
 Backend:
@@ -192,7 +195,7 @@ Never claim something works if it was not tested.
 
 ## Implementation Priority
 
-Follow docs/implementation_plan.md.
+Follow docs/SwasthyaVaani_implementation_plan.md.
 
 The most important vertical slice is:
 

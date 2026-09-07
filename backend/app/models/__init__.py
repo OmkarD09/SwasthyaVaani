@@ -1,3 +1,4 @@
+from app.models.ayush import AyushAssessmentModel
 from app.models.document import DocumentExtractionModel, DocumentModel
 from app.models.intake import Answer, ClinicalStateModel, IntakeSession, QuestionEvent
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
@@ -8,6 +9,7 @@ from app.models.user import Department, Doctor, Hospital, Patient, User
 __all__ = [
     "Answer",
     "AuditEventModel",
+    "AyushAssessmentModel",
     "ClinicalStateModel",
     "ContradictionModel",
     "Department",

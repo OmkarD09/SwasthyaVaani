@@ -1,3 +1,5 @@
+from typing import Any
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -66,7 +68,14 @@ class Settings(BaseSettings):
     KUNAL_GROQ_API_KEY: str = ""
     KUNAL_GROQ_DOCUMENT_MODEL: str = "openai/gpt-oss-120b"
     KUNAL_GEMINI_API_KEY: str = ""
-    KUNAL_GEMINI_DOCUMENT_MODEL: str = "gemini-2.5-flash-lite"
+    KUNAL_GEMINI_DOCUMENT_MODEL: str = "gemini-3.5-flash-lite"
+
+    @field_validator("KUNAL_GEMINI_API_KEY", mode="before")
+    @classmethod
+    def clean_gemini_key(cls, v: Any) -> str:
+        if isinstance(v, str):
+            return v.strip().strip("<>").strip()
+        return v
 
     # Interview Safety Guardrail Defaults
     MAX_QUESTIONS_DEFAULT: int = 10

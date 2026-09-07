@@ -79,6 +79,7 @@ export type PatientDetail = {
     confidence?: number;
     [key: string]: unknown;
   };
+  ayush_assessment?: AyushAssessmentData;
   submitted_at: string;
   clinician_notes?: string;
   fhir_bundle_id?: string;
@@ -117,5 +118,54 @@ export type MedicalRecordExtraction = {
   source_page?: number;
   source_text?: string;
   status?: string;
+};
+
+export type AyushProvenanceSource =
+  | 'PATIENT_STATED'
+  | 'AI_INFERRED'
+  | 'DOCUMENT'
+  | 'PHYSICIAN_CONFIRMED'
+  | 'SYSTEM_DERIVED';
+
+export type AyushAssessmentStatus =
+  | 'INCOMPLETE'
+  | 'PRELIMINARY'
+  | 'NEEDS_REVIEW'
+  | 'PHYSICIAN_CONFIRMED';
+
+export type AyushDimensionData = {
+  dimension: string;
+  value?: any;
+  status: AyushAssessmentStatus;
+  confidence?: number;
+  source?: AyushProvenanceSource | null;
+  source_id?: string;
+  evidence?: string[];
+  last_updated_turn?: number;
+};
+
+export type AyushAssessmentData = {
+  system: string;
+  overall_status: AyushAssessmentStatus;
+  prakriti?: AyushDimensionData;
+  vikriti?: AyushDimensionData;
+  agni?: AyushDimensionData;
+  koshtha?: AyushDimensionData;
+  ahara_vihara?: AyushDimensionData;
+  doshas?: [number, number, number] | number[];
+  dosha_evidence?: string[];
+  sara?: AyushDimensionData;
+  samhanana?: AyushDimensionData;
+  pramana?: AyushDimensionData;
+  satmya?: AyushDimensionData;
+  sattva?: AyushDimensionData;
+  ahara_shakti?: AyushDimensionData;
+  vyayama_shakti?: AyushDimensionData;
+  vaya?: AyushDimensionData;
+  evidence?: string[];
+  uncertainties?: string[];
+  confidence?: number;
+  physician_review_state?: Record<string, any>;
+  last_updated_at?: string;
 };
 

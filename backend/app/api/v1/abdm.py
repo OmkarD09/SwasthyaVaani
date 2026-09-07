@@ -5,9 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models.ayush import AyushAssessmentModel
 from app.models.intake import IntakeSession, ClinicalStateModel
 from app.models.user import Patient, Doctor
 from app.models.review import PhysicianReviewModel
+from app.schemas.ayush import AyushAssessment
 from app.schemas.clinical_state import ClinicalState
 from app.schemas.abdm import (
     ABHAVerifyRequest, ABHAVerifyResponse,
@@ -78,12 +80,25 @@ def get_abdm_compliant_bundle(intake_id: str, db: Session = Depends(get_db)):
     patient = db.query(Patient).filter(Patient.id == session.patient_id).first()
     doctor = db.query(Doctor).filter(Doctor.id == session.doctor_id).first()
 
+    ayush_assessment = None
+    ayush_record = (
+        db.query(AyushAssessmentModel)
+        .filter(AyushAssessmentModel.intake_session_id == session.id)
+        .first()
+    )
+    if ayush_record and ayush_record.assessment_json:
+        try:
+            ayush_assessment = AyushAssessment(**ayush_record.assessment_json)
+        except Exception:
+            ayush_assessment = None
+
     fhir_bundle = map_clinical_state_to_fhir_r4(
         intake_session_id=session.id,
         patient_id=session.patient_id,
         patient_name=patient.display_name if patient else "Patient",
         doctor_name=doctor.display_name if doctor else "Attending Physician",
-        state=state
+        state=state,
+        ayush_assessment=ayush_assessment,
     )
 
     bundle_dict = fhir_bundle.model_dump()

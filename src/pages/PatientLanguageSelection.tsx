@@ -18,6 +18,8 @@ import {
   KioskTopProgressBar,
 } from '../components/patient/KioskProgress';
 import { PatientFlowTransition } from '../components/patient/PatientFlowTransition';
+import { clearConversationStore } from '../lib/conversationStore';
+
 
 export function PatientLanguageSelection() {
   const [, setLocation] = useLocation();
@@ -27,6 +29,10 @@ export function PatientLanguageSelection() {
   useEffect(() => {
     const l = getStoredLanguage();
     if (l) setLanguage(l);
+    // Explicitly clear stale session and conversation boundaries when entering language selection
+    localStorage.removeItem('swasthya_active_intake_id');
+    localStorage.removeItem('swasthya_active_token');
+    clearConversationStore();
   }, []);
 
   const t = getKioskTranslation(language || 'English');
@@ -48,6 +54,13 @@ export function PatientLanguageSelection() {
   const handleContinue = () => {
     if (language) {
       setStoredLanguage(language);
+      localStorage.removeItem('swasthya_active_intake_id');
+      localStorage.removeItem('swasthya_active_token');
+      localStorage.removeItem('swasthya_active_patient_id');
+      localStorage.removeItem('swasthya_last_submission');
+      localStorage.removeItem('swasthya_chat_history');
+      localStorage.removeItem('swasthya_uploaded_doc_name');
+      clearConversationStore();
       setLocation('/patient/details');
     }
   };

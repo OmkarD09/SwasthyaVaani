@@ -158,22 +158,29 @@ const INTAKE_QUESTIONS: QuestionConfig[] = [
   },
 ];
 
+import { resolveChipsForTargetField } from '../utils/chipResolver';
+export { resolveChipsForTargetField };
+
 export function PatientTextChat({
   language,
   patientName = 'Ananya Sharma',
   patientAge = '34',
+  intakeSessionId: propIntakeSessionId,
   onComplete,
   onSwitchToVoice,
 }: {
   language: string;
   patientName?: string;
   patientAge?: string;
+  intakeSessionId?: string | null;
   onComplete: () => void;
   onSwitchToVoice: () => void;
 }) {
   const currentLang = language || 'English';
   const t = getKioskTranslation(currentLang);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isSubmittingRef = useRef<boolean>(false);
+  const sessionInitPromiseRef = useRef<Promise<string | null> | null>(null);
 
   const getLocalizedText = (dict: Record<string, string>) => {
     return dict[currentLang] || dict['English'] || Object.values(dict)[0];
@@ -197,14 +204,76 @@ export function PatientTextChat({
   const [inputText, setInputText] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [intakeSessionId, setIntakeSessionId] = useState<string | null>(propIntakeSessionId || null);
+  const [currentQuestionEventId, setCurrentQuestionEventId] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  const ensureSession = async (): Promise<string | null> => {
+    // Return existing confirmed session ID for this intake flow if available
+    if (intakeSessionId) return intakeSessionId;
+    if (propIntakeSessionId) {
+      setIntakeSessionId(propIntakeSessionId);
+      return propIntakeSessionId;
+    }
+    if (sessionInitPromiseRef.current) return sessionInitPromiseRef.current;
+
+    sessionInitPromiseRef.current = (async () => {
+      try {
+        const profile = getStoredPatientProfile();
+        const langCode = currentLang === 'हिन्दी' ? 'hi' : currentLang === 'मराठी' ? 'mr' : 'en';
+        // Avoid sending placeholder demo ABHA if neither scanned nor modified
+        const isDefaultDemoAbha = profile?.abhaNumber === '91-4521-8890-1234' && !profile?.isAbhaFromQr;
+        const abhaIdToSend = isDefaultDemoAbha ? null : (profile?.abhaNumber || null);
+        const abhaAddressToSend = isDefaultDemoAbha ? null : (profile?.abhaAddress || null);
+        const phoneToSend = profile?.phone === '9876543210' && !profile?.isAbhaFromQr ? null : (profile?.phone || null);
+
+        const res = await fetch('/api/v1/intakes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patient_name: profile?.name || patientName || 'Patient',
+            patient_age: (profile?.age ? parseInt(profile.age, 10) : null) ?? (parseInt(patientAge, 10) || null),
+            patient_gender: profile?.gender || 'Female',
+            phone: phoneToSend,
+            date_of_birth: profile?.dateOfBirth || null,
+            abha_id: abhaIdToSend,
+            abha_address: abhaAddressToSend,
+            language_code: langCode,
+            workflow_type: 'GENERAL_CLINICAL',
+            interaction_mode: 'TEXT',
+            consent_given: true,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setIntakeSessionId(data.id);
+          localStorage.setItem('swasthya_active_intake_id', data.id);
+          localStorage.setItem('swasthya_active_token', data.token || '');
+          localStorage.setItem('swasthya_active_patient_id', data.patient_id || '');
+          return data.id as string;
+        }
+      } catch (err) {
+        console.warn('[PatientTextChat] Session init note:', err);
+      } finally {
+        sessionInitPromiseRef.current = null;
+      }
+      return null;
+    })();
+
+    return sessionInitPromiseRef.current;
+  };
+
+  useEffect(() => {
+    ensureSession();
+  }, [patientName, patientAge, currentLang]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
 
   const handlePatientResponse = async (answerText: string) => {
-    if (!answerText.trim() || isThinking || isFinished) return;
+    if (isSubmittingRef.current || !answerText.trim() || isThinking || isFinished) return;
+    isSubmittingRef.current = true;
 
     const trimmedAnswer = answerText.trim();
     const lastAiMessage = [...messages].reverse().find((m) => m.sender === 'ai');
@@ -222,53 +291,95 @@ export function PatientTextChat({
     setIsThinking(true);
     setApiError(null);
 
-    const fieldKeys = ['chief_complaint', 'duration', 'severity', 'medical_history'];
-    const categoryLabels = ['CHIEF COMPLAINT', 'DURATION', 'SEVERITY', 'MEDICAL HISTORY'];
-    const targetField = fieldKeys[currentStepIndex] || 'symptom';
-    const categoryLabel = categoryLabels[currentStepIndex] || 'CLINICAL DETAIL';
+    const langCode = currentLang === 'हिन्दी' ? 'hi' : currentLang === 'मराठी' ? 'mr' : 'en';
 
-    // Record in local unified conversation store
-    recordIntakeAnswer(
-      targetField,
-      trimmedAnswer,
-      'text',
-      categoryLabel,
-      currentQText
-    );
-
-    const nextIndex = currentStepIndex + 1;
-    setTimeout(() => {
-      if (nextIndex < INTAKE_QUESTIONS.length) {
-        const nextQ = INTAKE_QUESTIONS[nextIndex];
-        const nextAiMessage: ChatMessage = {
-          id: `msg-ai-${Date.now()}`,
-          sender: 'ai',
-          text: getLocalizedText(nextQ.question),
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          chips: getLocalizedChips(nextQ.chips),
-        };
-        setMessages((prev) => [...prev, nextAiMessage]);
-        setCurrentStepIndex(nextIndex);
-        setIsThinking(false);
-      } else {
-        const completionText =
-          currentLang === 'हिन्दी'
-            ? 'धन्यवाद! आपकी सभी जानकारी रिकॉर्ड कर ली गई है। अब आप अपनी पुरानी पर्ची या रिपोर्ट अपलोड कर सकते हैं।'
-            : currentLang === 'मराठी'
-            ? 'धन्यवाद! तुमची सर्व माहिती नोंदवली गेली आहे. आता तुम्ही तुमचे मागील प्रिस्क्रिप्शन किंवा रिपोर्ट अपलोड करू शकता.'
-            : 'Thank you! Your intake responses have been recorded. You can now proceed to attach any previous prescriptions or reports.';
-
-        const finalAiMessage: ChatMessage = {
-          id: `msg-final-${Date.now()}`,
-          sender: 'ai',
-          text: completionText,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        setMessages((prev) => [...prev, finalAiMessage]);
-        setIsFinished(true);
-        setIsThinking(false);
+    try {
+      let activeId = intakeSessionId;
+      if (!activeId) {
+        activeId = await ensureSession();
       }
-    }, 450);
+
+      if (activeId) {
+        const res = await fetch(`/api/v1/intakes/${activeId}/answers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            raw_text: trimmedAnswer,
+            input_mode: 'TEXT',
+            language_code: langCode,
+            question_event_id: currentQuestionEventId || undefined,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const decision = data.decision;
+          const targetField = decision?.target_field || 'symptom';
+          const nextQEventId =
+            data.next_question_event_id ??
+            data.question_event_id ??
+            decision?.question_event_id ??
+            null;
+          setCurrentQuestionEventId(nextQEventId);
+
+          // Record in unified conversation store
+          recordIntakeAnswer(
+            targetField,
+            trimmedAnswer,
+            'text',
+            targetField.toUpperCase().replace('_', ' '),
+            currentQText
+          );
+
+          if (decision?.action === 'STOP' || decision?.action === 'ESCALATE') {
+            const completionText =
+              currentLang === 'हिन्दी'
+                ? 'धन्यवाद! आपकी सभी जानकारी रिकॉर्ड कर ली गई है। अब आप अपनी पुरानी पर्ची या रिपोर्ट अपलोड कर सकते हैं।'
+                : currentLang === 'मराठी'
+                ? 'धन्यवाद! तुमची सर्व माहिती नोंदवली गेली आहे. आता तुम्ही तुमचे मागील प्रिस्क्रिप्शन किंवा रिपोर्ट अपलोड करू शकता.'
+                : 'Thank you! Your intake responses have been recorded. You can now proceed to attach any previous prescriptions or reports.';
+
+            const finalAiMessage: ChatMessage = {
+              id: `msg-final-${Date.now()}`,
+              sender: 'ai',
+              text: completionText,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            };
+            setMessages((prev) => [...prev, finalAiMessage]);
+            setIsFinished(true);
+            setIsThinking(false);
+            return;
+          }
+
+          if (decision?.action === 'ASK' && decision?.question) {
+            const dynamicChips = resolveChipsForTargetField(decision.target_field, currentLang);
+            const nextAiMessage: ChatMessage = {
+              id: `msg-ai-${Date.now()}`,
+              sender: 'ai',
+              text: decision.question,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              chips: dynamicChips,
+            };
+            setMessages((prev) => [...prev, nextAiMessage]);
+            setCurrentStepIndex((prev) => prev + 1);
+            setIsThinking(false);
+            return;
+          }
+
+          throw new Error('The intake service returned no next action.');
+        }
+
+        throw new Error(`The intake service returned status ${res.status}.`);
+      }
+      throw new Error('No active intake session is available.');
+    } catch (err) {
+      console.warn('[PatientTextChat] Backend intake response error:', err);
+      setApiError(err instanceof Error ? err.message : 'Unable to submit this answer. Please retry.');
+      setInputText(trimmedAnswer);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsThinking(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -290,6 +401,7 @@ export function PatientTextChat({
       },
     ]);
     setCurrentStepIndex(0);
+    setCurrentQuestionEventId(null);
     setInputText('');
     setIsThinking(false);
     setIsFinished(false);
@@ -345,13 +457,13 @@ export function PatientTextChat({
             <div key={msg.id} className={`chat-bubble-row ${isAi ? 'ai-row' : 'patient-row'}`}>
               {isAi && (
                 <div className="chat-avatar ai-avatar">
-                  <Bot size={19} />
+                  <Bot size={15} />
                 </div>
               )}
               <div className="chat-bubble-content">
                 {isAi && (
                   <div className="chat-bubble-kicker">
-                    <Sparkles size={14} /> SwasthyaVaani Intake
+                    <Sparkles size={12} /> SwasthyaVaani Intake
                   </div>
                 )}
                 <div className={`chat-bubble ${isAi ? 'ai-bubble' : 'patient-bubble'}`}>
@@ -361,7 +473,7 @@ export function PatientTextChat({
               </div>
               {!isAi && (
                 <div className="chat-avatar patient-avatar">
-                  <User size={19} />
+                  <User size={15} />
                 </div>
               )}
             </div>
@@ -372,7 +484,7 @@ export function PatientTextChat({
         {isThinking && (
           <div className="chat-bubble-row ai-row">
             <div className="chat-avatar ai-avatar">
-              <Bot size={19} />
+              <Bot size={15} />
             </div>
             <div className="chat-bubble-content">
               <div className="chat-bubble ai-bubble thinking-bubble">
@@ -390,7 +502,7 @@ export function PatientTextChat({
         {isFinished && (
           <div className="chat-completed-card">
             <div className="chat-completed-badge">
-              <CheckCircle2 size={26} />
+              <CheckCircle2 size={24} />
             </div>
             <h3>Intake Responses Recorded</h3>
             <p>
@@ -399,10 +511,10 @@ export function PatientTextChat({
             </p>
             <div className="chat-completed-actions">
               <button type="button" onClick={onComplete} className="chat-finish-btn">
-                Continue to Records <ArrowRight size={17} />
+                Continue to Records <ArrowRight size={16} />
               </button>
               <button type="button" onClick={resetChat} className="chat-reset-btn">
-                <RotateCcw size={15} /> Start Over
+                <RotateCcw size={14} /> Start Over
               </button>
             </div>
           </div>
@@ -457,7 +569,7 @@ export function PatientTextChat({
           onClick={() => handlePatientResponse(inputText)}
           aria-label="Send message"
         >
-          <Send size={19} />
+          <Send size={16} />
         </button>
       </div>
     </div>

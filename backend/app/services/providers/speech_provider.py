@@ -1,7 +1,11 @@
 
+import logging
+
 import httpx
 
 from app.services.providers.base import AbstractSpeechProvider, TranscriptionResult
+
+logger = logging.getLogger(__name__)
 
 
 class MockSpeechProvider(AbstractSpeechProvider):
@@ -75,7 +79,7 @@ class SarvamSpeechProvider(AbstractSpeechProvider):
                 files = {"file": ("patient_audio.wav", audio_bytes, "audio/wav")}
                 data = {
                     "language_code": target_lang,
-                    "model": "saaras:v1"
+                    "model": "saaras:v3"
                 }
                 response = await client.post(self.asr_url, headers=headers, files=files, data=data)
 
@@ -90,8 +94,17 @@ class SarvamSpeechProvider(AbstractSpeechProvider):
                         provider_name="Sarvam AI Saaras"
                     )
                 else:
+                    logger.warning(
+                        "Sarvam ASR call failed with status %s: %s. Falling back to MockSpeechProvider.",
+                        response.status_code,
+                        response.text
+                    )
                     return await self.fallback.transcribe_audio(audio_bytes, language_code)
-        except Exception:  # noqa: BLE001 - external Sarvam boundary
+        except Exception as exc:  # noqa: BLE001 - external Sarvam boundary
+            logger.warning(
+                "Sarvam ASR call encountered exception: %s. Falling back to MockSpeechProvider.",
+                exc
+            )
             return await self.fallback.transcribe_audio(audio_bytes, language_code)
 
     async def text_to_speech(

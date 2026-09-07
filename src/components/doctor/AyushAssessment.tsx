@@ -80,7 +80,7 @@ export function AyushAssessment({ ayushData, defaultOpen = false }: AyushAssessm
                   <span className="font-medium">Dosha Distribution</span>
                   <span className="font-mono text-[10px]">Ayurveda Intake Metric</span>
                 </div>
-                <DoshaArcGauge doshas={ayushData.doshas || [33, 33, 34]} />
+                <DoshaArcGauge doshas={ayushData.doshas ?? null} />
               </div>
             </div>
           ) : (
