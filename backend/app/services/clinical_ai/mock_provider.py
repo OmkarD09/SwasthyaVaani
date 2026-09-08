@@ -27,7 +27,9 @@ def extract_clinical_facts_from_answer(
     non_info_phrases = [
         "wtf", "what the fuck", "idk", "i don't know", "i dont know", "what", "what?", "what do you mean",
         "kya", "samajh nahi aaya", "pata nahi", "nahi pata", "malum nahi", "not sure", "unsure",
-        "???", "leave it", "skip", "whatever", "why ask again", "stop asking"
+        "???", "leave it", "skip", "whatever", "why ask again", "stop asking",
+        "पता नहीं", "मुझे नहीं पता", "मुझे समझ नहीं आया", "समझ नहीं आया",
+        "मला माहित नाही", "मला माहिती नाही", "समजलं नाही", "नाही माहिती"
     ]
     if text in non_info_phrases or any(text == p for p in non_info_phrases):
         updated_state.last_non_informative_response = raw_answer.strip()
@@ -93,6 +95,12 @@ def extract_clinical_facts_from_answer(
         updated_state.set_canonical_dimension("location", "KNOWN_WITH_VALUE", value="Abdomen / Stomach")
         if "abdominal_location" not in updated_state.resolved_dimensions:
             updated_state.resolved_dimensions.append("abdominal_location")
+        progress = True
+    elif "knee" in text or "ghutna" in text:
+        loc = "Right knee" if "right" in text else "Left knee" if "left" in text else "Knee"
+        updated_state.location = loc
+        extracted["location"] = loc
+        updated_state.set_canonical_dimension("location", "KNOWN_WITH_VALUE", value=loc)
         progress = True
 
     # 3. Universal Duration & Onset
@@ -220,6 +228,7 @@ def extract_clinical_facts_from_answer(
         "i am not vomiting", "i'm not vomiting", "haven't vomited", "have not vomited",
         "without vomiting", "vomiting: no", "vomit: no", "no nausea", "not nauseous",
         "ulti nahi", "ulti nahit", "उलटी नाही", "उल्टी नहीं", "उलट्या नाहीत",
+        "उलटी होत नाही", "उलटी नाही होत", "उलटी येत नाही", "मला उलटी होत नाही",
         "उलट्या होत नाहीत", "मळमळ नाही"
     ]
     is_neg_vomit = any(w in text for w in neg_vomit_terms) or (
@@ -228,7 +237,8 @@ def extract_clinical_facts_from_answer(
     )
     is_uncertain_vomit = any(u in text for u in [
         "not sure", "unsure", "don't know", "dont know", "can't say", "cannot say",
-        "cant say", "pata nahi", "malum nahi", "samajh nahi"
+        "cant say", "pata nahi", "malum nahi", "samajh nahi",
+        "पता नहीं", "मुझे नहीं पता", "मला माहित नाही", "समजलं नाही"
     ])
 
     if not is_uncertain_vomit:
@@ -380,14 +390,27 @@ def extract_clinical_facts_from_answer(
     from app.schemas.clinical_state import AyushState
 
     # agni
-    if target_field == "agni" or any(w in text for w in ["appetite", "bhookh", "agni", "digestion is", "digest"]):
-        if any(w in text for w in ["low appetite", "poor appetite", "slow digestion", "manda", "kam bhookh", "bhookh kam", "loss of appetite"]):
+    indic_agni_terms = ["appetite", "bhookh", "agni", "digestion is", "digest", "भूख", "पाचन", "मंदाग्नि", "अपच", "पेट भारी", "भूक"]
+    if target_field == "agni" or any(w in text for w in indic_agni_terms):
+        if any(w in text for w in [
+            "low appetite", "poor appetite", "slow digestion", "manda", "kam bhookh", "bhookh kam",
+            "loss of appetite", "भूख कम", "कम भूख", "पाचन धीमा", "मंद", "अपच", "भारी रहता", "भूक कमी", "भूक मंद"
+        ]):
             val = "Manda"
-        elif any(w in text for w in ["sharp", "excessive", "tikshna", "bahut bhookh", "high appetite", "intense hunger"]):
+        elif any(w in text for w in [
+            "sharp", "excessive", "tikshna", "bahut bhookh", "high appetite", "intense hunger",
+            "तीक्ष्ण", "बहुत भूख", "तेज भूख", "तीव्र भूक"
+        ]):
             val = "Tikshna"
-        elif any(w in text for w in ["irregular", "sometimes high sometimes low", "visham", "kabhi kam kabhi jyada", "unpredictable"]):
+        elif any(w in text for w in [
+            "irregular", "sometimes high sometimes low", "visham", "kabhi kam kabhi jyada", "unpredictable",
+            "विषम", "कभी कम कभी ज्यादा", "अनियमित भूक"
+        ]):
             val = "Vishama"
-        elif any(w in text for w in ["normal", "regular", "good appetite", "sama", "theek bhookh"]):
+        elif any(w in text for w in [
+            "normal", "regular", "good appetite", "sama", "theek bhookh",
+            "सम", "सामान्य भूख", "ठीक भूख", "चांगली भूक"
+        ]):
             val = "Sama"
         else:
             val = raw_answer.strip()
@@ -400,12 +423,22 @@ def extract_clinical_facts_from_answer(
         progress = True
 
     # koshtha
-    if target_field == "koshtha" or any(w in text for w in ["bowel", "koshtha", "constipat", "hard stool", "soft stool", "motion habit"]):
-        if any(w in text for w in ["hard", "constipated", "krura", "hard stool", "kabz", "sakht"]):
+    indic_koshtha_terms = [
+        "bowel", "koshtha", "constipat", "hard stool", "soft stool", "motion habit",
+        "कब्ज", "शौच", "मल", "कोष्ठ", "बद्धकोष्ठता", "संडास"
+    ]
+    if target_field == "koshtha" or any(w in text for w in indic_koshtha_terms):
+        if any(w in text for w in [
+            "hard", "constipated", "krura", "hard stool", "kabz", "sakht", "कब्ज", "सख्त", "सख्त शौच", "कठीण", "क्रूर", "बद्धकोष्ठता"
+        ]):
             val = "Krura"
-        elif any(w in text for w in ["soft", "loose", "mridu", "frequent", "patla"]):
+        elif any(w in text for w in [
+            "soft", "loose", "mridu", "frequent", "patla", "मृदु", "पतला", "पातळ शौच", "पातळ संडास"
+        ]):
             val = "Mridu"
-        elif any(w in text for w in ["regular", "normal", "madhyam", "medium"]):
+        elif any(w in text for w in [
+            "regular", "normal", "madhyam", "medium", "मध्यम", "सामान्य शौच", "नियमित"
+        ]):
             val = "Madhyam"
         else:
             val = raw_answer.strip()
@@ -418,7 +451,11 @@ def extract_clinical_facts_from_answer(
         progress = True
 
     # ahara_vihara
-    if target_field == "ahara_vihara" or any(w in text for w in ["oily food", "spicy food", "diet", "lifestyle", "ahara", "vihara", "fast food"]):
+    indic_ahara_terms = [
+        "oily food", "spicy food", "diet", "lifestyle", "ahara", "vihara", "fast food", "street food",
+        "तला-भुना", "मसालेदार", "खाना", "आहार", "विहार", "दिनचर्या", "देर से सोना", "बाहेरचे जेवण", "तळलेले"
+    ]
+    if target_field == "ahara_vihara" or any(w in text for w in indic_ahara_terms):
         val = raw_answer.strip()
         extracted["ahara_vihara"] = val
         if not updated_state.ayush:
@@ -429,43 +466,43 @@ def extract_clinical_facts_from_answer(
 
     # Expanded Dashavidha Dimensions
     # sara
-    if target_field == "sara" or any(w in text for w in ["tissue strength", "vitality", "dhatu sara", "skin luster", "general vitality"]):
+    if target_field == "sara" or any(w in text for w in ["tissue strength", "vitality", "dhatu sara", "skin luster", "general vitality", "धातु", "सारता"]):
         val = raw_answer.strip()
         extracted["sara"] = val
         updated_state.set_canonical_dimension("sara", "KNOWN_WITH_VALUE", value=val)
         progress = True
 
     # samhanana
-    if target_field == "samhanana" or any(w in text for w in ["body build", "compact build", "samhanana", "sturdy build", "lean frame", "body frame"]):
+    if target_field == "samhanana" or any(w in text for w in ["body build", "compact build", "samhanana", "sturdy build", "lean frame", "body frame", "सहनन", "शरीर रचना"]):
         val = raw_answer.strip()
         extracted["samhanana"] = val
         updated_state.set_canonical_dimension("samhanana", "KNOWN_WITH_VALUE", value=val)
         progress = True
 
     # pramana
-    if target_field == "pramana" or any(w in text for w in ["body proportions", "pramana", "anthropometry", "height weight balance"]):
+    if target_field == "pramana" or any(w in text for w in ["body proportions", "pramana", "anthropometry", "height weight balance", "प्रमाण"]):
         val = raw_answer.strip()
         extracted["pramana"] = val
         updated_state.set_canonical_dimension("pramana", "KNOWN_WITH_VALUE", value=val)
         progress = True
 
     # satmya
-    if target_field == "satmya" or any(w in text for w in ["satmya", "suits me", "food tolerance", "homologation", "climate adaptability"]):
+    if target_field == "satmya" or any(w in text for w in ["satmya", "suits me", "food tolerance", "homologation", "climate adaptability", "सात्म्य", "माफक"]):
         val = raw_answer.strip()
         extracted["satmya"] = val
         updated_state.set_canonical_dimension("satmya", "KNOWN_WITH_VALUE", value=val)
         progress = True
 
     # sattva (Mental temperament / emotional resilience)
-    if target_field == "sattva" or ("mental" in text and ("strength" in text or "temperament" in text or "resilience" in text)):
+    if target_field == "sattva" or ("mental" in text and ("strength" in text or "temperament" in text or "resilience" in text)) or any(w in text for w in ["सत्त्व", "मानसिक"]):
         if is_vague_answer:
             updated_state.set_canonical_dimension("sattva", "AMBIGUOUS")
         else:
-            if any(w in text for w in ["high", "strong", "calm", "patient", "pravara", "good patience"]):
+            if any(w in text for w in ["high", "strong", "calm", "patient", "pravara", "good patience", "प्रवर", "मजबूत"]):
                 val = "Pravara"
-            elif any(w in text for w in ["weak", "easily stressed", "anxious", "low", "avara", "break down", "panic"]):
+            elif any(w in text for w in ["weak", "easily stressed", "anxious", "low", "avara", "break down", "panic", "अवर", "कमजोर", "तनाव"]):
                 val = "Avara"
-            elif any(w in text for w in ["moderate", "normal", "manageable", "madhyama"]):
+            elif any(w in text for w in ["moderate", "normal", "manageable", "madhyama", "मध्यम"]):
                 val = "Madhyama"
             else:
                 val = raw_answer.strip()
@@ -474,21 +511,21 @@ def extract_clinical_facts_from_answer(
             progress = True
 
     # ahara_shakti
-    if target_field == "ahara_shakti" or any(w in text for w in ["food intake capacity", "eating capacity", "ahara shakti", "full meals easily"]):
+    if target_field == "ahara_shakti" or any(w in text for w in ["food intake capacity", "eating capacity", "ahara shakti", "full meals easily", "आहार शक्ति", "जेवणाची क्षमता"]):
         val = raw_answer.strip()
         extracted["ahara_shakti"] = val
         updated_state.set_canonical_dimension("ahara_shakti", "KNOWN_WITH_VALUE", value=val)
         progress = True
 
     # vyayama_shakti
-    if target_field == "vyayama_shakti" or any(w in text for w in ["exercise tolerance", "physical stamina", "vyayama", "heavy work tolerance", "work capacity"]):
+    if target_field == "vyayama_shakti" or any(w in text for w in ["exercise tolerance", "physical stamina", "vyayama", "heavy work tolerance", "work capacity", "व्यायाम शक्ति", "स्टैमिना"]):
         val = raw_answer.strip()
         extracted["vyayama_shakti"] = val
         updated_state.set_canonical_dimension("vyayama_shakti", "KNOWN_WITH_VALUE", value=val)
         progress = True
 
     # vaya
-    if target_field == "vaya" or any(w in text for w in ["age stage", "biological age", "vaya", "youth", "middle aged", "elderly"]):
+    if target_field == "vaya" or any(w in text for w in ["age stage", "biological age", "vaya", "youth", "middle aged", "elderly", "वय", "आयु"]):
         val = raw_answer.strip()
         extracted["vaya"] = val
         updated_state.set_canonical_dimension("vaya", "KNOWN_WITH_VALUE", value=val)

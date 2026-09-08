@@ -57,7 +57,13 @@ async def transcribe_speech_audio(
         raise HTTPException(status_code=400, detail="Empty audio file provided")
 
     speech_service = get_speech_service()
-    result = await speech_service.transcribe_audio(audio_bytes, language_code)
+    try:
+        result = await speech_service.transcribe_audio(audio_bytes, language_code)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Speech transcription service unavailable. Please retry or switch to text chat."
+        ) from exc
 
     return ASRResponse(
         transcript=result.transcript_text,

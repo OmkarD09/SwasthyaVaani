@@ -14,6 +14,8 @@ import {
   getStoredLanguage,
   getStoredMode,
   setStoredMode,
+  getStoredWorkflow,
+  setStoredWorkflow,
 } from '../lib/kioskState';
 import {
   KioskProgressSidebar,
@@ -35,6 +37,7 @@ export function PatientModeSelection() {
 
   const handleContinue = () => {
     setStoredMode(mode);
+    setStoredWorkflow(getStoredWorkflow());
     setLocation('/patient/intake');
   };
 
@@ -59,13 +62,14 @@ export function PatientModeSelection() {
                 </span>
                 <h2>{t.modeKicker}</h2>
                 <p className="text-base text-[#688680] mt-1">
-                  Choose how you would like to share your health concern with our AI clinical intake assistant.
+                  Choose how you would like to share your symptoms with our AI assistant.
                 </p>
               </div>
 
-              <div className="mode-options-grid grid grid-cols-1 sm:grid-cols-2 gap-6 my-8">
+              <div className="mode-options-grid grid grid-cols-1 sm:grid-cols-2 gap-6 my-6">
                 <button
                   type="button"
+                  id="mode-option-voice"
                   className={`p-8 md:p-10 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-6 cursor-pointer min-h-[220px] ${
                     mode === 'voice'
                       ? 'border-[#eaba61] bg-[#fffdfa] shadow-lg ring-2 ring-[#eaba61]/40'
@@ -98,6 +102,7 @@ export function PatientModeSelection() {
 
                 <button
                   type="button"
+                  id="mode-option-text"
                   className={`p-8 md:p-10 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-6 cursor-pointer min-h-[220px] ${
                     mode === 'text'
                       ? 'border-[#eaba61] bg-[#fffdfa] shadow-lg ring-2 ring-[#eaba61]/40'

@@ -8,6 +8,10 @@ from app.services.providers.base import AbstractSpeechProvider, TranscriptionRes
 logger = logging.getLogger(__name__)
 
 
+class SpeechProviderError(RuntimeError):
+    """Raised when an external speech service (ASR/TTS) fails and cannot fulfill request."""
+
+
 class MockSpeechProvider(AbstractSpeechProvider):
     """Deterministic Speech-to-Text provider for rapid simulation."""
 
@@ -41,7 +45,6 @@ class SarvamSpeechProvider(AbstractSpeechProvider):
 
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key
-        self.fallback = MockSpeechProvider()
         self.asr_url = "https://api.sarvam.ai/speech-to-text"
         self.tts_url = "https://api.sarvam.ai/text-to-speech"
 
@@ -69,7 +72,8 @@ class SarvamSpeechProvider(AbstractSpeechProvider):
     ) -> TranscriptionResult:
         """Transcribe incoming audio using Sarvam Saaras Indic ASR."""
         if not self.api_key:
-            return await self.fallback.transcribe_audio(audio_bytes, language_code)
+            logger.error("Sarvam ASR called without API key configured.")
+            raise SpeechProviderError("Sarvam API key not configured")
 
         target_lang = self._map_language_code(language_code)
         headers = {"api-subscription-key": self.api_key}
@@ -94,18 +98,22 @@ class SarvamSpeechProvider(AbstractSpeechProvider):
                         provider_name="Sarvam AI Saaras"
                     )
                 else:
-                    logger.warning(
-                        "Sarvam ASR call failed with status %s: %s. Falling back to MockSpeechProvider.",
+                    logger.error(
+                        "Sarvam ASR call failed with status %s: %s",
                         response.status_code,
                         response.text
                     )
-                    return await self.fallback.transcribe_audio(audio_bytes, language_code)
+                    raise SpeechProviderError(
+                        f"Sarvam ASR call failed with status {response.status_code}: {response.text}"
+                    )
+        except SpeechProviderError:
+            raise
         except Exception as exc:  # noqa: BLE001 - external Sarvam boundary
-            logger.warning(
-                "Sarvam ASR call encountered exception: %s. Falling back to MockSpeechProvider.",
+            logger.error(
+                "Sarvam ASR call encountered exception: %s",
                 exc
             )
-            return await self.fallback.transcribe_audio(audio_bytes, language_code)
+            raise SpeechProviderError(f"Sarvam ASR call encountered exception: {exc}") from exc
 
     async def text_to_speech(
         self,

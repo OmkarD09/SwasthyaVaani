@@ -36,6 +36,7 @@ import {
   getStoredLanguage,
   getStoredMode,
   setStoredMode,
+  getStoredWorkflow,
 } from '../lib/kioskState';
 import {
   buildClinicalSummary,
@@ -258,6 +259,7 @@ export function PatientIntake() {
                     language={language}
                     patientName={patientName}
                     patientAge={patientAge}
+                    intakeSessionId={localStorage.getItem('swasthya_active_intake_id')}
                     onComplete={() => {
                       setDirection(1);
                       if (isReviewingStory) {
@@ -512,73 +514,109 @@ export function PatientIntake() {
                         setIsSubmitting(true);
                         try {
                           const profile = getStoredPatientProfile();
-                          const isDefaultDemoAbha = profile?.abhaNumber === '91-4521-8890-1234' && !profile?.isAbhaFromQr;
-                          const abhaIdToSend = isDefaultDemoAbha ? null : (profile?.abhaNumber || null);
-                          const abhaAddressToSend = isDefaultDemoAbha ? null : (profile?.abhaAddress || null);
-                          const phoneToSend = profile?.phone === '9876543210' && !profile?.isAbhaFromQr ? null : (profile?.phone || null);
-                          const langCode = language === 'हिन्दी' ? 'hi' : language === 'मराठी' ? 'mr' : 'en';
+                          const activeSessionId = localStorage.getItem('swasthya_active_intake_id');
+                          let activeId: string = activeSessionId || '';
+                          let patientId = localStorage.getItem('swasthya_active_patient_id') || '';
+                          let backendToken = localStorage.getItem('swasthya_active_token') || '';
+                          let sessionSubmitted = false;
 
-                          // Create intake session in DB only now
-                          const conversationTurns = getUnifiedConversation().map((m) => ({
-                            role: m.role,
-                            content: m.content,
-                            mode: m.mode,
-                            category: m.category,
-                          }));
-
-                          const audioConsent = getStoredConsent();
-
-                          const createRes = await fetch('/api/v1/intakes', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              patient_name: profile?.name || patientName || 'Patient',
-                              patient_age: (profile?.age ? parseInt(profile.age, 10) : null) ?? (parseInt(patientAge, 10) || null),
-                              patient_gender: profile?.gender || 'Female',
-                              phone: phoneToSend,
-                              date_of_birth: profile?.dateOfBirth || null,
-                              abha_id: abhaIdToSend,
-                              abha_address: abhaAddressToSend,
-                              language_code: langCode,
-                              workflow_type: 'GENERAL_CLINICAL',
-                              interaction_mode: mode.toUpperCase(),
-                              consent_given: true,
-                              consent_language: audioConsent?.consent_language || (langCode === 'hi' ? 'हिन्दी' : langCode === 'mr' ? 'मराठी' : 'English'),
-                              consent_timestamp: audioConsent?.consent_timestamp || new Date().toISOString(),
-                              consent_method: audioConsent?.consent_method || 'AUDIO_GUIDED',
-                              consent_version: audioConsent?.consent_version || 'v1.0',
-                              chief_complaint: summary.chiefConcern,
-                              symptoms: summary.symptoms.length > 0 ? summary.symptoms : [summary.chiefConcern],
-                              duration: summary.duration,
-                              severity: summary.severity,
-                              medical_history: summary.medicalHistory,
-                              conversation_history: conversationTurns,
-                              submit_now: true,
-                            }),
-                          });
-
-                          if (!createRes.ok) {
-                            let detail = '';
+                          // FIX 4: If an active adaptive intake session exists, SUBMIT IT directly.
+                          // Do NOT create a duplicate intake session.
+                          if (activeSessionId) {
                             try {
-                              const errData = await createRes.json();
-                              detail = typeof errData?.detail === 'string' ? errData.detail : JSON.stringify(errData?.detail || errData);
-                            } catch {
-                              // ignore
+                              const submitRes = await fetch(`/api/v1/intakes/${activeSessionId}/submit`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                              });
+
+                              if (submitRes.ok) {
+                                const submitData = await submitRes.json();
+                                activeId = submitData.intake_session_id || activeSessionId;
+                                patientId = submitData.patient_id || patientId;
+                                backendToken = typeof submitData.token === 'string' ? submitData.token : backendToken;
+                                sessionSubmitted = true;
+                              } else if (submitRes.status !== 404) {
+                                const errData = await submitRes.json().catch(() => ({}));
+                                const detail = typeof errData?.detail === 'string' ? errData.detail : JSON.stringify(errData?.detail || errData);
+                                throw new Error(detail ? `Intake submission failed: ${detail}` : `Failed to submit intake session (${submitRes.status})`);
+                              }
+                            } catch (submitErr) {
+                              if ((submitErr as Error).message.includes('Intake submission failed')) {
+                                throw submitErr;
+                              }
+                              console.warn('[PatientIntake] Submit active session error, falling back to create:', submitErr);
                             }
-                            throw new Error(detail ? `Intake creation failed: ${detail}` : `Failed to create intake session (${createRes.status})`);
                           }
 
-                          const createdData = await createRes.json();
-                          const activeId = createdData.id;
-                          const patientId = createdData.patient_id;
-                          const backendToken = typeof createdData.token === 'string' ? createdData.token : '';
+                          // If there genuinely was no active session or session was not found:
+                          if (!sessionSubmitted) {
+                            const isDefaultDemoAbha = profile?.abhaNumber === '91-4521-8890-1234' && !profile?.isAbhaFromQr;
+                            const abhaIdToSend = isDefaultDemoAbha ? null : (profile?.abhaNumber || null);
+                            const abhaAddressToSend = isDefaultDemoAbha ? null : (profile?.abhaAddress || null);
+                            const phoneToSend = profile?.phone === '9876543210' && !profile?.isAbhaFromQr ? null : (profile?.phone || null);
+                            const langCode = language === 'हिन्दी' ? 'hi' : language === 'मराठी' ? 'mr' : 'en';
 
-                          localStorage.setItem('swasthya_active_intake_id', activeId);
-                          if (patientId) {
-                            localStorage.setItem('swasthya_active_patient_id', patientId);
-                          }
-                          if (backendToken) {
-                            localStorage.setItem('swasthya_active_token', backendToken);
+                            const conversationTurns = getUnifiedConversation().map((m) => ({
+                              role: m.role,
+                              content: m.content,
+                              mode: m.mode,
+                              category: m.category,
+                            }));
+
+                            const audioConsent = getStoredConsent();
+
+                            const createRes = await fetch('/api/v1/intakes', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                patient_name: profile?.name || patientName || 'Patient',
+                                patient_age: (profile?.age ? parseInt(profile.age, 10) : null) ?? (parseInt(patientAge, 10) || null),
+                                patient_gender: profile?.gender || 'Female',
+                                phone: phoneToSend,
+                                date_of_birth: profile?.dateOfBirth || null,
+                                abha_id: abhaIdToSend,
+                                abha_address: abhaAddressToSend,
+                                language_code: langCode,
+                                workflow_type: getStoredWorkflow(),
+                                interaction_mode: mode.toUpperCase(),
+                                consent_given: true,
+                                consent_language: audioConsent?.consent_language || (langCode === 'hi' ? 'हिन्दी' : langCode === 'mr' ? 'मराठी' : 'English'),
+                                consent_timestamp: audioConsent?.consent_timestamp || new Date().toISOString(),
+                                consent_method: audioConsent?.consent_method || 'AUDIO_GUIDED',
+                                consent_version: audioConsent?.consent_version || 'v1.0',
+                                chief_complaint: summary.chiefConcern,
+                                symptoms: summary.symptoms.length > 0 ? summary.symptoms : [summary.chiefConcern],
+                                duration: summary.duration,
+                                severity: summary.severity,
+                                medical_history: summary.medicalHistory,
+                                conversation_history: conversationTurns,
+                                submit_now: true,
+                              }),
+                            });
+
+                            if (!createRes.ok) {
+                              let detail = '';
+                              try {
+                                const errData = await createRes.json();
+                                detail = typeof errData?.detail === 'string' ? errData.detail : JSON.stringify(errData?.detail || errData);
+                              } catch {
+                                // ignore
+                              }
+                              throw new Error(detail ? `Intake creation failed: ${detail}` : `Failed to create intake session (${createRes.status})`);
+                            }
+
+                            const createdData = await createRes.json();
+                            activeId = createdData.id;
+                            patientId = createdData.patient_id;
+                            backendToken = typeof createdData.token === 'string' ? createdData.token : '';
+
+                            localStorage.setItem('swasthya_active_intake_id', activeId);
+                            if (patientId) {
+                              localStorage.setItem('swasthya_active_patient_id', patientId);
+                            }
+                            if (backendToken) {
+                              localStorage.setItem('swasthya_active_token', backendToken);
+                            }
                           }
 
                           // If a document was attached on the Records page, upload it in background without blocking UI transition

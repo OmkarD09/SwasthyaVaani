@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { recordIntakeAnswer } from '../lib/conversationStore';
 import { getStoredPatientProfile } from '../services/patientApi';
+import { getStoredWorkflow } from '../lib/kioskState';
 
 const INITIAL_INTAKE_GREETING: Record<string, string> = {
   English: 'Hello! I am SwasthyaVaani, your AI health assistant. What main symptom or health concern brings you in today?',
@@ -93,12 +94,14 @@ export function PatientVoiceChat({
   language,
   patientName = 'Ananya Sharma',
   patientAge = '34',
+  intakeSessionId: propIntakeSessionId,
   onComplete,
   onSwitchToText,
 }: {
   language: string;
   patientName?: string;
   patientAge?: string;
+  intakeSessionId?: string | null;
   onComplete: () => void;
   onSwitchToText: () => void;
 }) {
@@ -107,10 +110,10 @@ export function PatientVoiceChat({
   const langCode = currentLang === 'हिन्दी' ? 'hi' : currentLang === 'मराठी' ? 'mr' : 'en';
 
   const MAX_QUESTIONS = 10;
+  const initialGreeting =
+    INITIAL_INTAKE_GREETING[currentLang] || INITIAL_INTAKE_GREETING['English'];
   const [questionCount, setQuestionCount] = useState(1);
-  const [activeQuestionText, setActiveQuestionText] = useState(
-    INITIAL_INTAKE_GREETING[currentLang] || INITIAL_INTAKE_GREETING['English']
-  );
+  const [activeQuestionText, setActiveQuestionText] = useState(initialGreeting);
   const [activeCategory, setActiveCategory] = useState('Chief Complaint');
 
   const [isSpeakingAi, setIsSpeakingAi] = useState(false);
@@ -122,7 +125,7 @@ export function PatientVoiceChat({
   const [finishReason, setFinishReason] = useState<string>('');
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const [intakeSessionId, setIntakeSessionId] = useState<string | null>(null);
+  const [intakeSessionId, setIntakeSessionId] = useState<string | null>(propIntakeSessionId || null);
   const [currentQuestionEventId, setCurrentQuestionEventId] = useState<string | null>(null);
   const [redFlags, setRedFlags] = useState<string[]>([]);
 
@@ -130,6 +133,14 @@ export function PatientVoiceChat({
   const [conversationHistory, setConversationHistory] = useState<
     Array<{ questionText: string; answerText: string; category: string }>
   >([]);
+
+  // FIX 2: Elimination of Stale Question Closures via synchronous authoritative refs
+  const activeQuestionTextRef = useRef<string>(initialGreeting);
+  const currentQuestionEventIdRef = useRef<string | null>(null);
+  const currentQuestionTargetFieldRef = useRef<string>('chief_complaint');
+  const currentCategoryLabelRef = useRef<string>('CHIEF COMPLAINT');
+  const isFinishedRef = useRef<boolean>(false);
+  const playbackCounterRef = useRef<number>(0);
 
   const liveTranscriptRef = useRef<string>('');
   const recognitionRef = useRef<any>(null);
@@ -146,6 +157,68 @@ export function PatientVoiceChat({
   const pendingAudioBase64Ref = useRef<string | null>(null);
   const isComponentMounted = useRef<boolean>(true);
   const isSubmittingRef = useRef<boolean>(false);
+  const sessionInitPromiseRef = useRef<Promise<string | null> | null>(null);
+
+  const ensureSession = async (): Promise<string | null> => {
+    if (intakeSessionId) return intakeSessionId;
+    if (propIntakeSessionId) {
+      setIntakeSessionId(propIntakeSessionId);
+      return propIntakeSessionId;
+    }
+    const stored = localStorage.getItem('swasthya_active_intake_id');
+    if (stored) {
+      setIntakeSessionId(stored);
+      return stored;
+    }
+    if (sessionInitPromiseRef.current) return sessionInitPromiseRef.current;
+
+    sessionInitPromiseRef.current = (async () => {
+      try {
+        const profile = getStoredPatientProfile();
+        const isDefaultDemoAbha = profile?.abhaNumber === '91-4521-8890-1234' && !profile?.isAbhaFromQr;
+        const abhaIdToSend = isDefaultDemoAbha ? null : (profile?.abhaNumber || null);
+        const abhaAddressToSend = isDefaultDemoAbha ? null : (profile?.abhaAddress || null);
+        const phoneToSend = profile?.phone === '9876543210' && !profile?.isAbhaFromQr ? null : (profile?.phone || null);
+
+        const res = await fetch('/api/v1/intakes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patient_name: profile?.name || patientName || 'Patient',
+            patient_age: (profile?.age ? parseInt(profile.age, 10) : null) ?? (parseInt(patientAge, 10) || null),
+            patient_gender: profile?.gender || 'Female',
+            phone: phoneToSend,
+            date_of_birth: profile?.dateOfBirth || null,
+            abha_id: abhaIdToSend,
+            abha_address: abhaAddressToSend,
+            language_code: langCode,
+            workflow_type: getStoredWorkflow(),
+            interaction_mode: 'VOICE',
+            consent_given: true,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setIntakeSessionId(data.id);
+          localStorage.setItem('swasthya_active_intake_id', data.id);
+          localStorage.setItem('swasthya_active_token', data.token || '');
+          localStorage.setItem('swasthya_active_patient_id', data.patient_id || '');
+          return data.id as string;
+        }
+      } catch (err) {
+        console.warn('[PatientVoiceChat] Session init note:', err);
+      } finally {
+        sessionInitPromiseRef.current = null;
+      }
+      return null;
+    })();
+
+    return sessionInitPromiseRef.current;
+  };
+
+  useEffect(() => {
+    ensureSession();
+  }, [patientName, patientAge, currentLang]);
 
   // 1. Cleanup on unmount
   useEffect(() => {
@@ -157,19 +230,24 @@ export function PatientVoiceChat({
     };
   }, []);
 
-  // 2. Automatically Speak initial or updated question
+  // 2. Automatically Speak initial or updated question (SINGLE SPEECH PLAYBACK AUTHORITY)
   useEffect(() => {
-    if (!isFinished && activeQuestionText) {
+    if (activeQuestionText) {
       const backendAudio = pendingAudioBase64Ref.current;
       pendingAudioBase64Ref.current = null;
       speakQuestionText(activeQuestionText, backendAudio);
     }
-  }, [activeQuestionText, isFinished]);
+  }, [activeQuestionText]);
 
   // 3. Spoken Audio Synthesis (Sarvam AI Bulbul v3 with Web Speech fallback)
+  // FIX 1: Mutual exclusion
+  // IF audio_base64 exists: play returned backend/Sarvam audio. DO NOT call browser speechSynthesis.
+  // IF audio_base64 does not exist: use browser speechSynthesis exactly once.
   const speakQuestionText = async (text: string, providedAudioBase64?: string | null) => {
     stopSpeaking();
     stopListening();
+
+    const currentPlaybackToken = ++playbackCounterRef.current;
     setIsSpeakingAi(true);
 
     try {
@@ -177,12 +255,19 @@ export function PatientVoiceChat({
         const audio = new Audio(`data:audio/wav;base64,${providedAudioBase64}`);
         currentAudioElementRef.current = audio;
         audio.onended = () => {
-          if (isComponentMounted.current && !isFinished) {
+          if (isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
             setIsSpeakingAi(false);
-            startListening();
+            if (!isFinishedRef.current) {
+              startListening();
+            }
           }
         };
-        audio.onerror = () => fallbackWebSpeechTTS(text);
+        audio.onerror = (err) => {
+          console.warn('[VoiceTTS] Audio element error, falling back to Web Speech:', err);
+          if (isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
+            fallbackWebSpeechTTS(text, currentPlaybackToken);
+          }
+        };
         await audio.play();
         return;
       }
@@ -197,21 +282,25 @@ export function PatientVoiceChat({
         body: formData,
       });
 
-      if (ttsRes.ok) {
+      if (ttsRes.ok && playbackCounterRef.current === currentPlaybackToken) {
         const ttsData = await ttsRes.json();
-        if (ttsData.audio_base64 && isComponentMounted.current) {
+        if (ttsData.audio_base64 && isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
           const audio = new Audio(`data:audio/wav;base64,${ttsData.audio_base64}`);
           currentAudioElementRef.current = audio;
 
           audio.onended = () => {
-            if (isComponentMounted.current && !isFinished) {
+            if (isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
               setIsSpeakingAi(false);
               // Hands-Free: Start listening automatically when AI finishes speaking
-              startListening();
+              if (!isFinishedRef.current) {
+                startListening();
+              }
             }
           };
           audio.onerror = () => {
-            fallbackWebSpeechTTS(text);
+            if (isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
+              fallbackWebSpeechTTS(text, currentPlaybackToken);
+            }
           };
           await audio.play();
           return;
@@ -221,15 +310,21 @@ export function PatientVoiceChat({
       console.warn('[VoiceTTS] Sarvam TTS fallback to Web Speech:', err);
     }
 
-    // Fallback to Browser Web Speech API
-    fallbackWebSpeechTTS(text);
+    // Fallback to Browser Web Speech API if audio_base64 was missing or failed
+    if (playbackCounterRef.current === currentPlaybackToken) {
+      fallbackWebSpeechTTS(text, currentPlaybackToken);
+    }
   };
 
-  const fallbackWebSpeechTTS = (text: string) => {
+  const fallbackWebSpeechTTS = (text: string, token?: number) => {
+    const currentPlaybackToken = token ?? ++playbackCounterRef.current;
+
     if (!('speechSynthesis' in window)) {
-      if (isComponentMounted.current) {
+      if (isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
         setIsSpeakingAi(false);
-        startListening();
+        if (!isFinishedRef.current) {
+          startListening();
+        }
       }
       return;
     }
@@ -250,33 +345,42 @@ export function PatientVoiceChat({
       }
 
       utterance.onstart = () => {
-        if (isComponentMounted.current) setIsSpeakingAi(true);
+        if (isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
+          setIsSpeakingAi(true);
+        }
       };
       utterance.onend = () => {
-        if (isComponentMounted.current && !isFinished) {
+        if (isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
           setIsSpeakingAi(false);
           // Hands-Free: Automatically start listening after speaking
-          startListening();
+          if (!isFinishedRef.current) {
+            startListening();
+          }
         }
       };
       utterance.onerror = () => {
-        if (isComponentMounted.current) {
+        if (isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
           setIsSpeakingAi(false);
-          startListening();
+          if (!isFinishedRef.current) {
+            startListening();
+          }
         }
       };
 
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.warn('Speech synthesis notice:', err);
-      if (isComponentMounted.current) {
+      if (isComponentMounted.current && playbackCounterRef.current === currentPlaybackToken) {
         setIsSpeakingAi(false);
-        startListening();
+        if (!isFinishedRef.current) {
+          startListening();
+        }
       }
     }
   };
 
   const stopSpeaking = () => {
+    playbackCounterRef.current += 1;
     if (currentAudioElementRef.current) {
       try {
         currentAudioElementRef.current.pause();
@@ -350,14 +454,14 @@ export function PatientVoiceChat({
     silenceTimerRef.current = setTimeout(() => {
       const finalRecorded = liveTranscriptRef.current.trim();
       if (finalRecorded.length >= 3 && !isSubmittingRef.current) {
-        handleAnswerSubmit(finalRecorded);
+        handleAnswerSubmit();
       }
     }, 3500);
   };
 
   // 6. Start Hands-Free Continuous Listening
   const startListening = async () => {
-    if (isFinished || isSubmittingRef.current) return;
+    if (isFinishedRef.current || isSubmittingRef.current) return;
 
     stopSpeaking();
     setLiveTranscript('');
@@ -393,8 +497,8 @@ export function PatientVoiceChat({
           // If recognition naturally pauses and patient has spoken text, auto-submit
           const recorded = liveTranscriptRef.current.trim();
           if (recorded.length >= 3 && !isSubmittingRef.current && !isSpeakingAi) {
-            handleAnswerSubmit(recorded);
-          } else if (!isFinished && !isSpeakingAi && !isSubmittingRef.current && isComponentMounted.current) {
+            handleAnswerSubmit();
+          } else if (!isFinishedRef.current && !isSpeakingAi && !isSubmittingRef.current && isComponentMounted.current) {
             // Keep microphone alive for continuous hands-free listening
             try {
               recognition.start();
@@ -495,15 +599,17 @@ export function PatientVoiceChat({
 
   // 7. Submit recorded audio to Backend ASR + Shared Adaptive Engine
   const handleAnswerSubmit = async (overrideAnswer?: string) => {
-    if (isSubmittingRef.current) return;
+    if (isSubmittingRef.current || isFinishedRef.current) return;
     isSubmittingRef.current = true;
 
     const recordedAudio = await finishAudioRecording();
     stopListening();
     stopSpeaking();
 
-    const answerToSubmit = (overrideAnswer || liveTranscriptRef.current || liveTranscript).trim();
-    if (!answerToSubmit) {
+    const fallbackText = (overrideAnswer || liveTranscriptRef.current || liveTranscript).trim();
+
+    // If neither audio nor text is available, exit early
+    if ((!recordedAudio || recordedAudio.size === 0) && !fallbackText) {
       isSubmittingRef.current = false;
       return;
     }
@@ -514,107 +620,162 @@ export function PatientVoiceChat({
     setLiveTranscript('');
     liveTranscriptRef.current = '';
 
-    const fieldKeys = ['chief_complaint', 'duration', 'severity', 'medical_history'];
-    const categoryLabels = ['Chief Complaint', 'Duration & Onset', 'Severity Level', 'Medications & History'];
-    const targetField = fieldKeys[questionCount - 1] || `q_${questionCount}`;
-    const category = categoryLabels[questionCount - 1] || activeCategory;
+    // FIX 2 & FIX 3: Capture the current question's authoritative values BEFORE any async transitions
+    const currentQText = activeQuestionTextRef.current;
+    const currentQTargetField = currentQuestionTargetFieldRef.current;
+    const currentQCategory = currentCategoryLabelRef.current;
+    const currentQEventId = currentQuestionEventIdRef.current;
 
-    setConversationHistory((prev) => [
-      ...prev,
-      {
-        category,
-        questionText: activeQuestionText,
-        answerText: answerToSubmit,
-      },
-    ]);
+    try {
+      let activeId = intakeSessionId;
+      if (!activeId) {
+        activeId = await ensureSession();
+      }
+      if (!activeId) {
+        throw new Error('Unable to establish intake session');
+      }
 
-    recordIntakeAnswer(
-      targetField,
-      answerToSubmit,
-      'voice',
-      category,
-      activeQuestionText,
-    );
+      let decision: any = null;
+      let transcriptText = fallbackText;
+      let returnedAudio: string | null = null;
+      let nextQEventId: string | null = null;
 
-    const nextQCount = questionCount + 1;
-    setQuestionCount(nextQCount);
+      // Path A: Recorded audio is available -> use POST /api/v1/intakes/{id}/voice-answer
+      if (recordedAudio && recordedAudio.size > 0 && !overrideAnswer) {
+        const formData = new FormData();
+        const fileExt = recordedAudio.type.includes('wav') ? 'wav' : 'webm';
+        formData.append('file', recordedAudio, `patient_voice.${fileExt}`);
+        formData.append('language_code', langCode);
+        if (currentQEventId) {
+          formData.append('question_event_id', currentQEventId);
+        }
 
-    if (nextQCount > 4) {
-      setIsFinished(true);
-      setFinishReason('Clinical intake completed.');
+        const res = await fetch(`/api/v1/intakes/${activeId}/voice-answer`, {
+          method: 'POST',
+          body: formData,
+        });
 
-      const completionSpeech =
-        currentLang === 'हिन्दी'
-          ? 'धन्यवाद! आपकी स्वास्थ्य संबंधी जानकारी दर्ज कर ली गई है। अब आप अपनी पुरानी पर्ची या रिपोर्ट जोड़ सकते हैं।'
-          : currentLang === 'मराठी'
-          ? 'धन्यवाद! तुमची आरोग्य माहिती नोंदवली गेली आहे. आता तुम्ही तुमची कागदपत्रे जोडू शकता.'
-          : 'Thank you! Your clinical information has been recorded. You can now attach previous documents or proceed.';
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          const detail =
+            errJson.detail ||
+            (currentLang === 'हिन्दी'
+              ? 'आवाज़ रिकॉर्ड करने में समस्या आई। कृपया पुनः बोलें या टेक्स्ट चैट पर स्विच करें।'
+              : currentLang === 'मराठी'
+              ? 'आवाज रेकॉर्ड करण्यात अडचण आली. कृपया पुन्हा बोला किंवा मजकूर चॅटवर स्विच करा.'
+              : 'Unable to process voice audio. Please retry speaking or switch to text chat.');
+          setApiError(detail);
+          setIsProcessing(false);
+          isSubmittingRef.current = false;
+          startListening();
+          return;
+        }
 
-      speakQuestionText(completionSpeech);
+        const data = await res.json();
+        decision = data.decision;
+        transcriptText = data.transcript_text || fallbackText;
+        returnedAudio = data.audio_base64 || null;
+        nextQEventId = data.next_question_event_id ?? data.question_event_id ?? decision?.question_event_id ?? null;
+      } else {
+        // Path B: Quick answer chip clicked or audio unavailable -> use POST /api/v1/intakes/{id}/answers
+        const res = await fetch(`/api/v1/intakes/${activeId}/answers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            raw_text: fallbackText,
+            input_mode: 'VOICE',
+            language_code: langCode,
+            question_event_id: currentQEventId || undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          setApiError(errJson.detail || 'Error processing response. Please try again.');
+          setIsProcessing(false);
+          isSubmittingRef.current = false;
+          startListening();
+          return;
+        }
+
+        const data = await res.json();
+        decision = data.decision;
+        transcriptText = fallbackText;
+        nextQEventId = data.next_question_event_id ?? data.question_event_id ?? decision?.question_event_id ?? null;
+      }
+
+      // FIX 3: Record the patient's answer against the CURRENT question (Question N),
+      // NEVER against the next decision's target_field.
+      setConversationHistory((prev) => [
+        ...prev,
+        {
+          category: currentQCategory,
+          questionText: currentQText,
+          answerText: transcriptText,
+        },
+      ]);
+
+      recordIntakeAnswer(
+        currentQTargetField,
+        transcriptText,
+        'voice',
+        currentQCategory,
+        currentQText
+      );
+
+      // Check decision action for completion or escalation
+      if (decision?.action === 'STOP' || decision?.action === 'ESCALATE') {
+        if (decision?.action === 'ESCALATE') {
+          setRedFlags((prev) => [...prev, 'EMERGENCY']);
+        }
+        isFinishedRef.current = true;
+        setIsFinished(true);
+        setFinishReason(decision?.rationale || 'Clinical intake completed.');
+
+        const completionSpeech =
+          currentLang === 'हिन्दी'
+            ? 'धन्यवाद! आपकी स्वास्थ्य संबंधी जानकारी दर्ज कर ली गई है। अब आप अपनी पुरानी पर्ची या रिपोर्ट जोड़ सकते हैं।'
+            : currentLang === 'मराठी'
+            ? 'धन्यवाद! तुमची आरोग्य माहिती नोंदवली गेली आहे. आता तुम्ही तुमची कागदपत्रे जोडू शकता.'
+            : 'Thank you! Your clinical information has been recorded. You can now attach previous documents or proceed.';
+
+        // FIX 1: Store returned audio in pendingAudioBase64Ref and update activeQuestionText.
+        // DO NOT call speakQuestionText here. The activeQuestionText useEffect handles playback.
+        pendingAudioBase64Ref.current = returnedAudio;
+        activeQuestionTextRef.current = completionSpeech;
+        setActiveQuestionText(completionSpeech);
+        setIsProcessing(false);
+        isSubmittingRef.current = false;
+        return;
+      }
+
+      if (decision?.action === 'ASK' && decision?.question) {
+        // FIX 3: Update Question N+1 refs and state
+        const nextTargetField = decision.target_field || 'clinical_evaluation';
+        const nextCategory = nextTargetField.toUpperCase().replace(/_/g, ' ');
+
+        activeQuestionTextRef.current = decision.question;
+        currentQuestionEventIdRef.current = nextQEventId;
+        currentQuestionTargetFieldRef.current = nextTargetField;
+        currentCategoryLabelRef.current = nextCategory;
+
+        // FIX 1: Store returned audio in pendingAudioBase64Ref.
+        // DO NOT call speakQuestionText here directly.
+        // ONLY the activeQuestionText useEffect invokes playback.
+        pendingAudioBase64Ref.current = returnedAudio;
+
+        setQuestionCount((prev) => prev + 1);
+        setActiveCategory(nextCategory);
+        setCurrentQuestionEventId(nextQEventId);
+        setActiveQuestionText(decision.question);
+      }
+    } catch (err: any) {
+      console.error('[PatientVoiceChat] Submission error:', err);
+      setApiError(err?.message || 'Error processing response. Please try again.');
+    } finally {
       setIsProcessing(false);
       isSubmittingRef.current = false;
-      return;
     }
-
-    const fallbackQuestions: Record<number, Record<string, string>> = {
-      2: {
-        English: 'How long have you been experiencing this discomfort?',
-        'हिन्दी': 'यह तकलीफ आपको कितने दिनों या हफ्तों से है?',
-        'मराठी': 'हा त्रास तुम्हाला किती दिवसांपासून किंवा आठवड्यांपासून होत आहे?',
-        'বাংলা': 'এই কষ্টটি আপনি কত দিন বা সপ্তাহ ধরে অনুভব করছেন?',
-        'తెలుగు': 'ఈ అసౌకర్యం మీకు ఎన్ని రోజులుగా లేదా వారాలుగా ఉంది?',
-        'தமிழ்': 'இந்த அசௌகரியம் உங்களுக்கு எத்தனை நாட்களாக உள்ளது?',
-        'ગુજરાતી': 'આ તકલીફ તમને કેટલા દિવસોથી છે?',
-        'ಕನ್ನಡ': 'ಈ ತೊಂದರೆ ನಿಮಗೆ ಎಷ್ಟು ದಿನಗಳಿಂದ ಇದೆ?',
-        'മലയാളം': 'ഈ ബുദ്ധിമുട്ട് നിങ്ങൾക്ക് എത്ര ദിവസമായി ഉണ്ട്?',
-        'ਪੰਜਾਬੀ': 'ਇਹ ਤਕਲੀਫ ਤੁਹਾਨੂੰ ਕਿੰਨੇ ਦਿਨਾਂ ਤੋਂ ਹੈ?',
-        'ଓଡ଼ିଆ': 'ଏହି ଅସୁବିଧା ଆପଣଙ୍କୁ କେତେ ଦିନରୁ ହେଉଛି?',
-        'অসমীয়া': 'এই সমস্যাটো আপোনাৰ কিমান দিনৰ পৰা হৈছে?',
-        'اردو': 'یہ تکلیف آپ کو کتنے دنوں سے ہے؟',
-      },
-      3: {
-        English: 'On a scale of 1 to 10, how severe is your pain or discomfort?',
-        'हिन्दी': '1 से 10 के पैमाने पर दर्द या परेशानी कितनी तेज है?',
-        'मराठी': '१ ते १० च्या प्रमाणात वेदना किंवा त्रास किती तीव्र आहे?',
-        'বাংলা': '১ থেকে ১০ স্কেলে ব্যথা বা যন্ত্রণা কতটা তীব্র?',
-        'తెలుగు': '1 నుండి 10 స్కేలుపై నొప్పి ఎంత తీవ్రంగా ఉంది?',
-        'தமிழ்': '1 முதல் 10 வரை வலி எவ்வளவு தீவிரமாக உள்ளது?',
-        'ગુજરાતી': '1 થી 10 ના માપદંડ પર દુખાવો કેટલો તીવ્ર છે?',
-        'ಕನ್ನಡ': '1 ರಿಂದ 10 ರ ಪ್ರಮಾಣದಲ್ಲಿ ನೋವು ಎಷ್ಟು ತೀವ್ರವಾಗಿದೆ?',
-        'മലയാളം': '1 മുതൽ 10 വരെയുള്ള സ്കെയിലിൽ വേദന എത്രത്തോളമുണ്ട്?',
-        'ਪੰਜਾਬੀ': '1 ਤੋਂ 10 ਦੇ ਪੈਮਾਨੇ ਤੇ ਦਰਦ ਕਿੰਨਾ ਤੇਜ਼ ਹੈ?',
-        'ଓଡ଼ିଆ': '୧ ରୁ ୧୦ ମଧ୍ୟରେ କଷ୍ଟ କେତେ ତୀବ୍ର?',
-        'অসমীয়া': '১ ৰ পৰা ১০ ৰ ভিতৰত বিষ কিমান তীব্ৰ?',
-        'اردو': '1 سے 10 کے پیمانے پر درد کतना شدید ہے؟',
-      },
-      4: {
-        English: 'Are you taking any regular medications, or do you have any allergies?',
-        'हिन्दी': 'क्या आप कोई नियमित दवाई ले रहे हैं या आपको कोई एलर्जी है?',
-        'मराठी': 'तुम्ही कोणतीही नियमित औषधे घेत आहात का किंवा काही ऍलर्जी आहे का?',
-        'বাংলা': 'আপনি কি কোনো নিয়মিত ওষুধ খাচ্ছেন বা আপনার কোনো অ্যালার্জি আছে?',
-        'తెలుగు': 'మీరు ఏదైనా మందులు వాడుతున్నారా లేదా ఏదైనా అలర్జీ ఉందా?',
-        'தமிழ்': 'வழக்கமான மருந்துகள் ஏதேனும் உட்கொள்கிறீர்களா அல்லது ஒவ்வாமை உள்ளதா?',
-        'ગુજરાતી': 'શું તમે કોઈ નિયમિત દવા લો છો અથવા કોઈ એલર્જી છે?',
-        'ಕನ್ನಡ': 'ನೀವು ಯಾವುದೇ ನಿಯಮಿತ ಔಷಧಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳುತ್ತಿದ್ದೀರಾ ಅಥವಾ ಅಲರ್ಜಿ ಇದೆಯೇ?',
-        'മലയാളം': 'പതിവായി മരുന്നുകൾ കഴിക്കുന്നുണ്ടോ അല്ലെങ്കിൽ എന്തെങ്കിലും അലർജിയുണ്ടോ?',
-        'ਪੰਜਾਬੀ': 'ਕੀ ਤੁਸੀਂ ਕੋਈ ਰੈਗੂਲਰ ਦਵਾਈ ਲੈ ਰਹੇ ਹੋ ਜਾਂ ਕੋਈ ਐਲਰਜੀ ਹੈ?',
-        'ଓଡ଼ିଆ': 'ଆପଣ କୌଣସି ନିୟମିତ ଔଷଧ ଖାଉଛନ୍ତି କିମ୍ବା ଆଲର୍ଜି ଅଛି କି?',
-        'অসমীয়া': 'আপুনি কোনো নিয়মিত ঔষধ খাই আছে নেকি বা এলাৰ্জি আছে নেকি?',
-        'اردو': 'کیا آپ کوئی باقاعدہ دوائیں لے رہے ہیں یا کوئی الرجی ہے؟',
-      },
-    };
-
-    const nextCategory = categoryLabels[nextQCount - 1] || 'Clinical Detail';
-    setActiveCategory(nextCategory);
-    const nextQuestionText =
-      fallbackQuestions[nextQCount]?.[currentLang] ||
-      fallbackQuestions[nextQCount]?.['English'] ||
-      'Please tell us more details about your symptoms.';
-
-    setActiveQuestionText(nextQuestionText);
-    speakQuestionText(nextQuestionText);
-    setIsProcessing(false);
-    isSubmittingRef.current = false;
   };
 
   const handleChipClick = (chipText: string) => {

@@ -509,24 +509,31 @@ async def process_intake_answer_core(
     dashavidha_fields = ["sara", "samhanana", "pramana", "satmya", "sattva", "ahara_shakti", "vyayama_shakti", "vaya"]
     for df in dashavidha_fields:
         if df in extracted_facts and extracted_facts[df] is not None:
-            updated_state.set_canonical_dimension(df, "KNOWN_WITH_VALUE", value=str(extracted_facts[df]))
+            if df == "vaya":
+                if not updated_state.is_dimension_sufficiently_known("vaya"):
+                    updated_state.set_canonical_dimension(df, "KNOWN_WITH_VALUE", value=str(extracted_facts[df]))
+            else:
+                updated_state.set_canonical_dimension(df, "KNOWN_WITH_VALUE", value=str(extracted_facts[df]))
 
     # Sync explicit negation for vomiting to canonical tracking as KNOWN_FALSE
     indic_negated_vomiting_terms = {
         "vomiting", "vomit", "nausea", "ulti", "not vomiting", "no vomiting",
         "i am not vomiting", "i'm not vomiting", "haven't vomited", "have not vomited",
         "without vomiting", "ulti nahi", "उलटी नाही", "उल्टी नहीं", "उलट्या नाहीत",
+        "उलटी होत नाही", "उलटी नाही होत", "मला उलटी होत नाही",
         "उलट्या होत नाहीत", "मळमळ नाही"
     }
     has_negated_vomit = any(
-        any(term in str(ns).lower() for term in indic_negated_vomiting_terms)
+        str(ns).lower() in ["vomiting", "vomit", "nausea", "ulti", "उलटी", "उल्टी", "मळमळ"]
+        or any(term in str(ns).lower() for term in indic_negated_vomiting_terms)
         for ns in updated_state.negated_symptoms
     ) or any(
         term in raw_text.lower()
         for term in [
             "no vomiting", "not vomiting", "i am not vomiting", "i'm not vomiting",
             "haven't vomited", "have not vomited", "without vomiting",
-            "उलटी नाही", "उल्टी नहीं", "उलट्या नाहीत", "उलट्या होत नाहीत", "मळमळ नाही"
+            "उलटी नाही", "उल्टी नहीं", "उलट्या नाहीत", "उलट्या होत नाहीत", "मळमळ नाही",
+            "उलटी होत नाही", "उलटी नाही होत", "मला उलटी होत नाही"
         ]
     ) or (
         target_field in ["vomiting", "nausea_vomiting"]
@@ -629,8 +636,19 @@ async def process_intake_answer_core(
         )
     )
 
-    # Sync to AyushAssessmentModel if AYUSH workflow or AYUSH data present
-    has_ayush_data = bool(updated_state.ayush) or any(df in extracted_facts for df in dashavidha_fields)
+    # Sync to AyushAssessmentModel if AYUSH workflow or explicit AYUSH clinical data present
+    has_ayush_core = bool(
+        updated_state.ayush
+        and any(
+            getattr(updated_state.ayush, f, None)
+            for f in ["prakriti", "vikriti", "agni", "koshtha", "ahara_vihara"]
+        )
+    )
+    dashavidha_clinical_fields = ["sara", "samhanana", "pramana", "satmya", "sattva", "ahara_shakti", "vyayama_shakti"]
+    has_ayush_data = has_ayush_core or any(
+        df in extracted_facts and extracted_facts[df] is not None
+        for df in dashavidha_clinical_fields
+    )
     if session.workflow_type == "AYUSH" or has_ayush_data:
         ayush_record = (
             db.query(AyushAssessmentModel)
@@ -649,8 +667,22 @@ async def process_intake_answer_core(
             db.flush()
 
         assessment_obj = AyushAssessment(**ayush_record.assessment_json)
+
+        # Helper to check if a dimension is protected by physician confirmation
+        def is_physician_protected(dim_name: str) -> bool:
+            curr_dim = assessment_obj.get_dimension(dim_name)
+            if not curr_dim:
+                return False
+            return (
+                curr_dim.source == AyushProvenanceSource.PHYSICIAN_CONFIRMED
+                or curr_dim.status == AyushAssessmentStatus.PHYSICIAN_CONFIRMED
+            )
+
+        # 1. Sync Core AYUSH dimensions (agni, koshtha, ahara_vihara, prakriti, vikriti)
         if updated_state.ayush:
             for af in ["prakriti", "vikriti", "agni", "koshtha", "ahara_vihara"]:
+                if is_physician_protected(af):
+                    continue
                 v = getattr(updated_state.ayush, af, None)
                 if v:
                     dim_src = (
@@ -658,37 +690,67 @@ async def process_intake_answer_core(
                         if af in ["prakriti", "vikriti"]
                         else AyushProvenanceSource.PATIENT_STATED
                     )
+                    existing_dim = assessment_obj.get_dimension(af)
+                    evidence_ids = list(existing_dim.evidence) if (existing_dim and existing_dim.evidence) else []
+                    if answer.id not in evidence_ids:
+                        evidence_ids.append(answer.id)
+
                     assessment_obj.set_dimension(
                         AyushDimensionValue(
                             dimension=af,
                             value=v,
                             source=dim_src,
                             source_id=answer.id,
+                            status=AyushAssessmentStatus.PRELIMINARY,
+                            evidence=evidence_ids,
+                            last_updated_turn=session.question_count,
                         )
                     )
-        for df in dashavidha_fields:
+
+        # 2. Sync Dashavidha dimensions excluding vaya (vaya has dedicated demographic provenance)
+        dashavidha_intake_fields = ["sara", "samhanana", "pramana", "satmya", "sattva", "ahara_shakti", "vyayama_shakti"]
+        for df in dashavidha_intake_fields:
+            if is_physician_protected(df):
+                continue
             if df in extracted_facts and extracted_facts[df] is not None:
+                existing_dim = assessment_obj.get_dimension(df)
+                evidence_ids = list(existing_dim.evidence) if (existing_dim and existing_dim.evidence) else []
+                if answer.id not in evidence_ids:
+                    evidence_ids.append(answer.id)
+
                 assessment_obj.set_dimension(
                     AyushDimensionValue(
                         dimension=df,
                         value=str(extracted_facts[df]),
                         source=AyushProvenanceSource.PATIENT_STATED,
                         source_id=answer.id,
+                        status=AyushAssessmentStatus.PRELIMINARY,
+                        evidence=evidence_ids,
+                        last_updated_turn=session.question_count,
                     )
                 )
 
-        vaya_dim = updated_state.canonical_dimensions.get("vaya")
-        if vaya_dim and vaya_dim.value and "vaya" not in assessment_obj.get_all_dimensions():
-            assessment_obj.set_dimension(
-                AyushDimensionValue(
-                    dimension="vaya",
-                    value=str(vaya_dim.value),
-                    source=AyushProvenanceSource.SYSTEM_DERIVED,
-                    status=AyushAssessmentStatus.PRELIMINARY,
+        # 3. Maintain Vaya with strict SYSTEM_DERIVED provenance if derived from demographic age
+        if not is_physician_protected("vaya"):
+            vaya_dim = updated_state.canonical_dimensions.get("vaya")
+            current_vaya_dim = assessment_obj.get_dimension("vaya")
+            if (not current_vaya_dim or not current_vaya_dim.value) and vaya_dim and vaya_dim.value:
+                assessment_obj.set_dimension(
+                    AyushDimensionValue(
+                        dimension="vaya",
+                        value=str(vaya_dim.value),
+                        source=AyushProvenanceSource.SYSTEM_DERIVED,
+                        status=AyushAssessmentStatus.PRELIMINARY,
+                    )
                 )
-            )
+            elif current_vaya_dim and current_vaya_dim.source != AyushProvenanceSource.PHYSICIAN_CONFIRMED:
+                # Ensure existing vaya retains SYSTEM_DERIVED provenance
+                current_vaya_dim.source = AyushProvenanceSource.SYSTEM_DERIVED
+                assessment_obj.set_dimension(current_vaya_dim)
 
-        ayush_record.status = assessment_obj.overall_status.value
+        # 4. Maintain overall status: PRELIMINARY if data present, unless already PHYSICIAN_CONFIRMED
+        if ayush_record.status != AyushAssessmentStatus.PHYSICIAN_CONFIRMED.value:
+            ayush_record.status = assessment_obj.overall_status.value
         ayush_record.assessment_json = assessment_obj.model_dump(mode="json")
         flag_modified(ayush_record, "assessment_json")
 
@@ -748,7 +810,15 @@ async def submit_voice_answer(
         raise HTTPException(status_code=400, detail="Empty audio file provided")
 
     speech = get_speech_service()
-    transcription = await speech.transcribe_audio(audio_bytes, language_code)
+    try:
+        transcription = await speech.transcribe_audio(audio_bytes, language_code)
+    except Exception as exc:
+        logger.error("Speech transcription failed in submit_voice_answer: %s", exc)
+        raise HTTPException(
+            status_code=502,
+            detail="Speech transcription service unavailable. Please retry or switch to text chat."
+        ) from exc
+
     transcript = transcription.transcript_text.strip()
     if not transcript:
         raise HTTPException(status_code=422, detail="Speech provider returned no transcript")

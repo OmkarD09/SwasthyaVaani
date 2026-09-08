@@ -209,7 +209,7 @@ def test_ayush_assessment_model_reflects_demographic_vaya(client: TestClient, db
     vaya_dim = assessment.vaya
     assert vaya_dim is not None
     assert "72 years (Vriddha)" in vaya_dim.value
-    assert vaya_dim.source == AyushProvenanceSource.PATIENT_STATED
+    assert vaya_dim.source == AyushProvenanceSource.SYSTEM_DERIVED
     assert vaya_dim.status == AyushAssessmentStatus.PRELIMINARY
 
 

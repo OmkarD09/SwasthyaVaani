@@ -1,0 +1,5330 @@
+{
+  "res_10": {
+    "1. Simple headache": {
+      "scenario": "1. Simple headache",
+      "ceiling": 10,
+      "total_questions_asked": 4,
+      "sufficiency_turn": 4,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Headache presentation: duration, lateralization, and photophobia characterized.",
+      "remaining_viable_count": 14,
+      "remaining_viable_candidates": [
+        {
+          "field": "visual_aura",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "HEADACHE"
+        },
+        {
+          "field": "dark_stool_onset",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_frequency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_headache_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 9,
+          "patient_reply": "Mainly severe pain in my head, feeling sensitive to light and a bit nauseous, no weakness.",
+          "top_candidates": [
+            {
+              "field": "open_headache_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "distribution",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "photophobia",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "distribution",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 7,
+          "patient_reply": "It is on the right side of my head, around the temple.",
+          "top_candidates": [
+            {
+              "field": "distribution",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "nausea_vomiting",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "nausea_vomiting",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 6,
+          "patient_reply": "Mild nausea, but no vomiting.",
+          "top_candidates": [
+            {
+              "field": "nausea_vomiting",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "blood_in_stool",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 150,
+          "viable_count": 17,
+          "patient_reply": "No, nothing else regarding that.",
+          "top_candidates": [
+            {
+              "field": "blood_in_stool",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "2. Simple fever/cough": {
+      "scenario": "2. Simple fever/cough",
+      "ceiling": 10,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 14,
+      "remaining_viable_candidates": [
+        {
+          "field": "cough_type",
+          "score": 110,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "breathlessness",
+          "score": 110,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "fever_pattern",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "duration",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "onset",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_respiratory_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 15,
+          "patient_reply": "I have fever, cough, and body ache. Breathing is okay, no chest pain.",
+          "top_candidates": [
+            {
+              "field": "open_respiratory_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "cough_type",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "radiation",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 150,
+          "viable_count": 16,
+          "patient_reply": "No, that is not present.",
+          "top_candidates": [
+            {
+              "field": "radiation",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "sweating_diaphoresis",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "cough_type",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "sweating_diaphoresis",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 150,
+          "viable_count": 15,
+          "patient_reply": "No, that is not present.",
+          "top_candidates": [
+            {
+              "field": "sweating_diaphoresis",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "cough_type",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "3. Simple abdominal pain": {
+      "scenario": "3. Simple abdominal pain",
+      "ceiling": 10,
+      "total_questions_asked": 3,
+      "sufficiency_turn": 3,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Acute Gastroenteritis: duration, food exposure, vomiting, and hydration status characterized.",
+      "remaining_viable_count": 11,
+      "remaining_viable_candidates": [
+        {
+          "field": "dark_stool_onset",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_consistency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_frequency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "bloating",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "abdominal_location",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_gi_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 20,
+          "patient_reply": "Burning pain in upper belly with acidity and sour burps. No vomiting or loose motions.",
+          "top_candidates": [
+            {
+              "field": "open_gi_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 170,
+          "viable_count": 15,
+          "patient_reply": "No, nothing unusual there.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 170,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "food_exposure",
+              "score": 135,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "food_exposure",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 135,
+          "viable_count": 14,
+          "patient_reply": "Ate spicy fried street food 4 days ago.",
+          "top_candidates": [
+            {
+              "field": "food_exposure",
+              "score": 135,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "4. GI with vomiting + dehydration": {
+      "scenario": "4. GI with vomiting + dehydration",
+      "ceiling": 10,
+      "total_questions_asked": 4,
+      "sufficiency_turn": 4,
+      "safety_turn": 3,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Acute Gastroenteritis: duration, food exposure, vomiting, and hydration status characterized.",
+      "remaining_viable_count": 8,
+      "remaining_viable_candidates": [
+        {
+          "field": "stool_frequency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "bloating",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "abdominal_location",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "meal_relationship",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "antacid_relief",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 170,
+          "viable_count": 14,
+          "patient_reply": "Severe thirst, dry mouth, weakness, and lightheadedness when standing.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 170,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "blood_in_stool",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 170,
+          "viable_count": 11,
+          "patient_reply": "No blood in stool or vomit, not dark.",
+          "top_candidates": [
+            {
+              "field": "blood_in_stool",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "dark_stool_onset",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 265,
+          "viable_count": 10,
+          "patient_reply": "No, nothing else.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_onset",
+              "score": 265,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 265,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "dark_stool_consistency",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 265,
+          "viable_count": 9,
+          "patient_reply": "No, nothing else.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_consistency",
+              "score": 265,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "bloating",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "5. Musculoskeletal pain": {
+      "scenario": "5. Musculoskeletal pain",
+      "ceiling": 10,
+      "total_questions_asked": 3,
+      "sufficiency_turn": 3,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Musculoskeletal presentation: location, duration, and joint mobility characterized.",
+      "remaining_viable_count": 2,
+      "remaining_viable_candidates": [
+        {
+          "field": "injury_history",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_msk_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "Pain in my right knee, swelling when walking, no other joint pain.",
+          "top_candidates": [
+            {
+              "field": "open_msk_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 5,
+          "patient_reply": "Right knee joint anterior aspect.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 4,
+          "patient_reply": "For the past 5 days.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "injury_history",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "6. Multi-symptom presentation": {
+      "scenario": "6. Multi-symptom presentation",
+      "ceiling": 10,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 8,
+      "remaining_viable_candidates": [
+        {
+          "field": "duration",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "onset",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "spread_progression",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "injury_history",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        },
+        {
+          "field": "fever_pattern",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "itching_pruritus",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 13,
+          "patient_reply": "The rash is mildly itchy and flares up in the sun.",
+          "top_candidates": [
+            {
+              "field": "itching_pruritus",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 11,
+          "patient_reply": "Small joints in both hands, wrists, and erythematous rash on forearms and face.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "character",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 10,
+          "patient_reply": "Aching stiffness in joints, raised reddish patches on skin.",
+          "top_candidates": [
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "7. Respiratory presentation": {
+      "scenario": "7. Respiratory presentation",
+      "ceiling": 10,
+      "total_questions_asked": 4,
+      "sufficiency_turn": 4,
+      "safety_turn": 1,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Respiratory presentation: cough type and breathlessness characterized.",
+      "remaining_viable_count": 8,
+      "remaining_viable_candidates": [
+        {
+          "field": "location",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "sputum_color",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "chest_tightness",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "associated_bodyache",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "cough_throat",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_respiratory_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 10,
+          "patient_reply": "Trouble breathing, wheezing sound when exhaling, tight chest at night. No fever.",
+          "top_candidates": [
+            {
+              "field": "open_respiratory_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "cough_type",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "cough_type",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 12,
+          "patient_reply": "Dry irritant cough, especially when lying flat.",
+          "top_candidates": [
+            {
+              "field": "cough_type",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "breathlessness",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 11,
+          "patient_reply": "Shortness of breath on walking just 20 meters, wheezing sound audible.",
+          "top_candidates": [
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 10,
+          "patient_reply": "For the past 3 days.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "8. Urinary presentation": {
+      "scenario": "8. Urinary presentation",
+      "ceiling": 10,
+      "total_questions_asked": 1,
+      "sufficiency_turn": 1,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Urinary tract presentation: duration and dysuria/frequency characterized.",
+      "remaining_viable_count": 4,
+      "remaining_viable_candidates": [
+        {
+          "field": "fever",
+          "score": 130,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        },
+        {
+          "field": "hematuria_blood",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        },
+        {
+          "field": "flank_pain",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "urinary_frequency",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 7,
+          "patient_reply": "Passing urine every 30 to 45 minutes, only small drops come out.",
+          "top_candidates": [
+            {
+              "field": "urinary_frequency",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "fever",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "hematuria_blood",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "9. Dermatology presentation": {
+      "scenario": "9. Dermatology presentation",
+      "ceiling": 10,
+      "total_questions_asked": 2,
+      "sufficiency_turn": 2,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Dermatology presentation: rash location, duration, and pruritus characterized.",
+      "remaining_viable_count": 7,
+      "remaining_viable_candidates": [
+        {
+          "field": "character",
+          "score": 110,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "spread_progression",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "associated_bodyache",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "cough_throat",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_dermatology_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "Red raised rash that itches terribly, spreads across chest and back. No fever.",
+          "top_candidates": [
+            {
+              "field": "open_dermatology_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 10,
+          "patient_reply": "Mid-chest, spreading to upper back and neck.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "10. AYUSH presentation": {
+      "scenario": "10. AYUSH presentation",
+      "ceiling": 10,
+      "total_questions_asked": 3,
+      "sufficiency_turn": 3,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for AYUSH intake (core constitutional parameters established and remaining candidate information gain is low).",
+      "remaining_viable_count": 23,
+      "remaining_viable_candidates": [
+        {
+          "field": "sleep_pattern",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "relieving_factors",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "sattva",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "vyayama_shakti",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "satmya",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_ayush_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 32,
+          "patient_reply": "Appetite is very low, gas and heaviness after eating, bowels are irregular and constipated.",
+          "top_candidates": [
+            {
+              "field": "open_ayush_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "open_gi_exploration",
+              "score": 130,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "ahara_vihara",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 29,
+          "patient_reply": "I eat irregular meals, spicy and deep fried snacks, late dinner at 11 PM and go to bed immediately.",
+          "top_candidates": [
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "ahara_shakti",
+              "score": 95,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 25,
+          "patient_reply": "Upper abdomen and gastrointestinal tract.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "sleep_pattern",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "relieving_factors",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "11. Complex AYUSH + modern symptom presentation": {
+      "scenario": "11. Complex AYUSH + modern symptom presentation",
+      "ceiling": 10,
+      "total_questions_asked": 7,
+      "sufficiency_turn": 7,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for AYUSH intake (core constitutional parameters established and remaining candidate information gain is low).",
+      "remaining_viable_count": 18,
+      "remaining_viable_candidates": [
+        {
+          "field": "relieving_factors",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "sattva",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "vyayama_shakti",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "satmya",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "dark_stool_onset",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 150,
+          "viable_count": 32,
+          "patient_reply": "No other symptoms.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 150,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "food_exposure",
+              "score": 115,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "agni",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "food_exposure",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 115,
+          "viable_count": 31,
+          "patient_reply": "No other symptoms.",
+          "top_candidates": [
+            {
+              "field": "food_exposure",
+              "score": 115,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "agni",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "koshtha",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "agni",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 30,
+          "patient_reply": "Tikshnagni with Vidagdha jeerna: intense hunger but immediate acid burning and sour regurgitation.",
+          "top_candidates": [
+            {
+              "field": "agni",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "koshtha",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "koshtha",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 29,
+          "patient_reply": "Mrudu koshtha: burning loose stools 2-3 times a day.",
+          "top_candidates": [
+            {
+              "field": "koshtha",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "target_field": "ahara_vihara",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 24,
+          "patient_reply": "Excessive intake of tea (5 cups daily), sour pickles, fermented foods, night shifts.",
+          "top_candidates": [
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 22,
+          "patient_reply": "Chest, stomach, knee joints, and finger joints.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 20,
+          "patient_reply": "Chronic for 1 year, getting worse over the last 2 months.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "relieving_factors",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "12. Ambiguous/non-informative patient": {
+      "scenario": "12. Ambiguous/non-informative patient",
+      "ceiling": 10,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 3,
+      "remaining_viable_candidates": [
+        {
+          "field": "location",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GENERAL"
+        },
+        {
+          "field": "character",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GENERAL"
+        },
+        {
+          "field": "associated_symptoms",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GENERAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_general_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "I don't know, just feeling sick.",
+          "top_candidates": [
+            {
+              "field": "open_general_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 6,
+          "patient_reply": "I don't know, just feeling sick.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "severity",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "severity",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 65,
+          "viable_count": 4,
+          "patient_reply": "I don't know, just feeling sick.",
+          "top_candidates": [
+            {
+              "field": "severity",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "13. Safety/red-flag presentation": {
+      "scenario": "13. Safety/red-flag presentation",
+      "ceiling": 10,
+      "total_questions_asked": 2,
+      "sufficiency_turn": 2,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Cardiac presentation: radiation and chest discomfort character evaluated.",
+      "remaining_viable_count": 5,
+      "remaining_viable_candidates": [
+        {
+          "field": "breathlessness",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "CARDIAC"
+        },
+        {
+          "field": "location",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "CARDIAC"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "CARDIAC"
+        },
+        {
+          "field": "injury_history",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        },
+        {
+          "field": "swelling_warmth",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "radiation",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 170,
+          "viable_count": 6,
+          "patient_reply": "The heavy pain is radiating down my left arm, shoulder, and jaw.",
+          "top_candidates": [
+            {
+              "field": "radiation",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "sweating_diaphoresis",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "open_cardiac_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "sweating_diaphoresis",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 170,
+          "viable_count": 8,
+          "patient_reply": "Yes, I am sweating cold sweat profusely, very pale, and feeling dizzy.",
+          "top_candidates": [
+            {
+              "field": "sweating_diaphoresis",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "open_cardiac_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "open_msk_exploration",
+              "score": 130,
+              "mode": "OPEN_EXPLORATION"
+            }
+          ]
+        }
+      ]
+    },
+    "14. Rich first answer": {
+      "scenario": "14. Rich first answer",
+      "ceiling": 10,
+      "total_questions_asked": 1,
+      "sufficiency_turn": 1,
+      "safety_turn": 1,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Headache presentation: duration, lateralization, and photophobia characterized.",
+      "remaining_viable_count": 17,
+      "remaining_viable_candidates": [
+        {
+          "field": "food_exposure",
+          "score": 115,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_onset",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_frequency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 150,
+          "viable_count": 18,
+          "patient_reply": "Everything else was described in my first answer.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 150,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "food_exposure",
+              "score": 115,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "15. Minimal/vague first answer": {
+      "scenario": "15. Minimal/vague first answer",
+      "ceiling": 10,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 17,
+      "remaining_viable_candidates": [
+        {
+          "field": "stool_frequency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_consistency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "food_exposure",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "vomiting",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "duration",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_general_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "Pain in my stomach, nothing else.",
+          "top_candidates": [
+            {
+              "field": "open_general_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "dark_stool_onset",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 19,
+          "patient_reply": "No, just that.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "dark_stool_consistency",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 18,
+          "patient_reply": "No, just that.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "res_12": {
+    "1. Simple headache": {
+      "scenario": "1. Simple headache",
+      "ceiling": 12,
+      "total_questions_asked": 4,
+      "sufficiency_turn": 4,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Headache presentation: duration, lateralization, and photophobia characterized.",
+      "remaining_viable_count": 14,
+      "remaining_viable_candidates": [
+        {
+          "field": "visual_aura",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "HEADACHE"
+        },
+        {
+          "field": "dark_stool_onset",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_frequency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_headache_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 9,
+          "patient_reply": "Mainly severe pain in my head, feeling sensitive to light and a bit nauseous, no weakness.",
+          "top_candidates": [
+            {
+              "field": "open_headache_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "distribution",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "photophobia",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "distribution",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 7,
+          "patient_reply": "It is on the right side of my head, around the temple.",
+          "top_candidates": [
+            {
+              "field": "distribution",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "nausea_vomiting",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "nausea_vomiting",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 6,
+          "patient_reply": "Mild nausea, but no vomiting.",
+          "top_candidates": [
+            {
+              "field": "nausea_vomiting",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "blood_in_stool",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 150,
+          "viable_count": 17,
+          "patient_reply": "No, nothing else regarding that.",
+          "top_candidates": [
+            {
+              "field": "blood_in_stool",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "2. Simple fever/cough": {
+      "scenario": "2. Simple fever/cough",
+      "ceiling": 12,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 14,
+      "remaining_viable_candidates": [
+        {
+          "field": "cough_type",
+          "score": 110,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "breathlessness",
+          "score": 110,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "fever_pattern",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "duration",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "onset",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_respiratory_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 15,
+          "patient_reply": "I have fever, cough, and body ache. Breathing is okay, no chest pain.",
+          "top_candidates": [
+            {
+              "field": "open_respiratory_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "cough_type",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "radiation",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 150,
+          "viable_count": 16,
+          "patient_reply": "No, that is not present.",
+          "top_candidates": [
+            {
+              "field": "radiation",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "sweating_diaphoresis",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "cough_type",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "sweating_diaphoresis",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 150,
+          "viable_count": 15,
+          "patient_reply": "No, that is not present.",
+          "top_candidates": [
+            {
+              "field": "sweating_diaphoresis",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "cough_type",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "3. Simple abdominal pain": {
+      "scenario": "3. Simple abdominal pain",
+      "ceiling": 12,
+      "total_questions_asked": 3,
+      "sufficiency_turn": 3,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Acute Gastroenteritis: duration, food exposure, vomiting, and hydration status characterized.",
+      "remaining_viable_count": 11,
+      "remaining_viable_candidates": [
+        {
+          "field": "dark_stool_onset",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_consistency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_frequency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "bloating",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "abdominal_location",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_gi_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 20,
+          "patient_reply": "Burning pain in upper belly with acidity and sour burps. No vomiting or loose motions.",
+          "top_candidates": [
+            {
+              "field": "open_gi_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 170,
+          "viable_count": 15,
+          "patient_reply": "No, nothing unusual there.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 170,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "food_exposure",
+              "score": 135,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "food_exposure",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 135,
+          "viable_count": 14,
+          "patient_reply": "Ate spicy fried street food 4 days ago.",
+          "top_candidates": [
+            {
+              "field": "food_exposure",
+              "score": 135,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "4. GI with vomiting + dehydration": {
+      "scenario": "4. GI with vomiting + dehydration",
+      "ceiling": 12,
+      "total_questions_asked": 4,
+      "sufficiency_turn": 4,
+      "safety_turn": 3,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Acute Gastroenteritis: duration, food exposure, vomiting, and hydration status characterized.",
+      "remaining_viable_count": 8,
+      "remaining_viable_candidates": [
+        {
+          "field": "stool_frequency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "bloating",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "abdominal_location",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "meal_relationship",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "antacid_relief",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 170,
+          "viable_count": 14,
+          "patient_reply": "Severe thirst, dry mouth, weakness, and lightheadedness when standing.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 170,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "blood_in_stool",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 170,
+          "viable_count": 11,
+          "patient_reply": "No blood in stool or vomit, not dark.",
+          "top_candidates": [
+            {
+              "field": "blood_in_stool",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "dark_stool_onset",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 265,
+          "viable_count": 10,
+          "patient_reply": "No, nothing else.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_onset",
+              "score": 265,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 265,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "dark_stool_consistency",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 265,
+          "viable_count": 9,
+          "patient_reply": "No, nothing else.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_consistency",
+              "score": 265,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "bloating",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "5. Musculoskeletal pain": {
+      "scenario": "5. Musculoskeletal pain",
+      "ceiling": 12,
+      "total_questions_asked": 3,
+      "sufficiency_turn": 3,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Musculoskeletal presentation: location, duration, and joint mobility characterized.",
+      "remaining_viable_count": 2,
+      "remaining_viable_candidates": [
+        {
+          "field": "injury_history",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_msk_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "Pain in my right knee, swelling when walking, no other joint pain.",
+          "top_candidates": [
+            {
+              "field": "open_msk_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 5,
+          "patient_reply": "Right knee joint anterior aspect.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 4,
+          "patient_reply": "For the past 5 days.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "injury_history",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "6. Multi-symptom presentation": {
+      "scenario": "6. Multi-symptom presentation",
+      "ceiling": 12,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 8,
+      "remaining_viable_candidates": [
+        {
+          "field": "duration",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "onset",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "spread_progression",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "injury_history",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        },
+        {
+          "field": "fever_pattern",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "itching_pruritus",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 13,
+          "patient_reply": "The rash is mildly itchy and flares up in the sun.",
+          "top_candidates": [
+            {
+              "field": "itching_pruritus",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 11,
+          "patient_reply": "Small joints in both hands, wrists, and erythematous rash on forearms and face.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "character",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 10,
+          "patient_reply": "Aching stiffness in joints, raised reddish patches on skin.",
+          "top_candidates": [
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "7. Respiratory presentation": {
+      "scenario": "7. Respiratory presentation",
+      "ceiling": 12,
+      "total_questions_asked": 4,
+      "sufficiency_turn": 4,
+      "safety_turn": 1,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Respiratory presentation: cough type and breathlessness characterized.",
+      "remaining_viable_count": 8,
+      "remaining_viable_candidates": [
+        {
+          "field": "location",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "sputum_color",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "chest_tightness",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "associated_bodyache",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "cough_throat",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_respiratory_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 10,
+          "patient_reply": "Trouble breathing, wheezing sound when exhaling, tight chest at night. No fever.",
+          "top_candidates": [
+            {
+              "field": "open_respiratory_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "cough_type",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "cough_type",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 12,
+          "patient_reply": "Dry irritant cough, especially when lying flat.",
+          "top_candidates": [
+            {
+              "field": "cough_type",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "breathlessness",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 11,
+          "patient_reply": "Shortness of breath on walking just 20 meters, wheezing sound audible.",
+          "top_candidates": [
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 10,
+          "patient_reply": "For the past 3 days.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "8. Urinary presentation": {
+      "scenario": "8. Urinary presentation",
+      "ceiling": 12,
+      "total_questions_asked": 1,
+      "sufficiency_turn": 1,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Urinary tract presentation: duration and dysuria/frequency characterized.",
+      "remaining_viable_count": 4,
+      "remaining_viable_candidates": [
+        {
+          "field": "fever",
+          "score": 130,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        },
+        {
+          "field": "hematuria_blood",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        },
+        {
+          "field": "flank_pain",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "urinary_frequency",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 7,
+          "patient_reply": "Passing urine every 30 to 45 minutes, only small drops come out.",
+          "top_candidates": [
+            {
+              "field": "urinary_frequency",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "fever",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "hematuria_blood",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "9. Dermatology presentation": {
+      "scenario": "9. Dermatology presentation",
+      "ceiling": 12,
+      "total_questions_asked": 2,
+      "sufficiency_turn": 2,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Dermatology presentation: rash location, duration, and pruritus characterized.",
+      "remaining_viable_count": 7,
+      "remaining_viable_candidates": [
+        {
+          "field": "character",
+          "score": 110,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "spread_progression",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "associated_bodyache",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "cough_throat",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_dermatology_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "Red raised rash that itches terribly, spreads across chest and back. No fever.",
+          "top_candidates": [
+            {
+              "field": "open_dermatology_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 10,
+          "patient_reply": "Mid-chest, spreading to upper back and neck.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "10. AYUSH presentation": {
+      "scenario": "10. AYUSH presentation",
+      "ceiling": 12,
+      "total_questions_asked": 3,
+      "sufficiency_turn": 3,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for AYUSH intake (core constitutional parameters established and remaining candidate information gain is low).",
+      "remaining_viable_count": 23,
+      "remaining_viable_candidates": [
+        {
+          "field": "sleep_pattern",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "relieving_factors",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "sattva",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "vyayama_shakti",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "satmya",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_ayush_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 32,
+          "patient_reply": "Appetite is very low, gas and heaviness after eating, bowels are irregular and constipated.",
+          "top_candidates": [
+            {
+              "field": "open_ayush_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "open_gi_exploration",
+              "score": 130,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "ahara_vihara",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 29,
+          "patient_reply": "I eat irregular meals, spicy and deep fried snacks, late dinner at 11 PM and go to bed immediately.",
+          "top_candidates": [
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "ahara_shakti",
+              "score": 95,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 25,
+          "patient_reply": "Upper abdomen and gastrointestinal tract.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "sleep_pattern",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "relieving_factors",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "11. Complex AYUSH + modern symptom presentation": {
+      "scenario": "11. Complex AYUSH + modern symptom presentation",
+      "ceiling": 12,
+      "total_questions_asked": 7,
+      "sufficiency_turn": 7,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for AYUSH intake (core constitutional parameters established and remaining candidate information gain is low).",
+      "remaining_viable_count": 18,
+      "remaining_viable_candidates": [
+        {
+          "field": "relieving_factors",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "sattva",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "vyayama_shakti",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "satmya",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "dark_stool_onset",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 150,
+          "viable_count": 32,
+          "patient_reply": "No other symptoms.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 150,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "food_exposure",
+              "score": 115,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "agni",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "food_exposure",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 115,
+          "viable_count": 31,
+          "patient_reply": "No other symptoms.",
+          "top_candidates": [
+            {
+              "field": "food_exposure",
+              "score": 115,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "agni",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "koshtha",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "agni",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 30,
+          "patient_reply": "Tikshnagni with Vidagdha jeerna: intense hunger but immediate acid burning and sour regurgitation.",
+          "top_candidates": [
+            {
+              "field": "agni",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "koshtha",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "koshtha",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 29,
+          "patient_reply": "Mrudu koshtha: burning loose stools 2-3 times a day.",
+          "top_candidates": [
+            {
+              "field": "koshtha",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "target_field": "ahara_vihara",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 24,
+          "patient_reply": "Excessive intake of tea (5 cups daily), sour pickles, fermented foods, night shifts.",
+          "top_candidates": [
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 22,
+          "patient_reply": "Chest, stomach, knee joints, and finger joints.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 20,
+          "patient_reply": "Chronic for 1 year, getting worse over the last 2 months.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "relieving_factors",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "12. Ambiguous/non-informative patient": {
+      "scenario": "12. Ambiguous/non-informative patient",
+      "ceiling": 12,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 3,
+      "remaining_viable_candidates": [
+        {
+          "field": "location",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GENERAL"
+        },
+        {
+          "field": "character",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GENERAL"
+        },
+        {
+          "field": "associated_symptoms",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GENERAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_general_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "I don't know, just feeling sick.",
+          "top_candidates": [
+            {
+              "field": "open_general_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 6,
+          "patient_reply": "I don't know, just feeling sick.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "severity",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "severity",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 65,
+          "viable_count": 4,
+          "patient_reply": "I don't know, just feeling sick.",
+          "top_candidates": [
+            {
+              "field": "severity",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "13. Safety/red-flag presentation": {
+      "scenario": "13. Safety/red-flag presentation",
+      "ceiling": 12,
+      "total_questions_asked": 2,
+      "sufficiency_turn": 2,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Cardiac presentation: radiation and chest discomfort character evaluated.",
+      "remaining_viable_count": 5,
+      "remaining_viable_candidates": [
+        {
+          "field": "breathlessness",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "CARDIAC"
+        },
+        {
+          "field": "location",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "CARDIAC"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "CARDIAC"
+        },
+        {
+          "field": "injury_history",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        },
+        {
+          "field": "swelling_warmth",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "radiation",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 170,
+          "viable_count": 6,
+          "patient_reply": "The heavy pain is radiating down my left arm, shoulder, and jaw.",
+          "top_candidates": [
+            {
+              "field": "radiation",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "sweating_diaphoresis",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "open_cardiac_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "sweating_diaphoresis",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 170,
+          "viable_count": 8,
+          "patient_reply": "Yes, I am sweating cold sweat profusely, very pale, and feeling dizzy.",
+          "top_candidates": [
+            {
+              "field": "sweating_diaphoresis",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "open_cardiac_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "open_msk_exploration",
+              "score": 130,
+              "mode": "OPEN_EXPLORATION"
+            }
+          ]
+        }
+      ]
+    },
+    "14. Rich first answer": {
+      "scenario": "14. Rich first answer",
+      "ceiling": 12,
+      "total_questions_asked": 1,
+      "sufficiency_turn": 1,
+      "safety_turn": 1,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Headache presentation: duration, lateralization, and photophobia characterized.",
+      "remaining_viable_count": 17,
+      "remaining_viable_candidates": [
+        {
+          "field": "food_exposure",
+          "score": 115,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_onset",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_frequency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 150,
+          "viable_count": 18,
+          "patient_reply": "Everything else was described in my first answer.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 150,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "food_exposure",
+              "score": 115,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "15. Minimal/vague first answer": {
+      "scenario": "15. Minimal/vague first answer",
+      "ceiling": 12,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 17,
+      "remaining_viable_candidates": [
+        {
+          "field": "stool_frequency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_consistency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "food_exposure",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "vomiting",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "duration",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_general_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "Pain in my stomach, nothing else.",
+          "top_candidates": [
+            {
+              "field": "open_general_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "dark_stool_onset",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 19,
+          "patient_reply": "No, just that.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "dark_stool_consistency",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 18,
+          "patient_reply": "No, just that.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "res_15": {
+    "1. Simple headache": {
+      "scenario": "1. Simple headache",
+      "ceiling": 15,
+      "total_questions_asked": 4,
+      "sufficiency_turn": 4,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Headache presentation: duration, lateralization, and photophobia characterized.",
+      "remaining_viable_count": 14,
+      "remaining_viable_candidates": [
+        {
+          "field": "visual_aura",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "HEADACHE"
+        },
+        {
+          "field": "dark_stool_onset",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_frequency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_headache_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 9,
+          "patient_reply": "Mainly severe pain in my head, feeling sensitive to light and a bit nauseous, no weakness.",
+          "top_candidates": [
+            {
+              "field": "open_headache_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "distribution",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "photophobia",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "distribution",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 7,
+          "patient_reply": "It is on the right side of my head, around the temple.",
+          "top_candidates": [
+            {
+              "field": "distribution",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "nausea_vomiting",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "nausea_vomiting",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 6,
+          "patient_reply": "Mild nausea, but no vomiting.",
+          "top_candidates": [
+            {
+              "field": "nausea_vomiting",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "blood_in_stool",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 150,
+          "viable_count": 17,
+          "patient_reply": "No, nothing else regarding that.",
+          "top_candidates": [
+            {
+              "field": "blood_in_stool",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "2. Simple fever/cough": {
+      "scenario": "2. Simple fever/cough",
+      "ceiling": 15,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 14,
+      "remaining_viable_candidates": [
+        {
+          "field": "cough_type",
+          "score": 110,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "breathlessness",
+          "score": 110,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "fever_pattern",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "duration",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "onset",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_respiratory_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 15,
+          "patient_reply": "I have fever, cough, and body ache. Breathing is okay, no chest pain.",
+          "top_candidates": [
+            {
+              "field": "open_respiratory_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "cough_type",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "radiation",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 150,
+          "viable_count": 16,
+          "patient_reply": "No, that is not present.",
+          "top_candidates": [
+            {
+              "field": "radiation",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "sweating_diaphoresis",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "cough_type",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "sweating_diaphoresis",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 150,
+          "viable_count": 15,
+          "patient_reply": "No, that is not present.",
+          "top_candidates": [
+            {
+              "field": "sweating_diaphoresis",
+              "score": 150,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "cough_type",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "3. Simple abdominal pain": {
+      "scenario": "3. Simple abdominal pain",
+      "ceiling": 15,
+      "total_questions_asked": 3,
+      "sufficiency_turn": 3,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Acute Gastroenteritis: duration, food exposure, vomiting, and hydration status characterized.",
+      "remaining_viable_count": 11,
+      "remaining_viable_candidates": [
+        {
+          "field": "dark_stool_onset",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_consistency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_frequency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "bloating",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "abdominal_location",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_gi_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 20,
+          "patient_reply": "Burning pain in upper belly with acidity and sour burps. No vomiting or loose motions.",
+          "top_candidates": [
+            {
+              "field": "open_gi_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 170,
+          "viable_count": 15,
+          "patient_reply": "No, nothing unusual there.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 170,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "food_exposure",
+              "score": 135,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "food_exposure",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 135,
+          "viable_count": 14,
+          "patient_reply": "Ate spicy fried street food 4 days ago.",
+          "top_candidates": [
+            {
+              "field": "food_exposure",
+              "score": 135,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "4. GI with vomiting + dehydration": {
+      "scenario": "4. GI with vomiting + dehydration",
+      "ceiling": 15,
+      "total_questions_asked": 4,
+      "sufficiency_turn": 4,
+      "safety_turn": 3,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Acute Gastroenteritis: duration, food exposure, vomiting, and hydration status characterized.",
+      "remaining_viable_count": 8,
+      "remaining_viable_candidates": [
+        {
+          "field": "stool_frequency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "bloating",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "abdominal_location",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "meal_relationship",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "antacid_relief",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 170,
+          "viable_count": 14,
+          "patient_reply": "Severe thirst, dry mouth, weakness, and lightheadedness when standing.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 170,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "blood_in_stool",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 170,
+          "viable_count": 11,
+          "patient_reply": "No blood in stool or vomit, not dark.",
+          "top_candidates": [
+            {
+              "field": "blood_in_stool",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "dark_stool_onset",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 265,
+          "viable_count": 10,
+          "patient_reply": "No, nothing else.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_onset",
+              "score": 265,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 265,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "dark_stool_consistency",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 265,
+          "viable_count": 9,
+          "patient_reply": "No, nothing else.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_consistency",
+              "score": 265,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "bloating",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "5. Musculoskeletal pain": {
+      "scenario": "5. Musculoskeletal pain",
+      "ceiling": 15,
+      "total_questions_asked": 3,
+      "sufficiency_turn": 3,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Musculoskeletal presentation: location, duration, and joint mobility characterized.",
+      "remaining_viable_count": 2,
+      "remaining_viable_candidates": [
+        {
+          "field": "injury_history",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_msk_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "Pain in my right knee, swelling when walking, no other joint pain.",
+          "top_candidates": [
+            {
+              "field": "open_msk_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 5,
+          "patient_reply": "Right knee joint anterior aspect.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 4,
+          "patient_reply": "For the past 5 days.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "injury_history",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "6. Multi-symptom presentation": {
+      "scenario": "6. Multi-symptom presentation",
+      "ceiling": 15,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 8,
+      "remaining_viable_candidates": [
+        {
+          "field": "duration",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "onset",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "spread_progression",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "injury_history",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        },
+        {
+          "field": "fever_pattern",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "itching_pruritus",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 13,
+          "patient_reply": "The rash is mildly itchy and flares up in the sun.",
+          "top_candidates": [
+            {
+              "field": "itching_pruritus",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 11,
+          "patient_reply": "Small joints in both hands, wrists, and erythematous rash on forearms and face.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "character",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 10,
+          "patient_reply": "Aching stiffness in joints, raised reddish patches on skin.",
+          "top_candidates": [
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "7. Respiratory presentation": {
+      "scenario": "7. Respiratory presentation",
+      "ceiling": 15,
+      "total_questions_asked": 4,
+      "sufficiency_turn": 4,
+      "safety_turn": 1,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Respiratory presentation: cough type and breathlessness characterized.",
+      "remaining_viable_count": 8,
+      "remaining_viable_candidates": [
+        {
+          "field": "location",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "sputum_color",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "chest_tightness",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "RESPIRATORY"
+        },
+        {
+          "field": "associated_bodyache",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "cough_throat",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_respiratory_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 10,
+          "patient_reply": "Trouble breathing, wheezing sound when exhaling, tight chest at night. No fever.",
+          "top_candidates": [
+            {
+              "field": "open_respiratory_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "cough_type",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "cough_type",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 12,
+          "patient_reply": "Dry irritant cough, especially when lying flat.",
+          "top_candidates": [
+            {
+              "field": "cough_type",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "breathlessness",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 11,
+          "patient_reply": "Shortness of breath on walking just 20 meters, wheezing sound audible.",
+          "top_candidates": [
+            {
+              "field": "breathlessness",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 10,
+          "patient_reply": "For the past 3 days.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "8. Urinary presentation": {
+      "scenario": "8. Urinary presentation",
+      "ceiling": 15,
+      "total_questions_asked": 1,
+      "sufficiency_turn": 1,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Urinary tract presentation: duration and dysuria/frequency characterized.",
+      "remaining_viable_count": 4,
+      "remaining_viable_candidates": [
+        {
+          "field": "fever",
+          "score": 130,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        },
+        {
+          "field": "hematuria_blood",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        },
+        {
+          "field": "flank_pain",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "URINARY"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "urinary_frequency",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 7,
+          "patient_reply": "Passing urine every 30 to 45 minutes, only small drops come out.",
+          "top_candidates": [
+            {
+              "field": "urinary_frequency",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "fever",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "hematuria_blood",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "9. Dermatology presentation": {
+      "scenario": "9. Dermatology presentation",
+      "ceiling": 15,
+      "total_questions_asked": 2,
+      "sufficiency_turn": 2,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Dermatology presentation: rash location, duration, and pruritus characterized.",
+      "remaining_viable_count": 7,
+      "remaining_viable_candidates": [
+        {
+          "field": "character",
+          "score": 110,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "spread_progression",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "DERMATOLOGY"
+        },
+        {
+          "field": "associated_bodyache",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        },
+        {
+          "field": "cough_throat",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "FEVER"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_dermatology_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "Red raised rash that itches terribly, spreads across chest and back. No fever.",
+          "top_candidates": [
+            {
+              "field": "open_dermatology_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 130,
+          "viable_count": 10,
+          "patient_reply": "Mid-chest, spreading to upper back and neck.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 130,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "10. AYUSH presentation": {
+      "scenario": "10. AYUSH presentation",
+      "ceiling": 15,
+      "total_questions_asked": 3,
+      "sufficiency_turn": 3,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for AYUSH intake (core constitutional parameters established and remaining candidate information gain is low).",
+      "remaining_viable_count": 23,
+      "remaining_viable_candidates": [
+        {
+          "field": "sleep_pattern",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "relieving_factors",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "sattva",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "vyayama_shakti",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "satmya",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_ayush_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 32,
+          "patient_reply": "Appetite is very low, gas and heaviness after eating, bowels are irregular and constipated.",
+          "top_candidates": [
+            {
+              "field": "open_ayush_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "open_gi_exploration",
+              "score": 130,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "ahara_vihara",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 29,
+          "patient_reply": "I eat irregular meals, spicy and deep fried snacks, late dinner at 11 PM and go to bed immediately.",
+          "top_candidates": [
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "ahara_shakti",
+              "score": 95,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 25,
+          "patient_reply": "Upper abdomen and gastrointestinal tract.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "sleep_pattern",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "relieving_factors",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "11. Complex AYUSH + modern symptom presentation": {
+      "scenario": "11. Complex AYUSH + modern symptom presentation",
+      "ceiling": 15,
+      "total_questions_asked": 7,
+      "sufficiency_turn": 7,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for AYUSH intake (core constitutional parameters established and remaining candidate information gain is low).",
+      "remaining_viable_count": 18,
+      "remaining_viable_candidates": [
+        {
+          "field": "relieving_factors",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "sattva",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "vyayama_shakti",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "satmya",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "AYUSH"
+        },
+        {
+          "field": "dark_stool_onset",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 150,
+          "viable_count": 32,
+          "patient_reply": "No other symptoms.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 150,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "food_exposure",
+              "score": 115,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "agni",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "food_exposure",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 115,
+          "viable_count": 31,
+          "patient_reply": "No other symptoms.",
+          "top_candidates": [
+            {
+              "field": "food_exposure",
+              "score": 115,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "agni",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "koshtha",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "agni",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 30,
+          "patient_reply": "Tikshnagni with Vidagdha jeerna: intense hunger but immediate acid burning and sour regurgitation.",
+          "top_candidates": [
+            {
+              "field": "agni",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "koshtha",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "target_field": "koshtha",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 29,
+          "patient_reply": "Mrudu koshtha: burning loose stools 2-3 times a day.",
+          "top_candidates": [
+            {
+              "field": "koshtha",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "target_field": "ahara_vihara",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 110,
+          "viable_count": 24,
+          "patient_reply": "Excessive intake of tea (5 cups daily), sour pickles, fermented foods, night shifts.",
+          "top_candidates": [
+            {
+              "field": "ahara_vihara",
+              "score": 110,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "target_field": "location",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 22,
+          "patient_reply": "Chest, stomach, knee joints, and finger joints.",
+          "top_candidates": [
+            {
+              "field": "location",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 20,
+          "patient_reply": "Chronic for 1 year, getting worse over the last 2 months.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "relieving_factors",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "12. Ambiguous/non-informative patient": {
+      "scenario": "12. Ambiguous/non-informative patient",
+      "ceiling": 15,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 3,
+      "remaining_viable_candidates": [
+        {
+          "field": "location",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GENERAL"
+        },
+        {
+          "field": "character",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GENERAL"
+        },
+        {
+          "field": "associated_symptoms",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GENERAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_general_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "I don't know, just feeling sick.",
+          "top_candidates": [
+            {
+              "field": "open_general_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "duration",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 6,
+          "patient_reply": "I don't know, just feeling sick.",
+          "top_candidates": [
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "severity",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "severity",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 65,
+          "viable_count": 4,
+          "patient_reply": "I don't know, just feeling sick.",
+          "top_candidates": [
+            {
+              "field": "severity",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "location",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "character",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "13. Safety/red-flag presentation": {
+      "scenario": "13. Safety/red-flag presentation",
+      "ceiling": 15,
+      "total_questions_asked": 2,
+      "sufficiency_turn": 2,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Cardiac presentation: radiation and chest discomfort character evaluated.",
+      "remaining_viable_count": 5,
+      "remaining_viable_candidates": [
+        {
+          "field": "breathlessness",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "CARDIAC"
+        },
+        {
+          "field": "location",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "CARDIAC"
+        },
+        {
+          "field": "severity",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "CARDIAC"
+        },
+        {
+          "field": "injury_history",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        },
+        {
+          "field": "swelling_warmth",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "MUSCULOSKELETAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "radiation",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 170,
+          "viable_count": 6,
+          "patient_reply": "The heavy pain is radiating down my left arm, shoulder, and jaw.",
+          "top_candidates": [
+            {
+              "field": "radiation",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "sweating_diaphoresis",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "open_cardiac_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "sweating_diaphoresis",
+          "reasoning_mode": "SAFETY_REQUIRED",
+          "score": 170,
+          "viable_count": 8,
+          "patient_reply": "Yes, I am sweating cold sweat profusely, very pale, and feeling dizzy.",
+          "top_candidates": [
+            {
+              "field": "sweating_diaphoresis",
+              "score": 170,
+              "mode": "SAFETY_REQUIRED"
+            },
+            {
+              "field": "open_cardiac_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "open_msk_exploration",
+              "score": 130,
+              "mode": "OPEN_EXPLORATION"
+            }
+          ]
+        }
+      ]
+    },
+    "14. Rich first answer": {
+      "scenario": "14. Rich first answer",
+      "ceiling": 15,
+      "total_questions_asked": 1,
+      "sufficiency_turn": 1,
+      "safety_turn": 1,
+      "max_q_reached": false,
+      "final_reason": "Minimum Sufficient History: Information sufficient for Headache presentation: duration, lateralization, and photophobia characterized.",
+      "remaining_viable_count": 17,
+      "remaining_viable_candidates": [
+        {
+          "field": "food_exposure",
+          "score": 115,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_onset",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "dark_stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_frequency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_consistency",
+          "score": 65,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "hydration_status",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 150,
+          "viable_count": 18,
+          "patient_reply": "Everything else was described in my first answer.",
+          "top_candidates": [
+            {
+              "field": "hydration_status",
+              "score": 150,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "food_exposure",
+              "score": 115,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_onset",
+              "score": 65,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    },
+    "15. Minimal/vague first answer": {
+      "scenario": "15. Minimal/vague first answer",
+      "ceiling": 15,
+      "total_questions_asked": 3,
+      "sufficiency_turn": null,
+      "safety_turn": null,
+      "max_q_reached": false,
+      "final_reason": "No meaningful clinical information progress detected for 2 turns. Stopping interview.",
+      "remaining_viable_count": 17,
+      "remaining_viable_candidates": [
+        {
+          "field": "stool_frequency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "stool_consistency",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "food_exposure",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "vomiting",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        },
+        {
+          "field": "duration",
+          "score": 85,
+          "mode": "TARGETED_FOLLOW_UP",
+          "domain": "GASTROINTESTINAL"
+        }
+      ],
+      "log": [
+        {
+          "turn": 1,
+          "target_field": "open_general_exploration",
+          "reasoning_mode": "OPEN_EXPLORATION",
+          "score": 150,
+          "viable_count": 7,
+          "patient_reply": "Pain in my stomach, nothing else.",
+          "top_candidates": [
+            {
+              "field": "open_general_exploration",
+              "score": 150,
+              "mode": "OPEN_EXPLORATION"
+            },
+            {
+              "field": "duration",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "target_field": "dark_stool_onset",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 19,
+          "patient_reply": "No, just that.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_onset",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "target_field": "dark_stool_consistency",
+          "reasoning_mode": "TARGETED_FOLLOW_UP",
+          "score": 85,
+          "viable_count": 18,
+          "patient_reply": "No, just that.",
+          "top_candidates": [
+            {
+              "field": "dark_stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "stool_frequency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            },
+            {
+              "field": "stool_consistency",
+              "score": 85,
+              "mode": "TARGETED_FOLLOW_UP"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { patientApi } from '../services/patientApi';
+import { patientApi } from '../services/patientApi.ts';
 
 export const PATIENT_LANG_KEY = 'sv_selected_language';
 export const PATIENT_LANG_CODE_KEY = 'sv_selected_lang_code';
@@ -22,6 +22,8 @@ export function setStoredLanguage(lang: string) {
   });
 }
 
+export const PATIENT_WORKFLOW_KEY = 'sv_selected_workflow';
+
 export function getStoredMode(): 'voice' | 'text' {
   const m = localStorage.getItem(PATIENT_MODE_KEY);
   return m === 'text' ? 'text' : 'voice';
@@ -29,6 +31,32 @@ export function getStoredMode(): 'voice' | 'text' {
 
 export function setStoredMode(mode: 'voice' | 'text') {
   localStorage.setItem(PATIENT_MODE_KEY, mode);
+}
+
+export function getStoredWorkflow(): 'GENERAL_CLINICAL' | 'AYUSH' {
+  if (typeof window !== 'undefined' && window.location) {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const track = params.get('track') || params.get('workflow');
+      if (track) {
+        const normalized = track.toUpperCase();
+        if (normalized === 'AYUSH') {
+          return 'AYUSH';
+        }
+        if (normalized === 'GENERAL_CLINICAL' || normalized === 'GENERAL') {
+          return 'GENERAL_CLINICAL';
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  const wf = localStorage.getItem(PATIENT_WORKFLOW_KEY);
+  return wf === 'AYUSH' ? 'AYUSH' : 'GENERAL_CLINICAL';
+}
+
+export function setStoredWorkflow(workflow: 'GENERAL_CLINICAL' | 'AYUSH') {
+  localStorage.setItem(PATIENT_WORKFLOW_KEY, workflow);
 }
 
 export const INTAKE_LANGUAGES = [

@@ -55,8 +55,10 @@ async def test_voice_transcript_integrity_mocked_sarvam():
 
 
 @pytest.mark.asyncio
-async def test_voice_transcript_integrity_fallback_on_sarvam_failure(caplog):
-    """Verify that when Sarvam fails (e.g. 400), it logs warning and falls back safely."""
+async def test_voice_transcript_integrity_failure_on_sarvam_error(caplog):
+    """Verify that when Sarvam fails (e.g. 400), it logs error and raises SpeechProviderError without manufacturing fake clinical data."""
+    from app.services.providers.speech_provider import SpeechProviderError
+
     provider = SarvamSpeechProvider(api_key="valid_key")
 
     async def mock_failure(url, headers=None, files=None, data=None):
@@ -66,9 +68,8 @@ async def test_voice_transcript_integrity_fallback_on_sarvam_failure(caplog):
         )
 
     with patch("httpx.AsyncClient.post", new=AsyncMock(side_effect=mock_failure)):
-        res = await provider.transcribe_audio(b"audio_bytes", language_code="en")
-        # Falls back to MockSpeechProvider
-        assert res.provider_name == "MockSpeechProvider"
+        with pytest.raises(SpeechProviderError):
+            await provider.transcribe_audio(b"audio_bytes", language_code="en")
         assert any("Sarvam ASR call failed with status 400" in record.message for record in caplog.records)
 
 

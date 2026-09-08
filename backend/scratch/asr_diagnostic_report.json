@@ -1,0 +1,278 @@
+{
+  "summary": {
+    "total_trials": 24,
+    "exact_match_rate": 100.0,
+    "semantic_match_rate": 100.0,
+    "failure_rate": 0.0,
+    "average_latency": 0.924267053604126,
+    "dangerous_substitutions_count": 0
+  },
+  "dangerous_substitutions": [],
+  "bad_transcriptions": [],
+  "results": [
+    {
+      "spoken_sentence": "I have stomach pain.",
+      "trial": 1,
+      "transcript": "I have stomach pain",
+      "http_status": 200,
+      "latency": 0.6430668830871582,
+      "audio_bytes_len": 52728,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have stomach pain.",
+      "trial": 2,
+      "transcript": "I have stomach pain",
+      "http_status": 200,
+      "latency": 1.1407642364501953,
+      "audio_bytes_len": 52728,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have stomach pain.",
+      "trial": 3,
+      "transcript": "I have stomach pain",
+      "http_status": 200,
+      "latency": 0.8612008094787598,
+      "audio_bytes_len": 52728,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I am vomiting.",
+      "trial": 1,
+      "transcript": "I am vomiting",
+      "http_status": 200,
+      "latency": 0.6933903694152832,
+      "audio_bytes_len": 48966,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I am vomiting.",
+      "trial": 2,
+      "transcript": "I am vomiting",
+      "http_status": 200,
+      "latency": 0.741316556930542,
+      "audio_bytes_len": 48966,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I am vomiting.",
+      "trial": 3,
+      "transcript": "I am vomiting",
+      "http_status": 200,
+      "latency": 0.47394585609436035,
+      "audio_bytes_len": 48966,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have shortness of breath.",
+      "trial": 1,
+      "transcript": "I have shortness of breath.",
+      "http_status": 200,
+      "latency": 0.8861992359161377,
+      "audio_bytes_len": 71544,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have shortness of breath.",
+      "trial": 2,
+      "transcript": "I have shortness of breath.",
+      "http_status": 200,
+      "latency": 1.7083158493041992,
+      "audio_bytes_len": 71544,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have shortness of breath.",
+      "trial": 3,
+      "transcript": "I have shortness of breath.",
+      "http_status": 200,
+      "latency": 0.560452938079834,
+      "audio_bytes_len": 71544,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "My right knee hurts.",
+      "trial": 1,
+      "transcript": "My right knee hurts",
+      "http_status": 200,
+      "latency": 0.5738368034362793,
+      "audio_bytes_len": 60256,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "My right knee hurts.",
+      "trial": 2,
+      "transcript": "My right knee hurts",
+      "http_status": 200,
+      "latency": 0.8317439556121826,
+      "audio_bytes_len": 60256,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "My right knee hurts.",
+      "trial": 3,
+      "transcript": "My right knee hurts",
+      "http_status": 200,
+      "latency": 1.1402194499969482,
+      "audio_bytes_len": 60256,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have had this pain for three days.",
+      "trial": 1,
+      "transcript": "I have had this pain for three days.",
+      "http_status": 200,
+      "latency": 0.729313850402832,
+      "audio_bytes_len": 94124,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have had this pain for three days.",
+      "trial": 2,
+      "transcript": "I have had this pain for three days.",
+      "http_status": 200,
+      "latency": 0.7868368625640869,
+      "audio_bytes_len": 94124,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have had this pain for three days.",
+      "trial": 3,
+      "transcript": "I have had this pain for three days.",
+      "http_status": 200,
+      "latency": 0.7676031589508057,
+      "audio_bytes_len": 94124,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have not been vomiting.",
+      "trial": 1,
+      "transcript": "I have not been vomiting",
+      "http_status": 200,
+      "latency": 0.9789731502532959,
+      "audio_bytes_len": 71544,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have not been vomiting.",
+      "trial": 2,
+      "transcript": "I have not been vomiting",
+      "http_status": 200,
+      "latency": 0.7407584190368652,
+      "audio_bytes_len": 71544,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have not been vomiting.",
+      "trial": 3,
+      "transcript": "I have not been vomiting",
+      "http_status": 200,
+      "latency": 0.9005672931671143,
+      "audio_bytes_len": 71544,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I don't know.",
+      "trial": 1,
+      "transcript": "I don't know",
+      "http_status": 200,
+      "latency": 1.0100626945495605,
+      "audio_bytes_len": 37676,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I don't know.",
+      "trial": 2,
+      "transcript": "I don't know",
+      "http_status": 200,
+      "latency": 1.063701868057251,
+      "audio_bytes_len": 37676,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I don't know.",
+      "trial": 3,
+      "transcript": "I don't know",
+      "http_status": 200,
+      "latency": 2.144594192504883,
+      "audio_bytes_len": 37676,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have eaten street food.",
+      "trial": 1,
+      "transcript": "I have eaten street food",
+      "http_status": 200,
+      "latency": 0.9386487007141113,
+      "audio_bytes_len": 67782,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have eaten street food.",
+      "trial": 2,
+      "transcript": "I have eaten street food",
+      "http_status": 200,
+      "latency": 1.1201977729797363,
+      "audio_bytes_len": 67782,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    },
+    {
+      "spoken_sentence": "I have eaten street food.",
+      "trial": 3,
+      "transcript": "I have eaten street food",
+      "http_status": 200,
+      "latency": 0.7466983795166016,
+      "audio_bytes_len": 67782,
+      "model": "saaras:v3",
+      "detected_lang": "en-IN",
+      "error": null
+    }
+  ]
+}

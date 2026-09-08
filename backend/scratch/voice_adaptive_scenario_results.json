@@ -1,0 +1,41 @@
+{
+  "test_a": {
+    "status": "PASSED",
+    "intake_id": "30ac05f8-cdca-413d-8664-e835151a0340",
+    "transcript": "\u092e\u0941\u091d\u0947 \u092a\u0947\u091f \u092e\u0947\u0902 \u0926\u0930\u094d\u0926 \u0939\u094b \u0930\u0939\u093e \u0939\u0948",
+    "next_q": "\u0915\u094d\u092f\u093e \u0906\u092a\u0915\u094b \u092a\u0947\u091f \u092b\u0942\u0932\u0928\u093e, \u0917\u0948\u0938 \u092f\u093e \u0905\u092a\u091a\u0928 \u091c\u0948\u0938\u0940 \u0938\u092e\u0938\u094d\u092f\u093e \u092d\u0940 \u0939\u094b \u0930\u0939\u0940 \u0939\u0948?",
+    "target_field": "open_gi_exploration"
+  },
+  "test_b": {
+    "status": "PASSED",
+    "vomiting_status": "KNOWN_TRUE",
+    "duration": "2 \u0926\u093f\u0928",
+    "next_field": "hydration_status"
+  },
+  "test_c": {
+    "status": "PASSED",
+    "marathi_vomiting_status": "KNOWN_FALSE",
+    "negated_symptoms": [
+      "\u0909\u0932\u091f\u0940",
+      "vomiting"
+    ]
+  },
+  "test_d": {
+    "status": "PASSED",
+    "error_raised": true,
+    "endpoint_status": 502,
+    "no_fake_transcript": true
+  },
+  "test_e": {
+    "status": "PASSED",
+    "session_id": "d4313828-2ca7-4eb9-bc37-cc8ea477525f",
+    "turns": 3,
+    "accumulated_correctly": true
+  },
+  "test_f": {
+    "status": "PASSED",
+    "new_session_id": "2d688939-104e-4ce8-8301-4c1a2743c06f",
+    "isolated": true,
+    "zero_cardiac_leakage": true
+  }
+}

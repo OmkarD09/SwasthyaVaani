@@ -352,7 +352,9 @@ chief_complaint (string or null), onset (string or null), duration (string or nu
 associated_symptoms (array of strings: positive accompanying symptoms),
 negated_symptoms (array of strings: symptoms explicitly DENIED, ABSENT, or stated as NO like 'not vomiting', 'no fever', 'no pain', 'उलटी नाही', 'उल्टी नहीं'),
 is_non_informative (boolean: true if patient reply is vague, confused, non-informative, or expressing uncertainty like 'idk', 'I don't know', 'what?', 'pata nahi', 'samajh nahi aaya', 'not sure', 'leave it', 'skip', otherwise false),
-agni (string or null: Manda, Tikshna, Vishama, Sama), koshtha (string or null: Mridu, Krura, Madhyam), ahara_vihara (string or null),
+agni (string or null: Manda if low appetite/sluggish digestion/heaviness after food/भूख कम लगना, Tikshna if excessive/sharp hunger, Vishama if irregular/unpredictable, Sama if balanced/normal),
+koshtha (string or null: Krura if constipation/hard stool/कब्ज/सख्त शौच, Mridu if loose/soft stool, Madhyam if regular/normal),
+ahara_vihara (string or null: dietary habits like oily/spicy/street food, meal routines, sleep schedule, and lifestyle factors),
 sara (string or null), samhanana (string or null), pramana (string or null), satmya (string or null),
 sattva (string or null: Pravara, Madhyama, Avara), ahara_shakti (string or null), vyayama_shakti (string or null), vaya (string or null: Bala, Madhya, Vriddha).
 
@@ -360,7 +362,7 @@ CLINICAL SAFETY RULES:
 1. NEVER output diagnoses or prescriptions.
 2. Extract ONLY factual symptom characteristics and patient-reported AYUSH dimensions.
 3. If a field was not mentioned by patient, return null.
-4. Fully support Indic expressions (e.g., 'chhati mein dard', 'chakkar', 'tez bukhar', 'jalan', 'saans phulna', 'agnimandya', 'koshtha', 'kamzori', 'bhookh').
+4. Fully support Indic expressions (e.g., 'chhati mein dard', 'chakkar', 'tez bukhar', 'jalan', 'saans phulna', 'agnimandya', 'koshtha', 'kamzori', 'bhookh', 'pachan', 'kabz', 'saucha').
 5. If the patient expresses confusion, uncertainty, or lack of knowledge ('idk', 'not sure', 'what?', 'samajh nahi aaya', 'pata nahi'), set is_non_informative: true.
 6. If a symptom is explicitly denied, absent, or negated ('no vomiting', 'I am not vomiting', 'no fever', 'nahi hai', 'nahi', 'उलटी नाही', 'उल्टी नहीं'), place it in negated_symptoms, NEVER in associated_symptoms.
 Output ONLY valid JSON."""
@@ -511,9 +513,14 @@ RULES:
 1. NEVER output diagnoses or prescriptions.
 2. Extract only factual symptom characteristics (SOCRATES framework & AYUSH metrics).
 3. If a field is not mentioned, leave it null.
-4. Support both English and Indic language terms (e.g., 'chhati mein dard', 'sir dard', 'tez bukhar', 'chakkar', 'jalan', 'saans phulna', 'agnimandya', 'koshtha').
-5. If the patient reply is non-informative, confused, or expressing uncertainty (e.g., 'idk', 'I don't know', 'what?', 'pata nahi', 'samajh nahi aaya', 'not sure'), set is_non_informative to true.
-6. If a symptom is explicitly denied, absent, or negated ('no vomiting', 'I am not vomiting', 'no fever', 'nahi hai', 'nahi', 'उलटी नाही', 'उल्टी नहीं'), place it in negated_symptoms, NEVER in associated_symptoms.
+4. Support both English and Indic language terms (e.g., 'chhati mein dard', 'sir dard', 'tez bukhar', 'chakkar', 'jalan', 'saans phulna', 'agnimandya', 'koshtha', 'bhookh', 'pachan', 'kabz').
+5. AYUSH field mappings:
+   - agni: 'Manda' if low appetite/sluggish digestion/heaviness after food/भूख कम लगना, 'Tikshna' if sharp/excess hunger, 'Vishama' if irregular, 'Sama' if balanced/normal.
+   - koshtha: 'Krura' if constipation/hard stool/कब्ज/सख्त शौच, 'Mridu' if loose/soft stool, 'Madhyam' if regular/normal.
+   - ahara_vihara: concise summary of diet (oily/spicy/fast food), meal timing, sleep routine, and lifestyle.
+   - Dashavidha (sara, samhanana, pramana, satmya, sattva, ahara_shakti, vyayama_shakti): extract ONLY if patient explicitly described them.
+6. If the patient reply is non-informative, confused, or expressing uncertainty (e.g., 'idk', 'I don't know', 'what?', 'pata nahi', 'samajh nahi aaya', 'not sure'), set is_non_informative to true.
+7. If a symptom is explicitly denied, absent, or negated ('no vomiting', 'I am not vomiting', 'no fever', 'nahi hai', 'nahi', 'उलटी नाही', 'उल्टी नहीं'), place it in negated_symptoms, NEVER in associated_symptoms.
 
 Target Field Being Answered: {target_field}
 Current State Summary: {current_state}

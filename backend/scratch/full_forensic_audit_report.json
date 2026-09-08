@@ -1,0 +1,258 @@
+{
+  "part_2_parity": [
+    {
+      "case": "1. Abdominal pain",
+      "domain": "GASTROINTESTINAL",
+      "text_target": "open_gi_exploration",
+      "voice_target": "open_gi_exploration",
+      "text_action": "ASK",
+      "voice_action": "ASK",
+      "parity": "EXACT",
+      "divergence": []
+    },
+    {
+      "case": "2. Headache",
+      "domain": "HEADACHE",
+      "text_target": "nausea_vomiting",
+      "voice_target": "nausea_vomiting",
+      "text_action": "ASK",
+      "voice_action": "ASK",
+      "parity": "EXACT",
+      "divergence": []
+    },
+    {
+      "case": "3. Leg pain",
+      "domain": "MUSCULOSKELETAL",
+      "text_target": "open_msk_exploration",
+      "voice_target": "open_msk_exploration",
+      "text_action": "ASK",
+      "voice_action": "ASK",
+      "parity": "EXACT",
+      "divergence": []
+    },
+    {
+      "case": "4. Cough",
+      "domain": "RESPIRATORY",
+      "text_target": "open_respiratory_exploration",
+      "voice_target": "open_respiratory_exploration",
+      "text_action": "ASK",
+      "voice_action": "ASK",
+      "parity": "EXACT",
+      "divergence": []
+    },
+    {
+      "case": "5. Chest pain",
+      "domain": "CARDIAC",
+      "text_target": "sweating_diaphoresis",
+      "voice_target": "sweating_diaphoresis",
+      "text_action": "ASK",
+      "voice_action": "ASK",
+      "parity": "EXACT",
+      "divergence": []
+    }
+  ],
+  "part_3_smart_memory": {
+    "Test A (Positive Vomiting)": {
+      "vomiting_score_before": 85,
+      "vomiting_score_after": -415,
+      "hydration_score_after": 170,
+      "vomiting_is_disqualified": true,
+      "hydration_is_boosted": true
+    },
+    "Test B (Negated Vomiting)": {
+      "vomiting_canonical": "KNOWN_FALSE",
+      "vomiting_score": -415,
+      "hydration_score": 85,
+      "vomiting_penalized": true,
+      "hydration_not_boosted": true
+    },
+    "Test C (Ambiguous Vomiting)": {
+      "vomit_status": "UNKNOWN / NONE",
+      "not_forced_true_or_false": true
+    },
+    "Test D (Volunteered Melena Finding)": {
+      "dark_stool_detected": true,
+      "dark_stool_onset_score": 265,
+      "safety_required": true
+    },
+    "Test E (Specific Location Refinement)": {
+      "initial_location": null,
+      "refined_location": null,
+      "refined_correctly": false
+    }
+  },
+  "part_6_non_informative": [
+    {
+      "language": "English",
+      "phrase": "idk",
+      "is_non_informative": true,
+      "has_progress": false,
+      "last_response_stored": true
+    },
+    {
+      "language": "English",
+      "phrase": "I don't know",
+      "is_non_informative": true,
+      "has_progress": false,
+      "last_response_stored": true
+    },
+    {
+      "language": "English",
+      "phrase": "I'm not sure",
+      "is_non_informative": false,
+      "has_progress": false,
+      "last_response_stored": false
+    },
+    {
+      "language": "Hindi",
+      "phrase": "\u092a\u0924\u093e \u0928\u0939\u0940\u0902",
+      "is_non_informative": false,
+      "has_progress": false,
+      "last_response_stored": false
+    },
+    {
+      "language": "Hindi",
+      "phrase": "\u092e\u0941\u091d\u0947 \u0938\u092e\u091d \u0928\u0939\u0940\u0902 \u0906\u092f\u093e",
+      "is_non_informative": false,
+      "has_progress": false,
+      "last_response_stored": false
+    },
+    {
+      "language": "Hindi",
+      "phrase": "\u092e\u0941\u091d\u0947 \u0928\u0939\u0940\u0902 \u092a\u0924\u093e",
+      "is_non_informative": false,
+      "has_progress": false,
+      "last_response_stored": false
+    },
+    {
+      "language": "Marathi",
+      "phrase": "\u092e\u0932\u093e \u092e\u093e\u0939\u093f\u0924 \u0928\u093e\u0939\u0940",
+      "is_non_informative": false,
+      "has_progress": false,
+      "last_response_stored": false
+    },
+    {
+      "language": "Marathi",
+      "phrase": "\u092e\u0932\u093e \u0915\u0933\u0932\u0902 \u0928\u093e\u0939\u0940",
+      "is_non_informative": false,
+      "has_progress": false,
+      "last_response_stored": false
+    },
+    {
+      "language": "Marathi",
+      "phrase": "\u0938\u092e\u091c\u0932\u0902 \u0928\u093e\u0939\u0940",
+      "is_non_informative": false,
+      "has_progress": false,
+      "last_response_stored": false
+    }
+  ],
+  "part_7_negation": [
+    {
+      "test": "English Positive",
+      "phrase": "I am vomiting",
+      "expected": "KNOWN_TRUE",
+      "actual": "KNOWN_TRUE",
+      "match": true
+    },
+    {
+      "test": "English Negative",
+      "phrase": "I am not vomiting",
+      "expected": "KNOWN_FALSE",
+      "actual": "KNOWN_FALSE",
+      "match": true
+    },
+    {
+      "test": "Hindi Positive",
+      "phrase": "\u092e\u0941\u091d\u0947 \u0909\u0932\u094d\u091f\u0940 \u0939\u094b \u0930\u0939\u0940 \u0939\u0948",
+      "expected": "KNOWN_TRUE",
+      "actual": "KNOWN_TRUE",
+      "match": true
+    },
+    {
+      "test": "Hindi Negative",
+      "phrase": "\u092e\u0941\u091d\u0947 \u0909\u0932\u094d\u091f\u0940 \u0928\u0939\u0940\u0902 \u0939\u094b \u0930\u0939\u0940 \u0939\u0948",
+      "expected": "KNOWN_FALSE",
+      "actual": "KNOWN_FALSE",
+      "match": true
+    },
+    {
+      "test": "Marathi Positive",
+      "phrase": "\u0909\u0932\u091f\u0940 \u092f\u0947\u0924 \u0906\u0939\u0947",
+      "expected": "KNOWN_TRUE",
+      "actual": "KNOWN_TRUE",
+      "match": true
+    },
+    {
+      "test": "Marathi Negative",
+      "phrase": "\u0909\u0932\u091f\u0940 \u0939\u094b\u0924 \u0928\u093e\u0939\u0940",
+      "expected": "KNOWN_FALSE",
+      "actual": "KNOWN_TRUE",
+      "match": false
+    }
+  ],
+  "part_8_cross_language": {
+    "vomiting_remembered": "KNOWN_TRUE",
+    "hydration_remembered": true,
+    "total_transcript_snippets": 3,
+    "coherent": true
+  },
+  "part_10_session_isolation": {
+    "session_a_id": "cbf48847-87d3-4309-a618-2675465b6d2d",
+    "session_b_id": "6d55da18-1f77-45b2-80cb-5c8ffa8cda01",
+    "session_b_chief_complaint": "Right knee swelling and pain",
+    "isolation_passed": true,
+    "leakage_detected": []
+  },
+  "part_11_12_speech": {
+    "mock_asr_works": true,
+    "sarvam_handles_invalid_gracefully": false,
+    "tts_does_not_crash_on_failure": true
+  },
+  "part_13_safety": {
+    "chest_pain_red_flag": true,
+    "severe_pain_red_flag": true,
+    "fever_dyspnea_red_flag": false,
+    "melena_red_flag": false
+  },
+  "part_16_ayush": {
+    "domain_is_ayush": true,
+    "top_fields": [
+      "open_ayush_exploration",
+      "open_gi_exploration",
+      "agni",
+      "koshtha",
+      "ahara_vihara"
+    ],
+    "agni_in_top": true,
+    "cardiac_penalized": false
+  },
+  "part_18_db_integrity": [
+    {
+      "session_id": "6d55da18-1f77-45b2-80cb-5c8ffa8cda01",
+      "status": "ACTIVE",
+      "mode": "TEXT",
+      "answers_count": 0,
+      "questions_count": 0,
+      "states_versions": 1,
+      "coherent": true
+    },
+    {
+      "session_id": "cbf48847-87d3-4309-a618-2675465b6d2d",
+      "status": "ACTIVE",
+      "mode": "TEXT",
+      "answers_count": 1,
+      "questions_count": 1,
+      "states_versions": 2,
+      "coherent": true
+    },
+    {
+      "session_id": "86d5015f-7d17-415f-8e74-e35348cdb695",
+      "status": "SUBMITTED",
+      "mode": "TEXT",
+      "answers_count": 13,
+      "questions_count": 13,
+      "states_versions": 1,
+      "coherent": true
+    }
+  ]
+}
