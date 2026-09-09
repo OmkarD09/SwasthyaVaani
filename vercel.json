@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "https://swasthyavaani-g66q.onrender.com/api/:path*"
+        }
+    ]
+}
