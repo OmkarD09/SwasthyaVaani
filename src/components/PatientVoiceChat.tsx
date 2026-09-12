@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { recordIntakeAnswer } from '../lib/conversationStore';
 import { getStoredPatientProfile } from '../services/patientApi';
-import { getStoredWorkflow } from '../lib/kioskState';
+import { getStoredDepartment, getStoredWorkflow } from '../lib/kioskState';
 
 const INITIAL_INTAKE_GREETING: Record<string, string> = {
   English: 'Hello! I am SwasthyaVaani, your AI health assistant. What main symptom or health concern brings you in today?',
@@ -193,6 +193,7 @@ export function PatientVoiceChat({
             abha_address: abhaAddressToSend,
             language_code: langCode,
             workflow_type: getStoredWorkflow(),
+            department_code: getStoredDepartment(),
             interaction_mode: 'VOICE',
             consent_given: true,
           }),

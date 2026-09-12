@@ -21,6 +21,10 @@ export type DoctorQueueItem = {
   review_status?: string;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
+  department_id?: string | null;
+  department_code?: string | null;
+  department_name?: string | null;
+  ayush_opd_tag?: string | null;
 };
 
 export type PatientDetail = {
@@ -46,6 +50,10 @@ export type PatientDetail = {
   review_status: 'AI_DRAFT' | 'NEEDS_VERIFICATION' | 'PHYSICIAN_CONFIRMED' | 'REVIEWED' | 'PENDING_REVIEW';
   reviewed_by?: string | null;
   reviewed_at?: string | null;
+  department_id?: string | null;
+  department_code?: string | null;
+  department_name?: string | null;
+  ayush_opd_tag?: string | null;
   clinical_state: {
     chief_complaint?: string;
     symptoms?: string[];

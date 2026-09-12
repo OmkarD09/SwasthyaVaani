@@ -15,7 +15,7 @@ import { getStoredLanguage } from '../lib/kioskState';
 import { clearConversationStore } from '../lib/conversationStore';
 import { hasValidConsent } from '../lib/consentStore';
 
-import { patientApi, type PatientProfileData } from '../services/patientApi';
+import { patientApi, type PatientProfileData, BLANK_PATIENT_PROFILE } from '../services/patientApi';
 import {
   KioskProgressSidebar,
   KioskTopProgressBar,
@@ -25,14 +25,7 @@ import { PatientFlowTransition } from '../components/patient/PatientFlowTransiti
 export function PatientDetails() {
   const [, setLocation] = useLocation();
   const [language, setLanguage] = useState(getStoredLanguage);
-  const [patientData, setPatientData] = useState<PatientProfileData>({
-    name: 'Ananya Sharma',
-    age: '34',
-    gender: 'Female',
-    abhaNumber: '91-4521-8890-1234',
-    phone: '9876543210',
-    preferredLanguage: 'en',
-  });
+  const [patientData, setPatientData] = useState<PatientProfileData>({ ...BLANK_PATIENT_PROFILE });
   const [profileErrors, setProfileErrors] = useState<{ name?: string; age?: string }>({});
   const [savedNotice, setSavedNotice] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
@@ -116,7 +109,7 @@ export function PatientDetails() {
     setSavedNotice(true);
 
     setTimeout(() => {
-      setLocation('/patient/mode');
+      setLocation('/patient/department');
     }, 300);
   };
 

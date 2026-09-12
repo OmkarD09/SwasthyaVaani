@@ -3,7 +3,7 @@ import { Send, Bot, User, ArrowRight, Mic, CheckCircle2, RotateCcw, Sparkles } f
 import { getKioskTranslation } from '../lib/kioskTranslations';
 import { recordIntakeAnswer } from '../lib/conversationStore';
 import { getStoredPatientProfile } from '../services/patientApi';
-import { getStoredWorkflow } from '../lib/kioskState';
+import { getStoredDepartment, getStoredWorkflow } from '../lib/kioskState';
 
 export interface ChatMessage {
   id: string;
@@ -241,6 +241,7 @@ export function PatientTextChat({
             abha_address: abhaAddressToSend,
             language_code: langCode,
             workflow_type: getStoredWorkflow(),
+            department_code: getStoredDepartment(),
             interaction_mode: 'TEXT',
             consent_given: true,
           }),

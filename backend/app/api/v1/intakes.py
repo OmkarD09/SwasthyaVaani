@@ -15,8 +15,9 @@ from app.core.database import get_db
 from app.core.events import ws_manager
 from app.models.ayush import AyushAssessmentModel
 from app.models.intake import Answer, ClinicalStateModel, IntakeSession, QuestionEvent
+from app.models.review import AuditEventModel
 from app.models.safety import RedFlagModel
-from app.models.user import Patient
+from app.models.user import Department, Doctor, Hospital, Patient
 from app.schemas.ayush import (
     AyushAssessment,
     AyushAssessmentStatus,
@@ -29,12 +30,23 @@ from app.schemas.clinical_state import ClinicalState
 from app.schemas.intake import (
     AnswerSubmitRequest,
     AnswerSubmitResponse,
+    IntakeAbortRequest,
+    IntakeAbortResponse,
     IntakeCreateRequest,
     IntakeSessionDetail,
     IntakeSubmissionResponse,
     VoiceAnswerSubmitResponse,
 )
 from app.services.clinical_ai.adaptive_engine import evaluate_next_question
+from app.services.clinical_ai.department_router import (
+    DEPARTMENT_METADATA,
+    CODE_ALIASES,
+    DEPT_EMERGENCY,
+    DEPT_GEN_MED,
+    normalize_department_code,
+    resolve_department_route,
+)
+from app.services.clinical_ai.domain_classifier import classify_clinical_domains
 from app.services.patient_id import generate_next_patient_display_id
 from app.services.providers.factory import get_llm_service, get_speech_service
 from app.core.datetime_utils import ensure_utc_iso
@@ -75,6 +87,91 @@ def normalize_phone(val: str | None) -> str | None:
         return digits[1:]
     cleaned = str(val).strip()
     return cleaned if cleaned else None
+
+
+def get_on_duty_doctor_for_dept(
+    db: Session,
+    department_code_or_id: str | None,
+    hospital_id: str = "hosp_district_01",
+) -> tuple[Department, Doctor]:
+    """
+    Selects an active Department and assigned active Doctor matching
+    department_code_or_id, falling back cleanly if none are assigned.
+    """
+    hosp = db.query(Hospital).filter(Hospital.id == hospital_id).first() or db.query(Hospital).first()
+    hosp_id = hosp.id if hosp else hospital_id
+
+    canonical_code = normalize_department_code(department_code_or_id) if department_code_or_id else DEPT_GEN_MED
+
+    # 1. Match Department by ID, canonical code, or alias
+    dept = db.query(Department).filter(
+        or_(
+            Department.id == department_code_or_id,
+            Department.code == canonical_code,
+            Department.code == department_code_or_id,
+        ),
+        Department.is_active == True,
+    ).first()
+
+    if not dept:
+        for alias, can_code in CODE_ALIASES.items():
+            if can_code == canonical_code:
+                dept = db.query(Department).filter(Department.code == alias, Department.is_active == True).first()
+                if dept:
+                    break
+
+    if not dept:
+        dept = db.query(Department).filter(
+            or_(
+                Department.code == DEPT_GEN_MED,
+                Department.code == "GEN-OPD",
+            ),
+            Department.is_active == True,
+        ).first()
+
+    if not dept:
+        dept = db.query(Department).filter(Department.is_active == True).first()
+
+    if not dept:
+        meta = DEPARTMENT_METADATA.get(canonical_code, DEPARTMENT_METADATA[DEPT_GEN_MED])
+        dept = Department(
+            id=f"dept_{canonical_code.lower().replace('dept_', '')}_01",
+            hospital_id=hosp_id,
+            name=meta["name_en"],
+            code=canonical_code,
+            is_active=True,
+        )
+        db.add(dept)
+        db.flush()
+
+    # 2. Select an active doctor assigned to this department
+    doctor = db.query(Doctor).filter(
+        Doctor.department_id == dept.id,
+        Doctor.is_active == True,
+    ).first()
+
+    if not doctor:
+        doctor = db.query(Doctor).filter(
+            Doctor.hospital_id == hosp_id,
+            Doctor.is_active == True,
+        ).first()
+
+    if not doctor:
+        doctor = db.query(Doctor).filter(Doctor.id == "doc_001").first() or db.query(Doctor).first()
+
+    if not doctor:
+        doctor = Doctor(
+            id="doc_001",
+            hospital_id=hosp_id,
+            department_id=dept.id,
+            display_name="Dr. Ananya Rao",
+            specialization="General Medicine",
+            is_active=True,
+        )
+        db.add(doctor)
+        db.flush()
+
+    return dept, doctor
 
 
 @router.post("", response_model=IntakeSessionDetail)
@@ -155,16 +252,24 @@ async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(
 
     resolved_age = patient.age if (patient and patient.age is not None) else req.patient_age
 
+    # Resolve Department and on-duty Doctor
+    dept, assigned_doctor = get_on_duty_doctor_for_dept(
+        db,
+        req.department_code,
+        req.hospital_id,
+    )
+
     token = generate_token()
     session = IntakeSession(
         id=str(uuid.uuid4()),
         token=token,
         patient_id=patient.id,
         hospital_id=req.hospital_id,
-        doctor_id=req.doctor_id,
+        doctor_id=assigned_doctor.id,
+        department_id=dept.id,
         workflow_type=req.workflow_type,
-        language_code=req.language_code,
         interaction_mode=req.interaction_mode,
+        language_code=req.language_code,
         status="SUBMITTED" if req.submit_now else "ACTIVE",
         submitted_at=datetime.now(timezone.utc) if req.submit_now else None,
         question_count=0,
@@ -328,6 +433,8 @@ async def create_intake_session(req: IntakeCreateRequest, db: Session = Depends(
         consent_recorded=bool(patient.consent_recorded),
         hospital_id=session.hospital_id,
         doctor_id=session.doctor_id,
+        department_id=session.department_id,
+        department_code=dept.code if dept else None,
         workflow_type=session.workflow_type,
         language_code=session.language_code,
         interaction_mode=session.interaction_mode,
@@ -358,6 +465,8 @@ def get_intake_session(intake_id: str, db: Session = Depends(get_db)):
         **(latest_state_model.state_json if latest_state_model else {})
     )
 
+    dept = db.query(Department).filter(Department.id == session.department_id).first() if session.department_id else None
+
     return IntakeSessionDetail(
         id=session.id,
         token=session.token,
@@ -375,6 +484,8 @@ def get_intake_session(intake_id: str, db: Session = Depends(get_db)):
         consent_recorded=bool(patient.consent_recorded) if patient else False,
         hospital_id=session.hospital_id,
         doctor_id=session.doctor_id,
+        department_id=session.department_id,
+        department_code=dept.code if dept else None,
         workflow_type=session.workflow_type,
         language_code=session.language_code,
         interaction_mode=session.interaction_mode,
@@ -875,6 +986,8 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
         raise HTTPException(status_code=404, detail="Intake session not found")
 
     patient = db.query(Patient).filter(Patient.id == session.patient_id).first()
+    current_dept = db.query(Department).filter(Department.id == session.department_id).first() if session.department_id else None
+
     if session.status == "SUBMITTED" and session.submitted_at:
         if patient and not patient.display_id:
             patient.display_id = generate_next_patient_display_id(db)
@@ -887,6 +1000,8 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
             patient_display_id=patient.display_id if patient else None,
             display_id=patient.display_id if patient else None,
             doctor_id=session.doctor_id,
+            department_id=session.department_id,
+            department_code=current_dept.code if current_dept else None,
             submitted_at=session.submitted_at,
             message="Patient intake successfully submitted to clinician queue.",
         )
@@ -905,14 +1020,19 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
         .first()
     )
 
-    current_state = ClinicalState(
-        **(latest_state_model.state_json if latest_state_model else {})
-    )
+    raw_state_dict = latest_state_model.state_json if (latest_state_model and isinstance(latest_state_model.state_json, dict)) else {}
+    try:
+        current_state = ClinicalState(**raw_state_dict)
+    except Exception:
+        current_state = ClinicalState()
 
-    # Calculate priority level
+    # 1. Calculate priority level & red flags
     priority = "NORMAL"
-    if current_state.red_flags:
+    has_red_flags = False
+    raw_red_flags = raw_state_dict.get("red_flags", [])
+    if current_state.red_flags or raw_red_flags:
         priority = "URGENT"
+        has_red_flags = True
         for rf in current_state.red_flags:
             red_flag_entry = RedFlagModel(
                 intake_session_id=session.id,
@@ -925,6 +1045,48 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
             )
             db.add(red_flag_entry)
 
+    # 2. Department & OPD Triage Routing
+    detected_domains = classify_clinical_domains(current_state, session.workflow_type)
+    primary_domain = raw_state_dict.get("detected_domain") or (detected_domains[0] if detected_domains else None)
+    patient_age = patient.age if patient else None
+
+    current_dept_code = current_dept.code if current_dept else "AUTO"
+
+    resolved_dept_code = resolve_department_route(
+        current_department_id=current_dept_code,
+        detected_domain=primary_domain,
+        has_red_flags=has_red_flags,
+        patient_age=patient_age,
+    )
+
+    # Re-route if necessary or if unassigned
+    target_dept, target_doc = get_on_duty_doctor_for_dept(
+        db, resolved_dept_code, session.hospital_id
+    )
+
+    if not current_dept or normalize_department_code(current_dept.code) != resolved_dept_code:
+        old_dept_code = current_dept.code if current_dept else "UNASSIGNED"
+        session.department_id = target_dept.id
+        session.doctor_id = target_doc.id
+
+        audit_event = AuditEventModel(
+            actor_role="SYSTEM_TRIAGE",
+            event_type="DEPARTMENT_ROUTED",
+            resource_type="INTAKE_SESSION",
+            resource_id=session.id,
+            metadata_json={
+                "previous_department": old_dept_code,
+                "target_department": resolved_dept_code,
+                "primary_domain": primary_domain,
+                "has_red_flags": has_red_flags,
+                "assigned_doctor_id": target_doc.id,
+            },
+        )
+        db.add(audit_event)
+    elif not session.department_id:
+        session.department_id = target_dept.id
+        session.doctor_id = target_doc.id
+
     db.commit()
 
     # Broadcast to Doctor Queue via WebSocket
@@ -934,6 +1096,8 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
             "intake_session_id": session.id,
             "token": session.token,
             "priority": priority,
+            "department_id": session.department_id,
+            "department_code": resolved_dept_code,
             "submitted_at": ensure_utc_iso(session.submitted_at),
         }
     )
@@ -946,6 +1110,58 @@ async def submit_intake_for_review(intake_id: str, db: Session = Depends(get_db)
         patient_display_id=patient.display_id if patient else None,
         display_id=patient.display_id if patient else None,
         doctor_id=session.doctor_id or "doc_001",
+        department_id=session.department_id,
+        department_code=resolved_dept_code,
         submitted_at=session.submitted_at,
         message="Patient intake successfully submitted to clinician queue.",
     )
+
+
+@router.post("/{intake_id}/abort", response_model=IntakeAbortResponse)
+async def abort_intake_session(
+    intake_id: str,
+    payload: IntakeAbortRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Aborts an active or abandoned kiosk intake session.
+    Enforces Digital Personal Data Protection (DPDP) Act compliance by transitioning
+    the session status to 'ABANDONED', recording an audit event 'SESSION_PURGED_PRIVACY',
+    and preventing abandoned sessions from leaking to clinical review queues.
+    """
+    session = db.query(IntakeSession).filter(IntakeSession.id == intake_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Intake session not found")
+
+    reason = payload.reason if payload and payload.reason else "IDLE_TIMEOUT"
+    previous_status = session.status
+
+    # If the session is already submitted or completed, do not overwrite final status,
+    # but still record the privacy audit event if called.
+    if session.status not in ["SUBMITTED", "IN_REVIEW", "COMPLETED"]:
+        session.status = "ABANDONED"
+
+    # Record DPDP audit trail event
+    audit_event = AuditEventModel(
+        actor_role="PATIENT_KIOSK",
+        event_type="SESSION_PURGED_PRIVACY",
+        resource_type="intake_session",
+        resource_id=session.id,
+        metadata_json={
+            "reason": reason,
+            "previous_status": previous_status,
+            "intake_id": session.id,
+            "purged_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    db.add(audit_event)
+    db.commit()
+
+    return IntakeAbortResponse(
+        status="SESSION_PURGED",
+        intake_session_id=session.id,
+        previous_status=previous_status,
+        reason=reason,
+        purged_at=datetime.now(timezone.utc).isoformat(),
+    )
+

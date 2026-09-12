@@ -21,6 +21,7 @@ import {
 import { clearStoredDocumentUpload } from '../lib/documentUploadState';
 import { patientApi } from '../services/patientApi';
 import { PatientFlowTransition } from '../components/patient/PatientFlowTransition';
+import { purgeKioskSession } from '../lib/kioskSessionManager';
 
 interface SubmissionData {
   patientName: string;
@@ -185,29 +186,15 @@ export function PatientComplete() {
   const [isTimerPaused, setIsTimerPaused] = useState<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Clear temporary patient intake state securely from the kiosk
-  const clearTemporaryPatientState = useCallback(() => {
-    try {
-      localStorage.removeItem('swasthya_active_intake_id');
-      localStorage.removeItem('swasthya_active_patient_id');
-      localStorage.removeItem('swasthya_active_token');
-      localStorage.removeItem('swasthya_last_submission');
-      localStorage.removeItem('swasthya_chat_history');
-      localStorage.removeItem('swasthya_uploaded_doc_name');
-      clearStoredDocumentUpload();
-    } catch {
-      // ignore storage clear errors
-    }
-  }, []);
-
-  // Finish intake and return directly to Patient Welcome/Home
+  // Finish intake and return directly to Patient Welcome/Language selection with a clean slate
   const handleDone = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
-    clearTemporaryPatientState();
-    setLocation('/patient');
-  }, [clearTemporaryPatientState, setLocation]);
+    clearStoredDocumentUpload();
+    purgeKioskSession('INTAKE_COMPLETED');
+    setLocation('/patient/language');
+  }, [setLocation]);
 
   // Load latest submission from localStorage or API on mount
   useEffect(() => {

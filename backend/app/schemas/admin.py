@@ -34,6 +34,8 @@ class AdminDashboardStats(BaseModel):
     intake_volume_trend: List[StatTrend]
     critical_cases_trend: List[StatTrend]
     common_complaints: List[ComplaintFrequency]
+    modern_clinical_count: Optional[int] = 0
+    ayush_count: Optional[int] = 0
 
 
 # -------------------------------------------------------------

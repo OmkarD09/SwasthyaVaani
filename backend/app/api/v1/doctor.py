@@ -18,7 +18,11 @@ from app.models.document import (
 )
 from app.models.intake import Answer, ClinicalStateModel, IntakeSession, QuestionEvent
 from app.models.review import AuditEventModel, PhysicianEditModel, PhysicianReviewModel
-from app.models.user import Doctor, Hospital, Patient
+from app.models.user import Department, Doctor, Hospital, Patient
+from app.services.clinical_ai.department_router import (
+    DEPARTMENT_METADATA,
+    normalize_department_code,
+)
 from app.schemas.ayush import (
     AyushAssessment,
     AyushAssessmentStatus,
@@ -116,6 +120,12 @@ def get_doctor_queue(
         elif d_pat_id:
             doc_counts[d_pat_id] = doc_counts.get(d_pat_id, 0) + 1
 
+    # 5. Batch fetch departments in single query
+    dept_ids = list({s.department_id for s in sessions if s.department_id})
+    departments_map = {
+        d.id: d for d in db.query(Department).filter(Department.id.in_(dept_ids)).all()
+    } if dept_ids else {}
+
     now_utc = datetime.now(timezone.utc)
     queue_items: list[DoctorQueueItem] = []
 
@@ -136,6 +146,19 @@ def get_doctor_queue(
 
         red_flags = state_dict.get("red_flags", [])
         has_red_flags = len(red_flags) > 0
+
+        # Resolve department details
+        dept_obj = departments_map.get(s.department_id) if s.department_id else None
+        if dept_obj:
+            d_code = normalize_department_code(dept_obj.code)
+            d_meta = DEPARTMENT_METADATA.get(d_code)
+            d_name = d_meta["name_en"] if d_meta else dept_obj.name
+            d_ayush = d_meta["ayush_name"] if d_meta else None
+        else:
+            d_code = "DEPT_GEN_MED"
+            d_meta = DEPARTMENT_METADATA.get("DEPT_GEN_MED")
+            d_name = d_meta["name_en"] if d_meta else "General Medicine"
+            d_ayush = d_meta["ayush_name"] if d_meta else "Kayachikitsa"
 
         # Calculate wait time
         wait_mins = 0
@@ -186,6 +209,10 @@ def get_doctor_queue(
                 review_status=s.review_status or "PENDING_REVIEW",
                 reviewed_by=s.reviewed_by,
                 reviewed_at=s.reviewed_at,
+                department_id=s.department_id,
+                department_code=d_code,
+                department_name=d_name,
+                ayush_opd_tag=d_ayush,
             )
         )
 
@@ -257,6 +284,12 @@ def get_reviewed_patients(
         elif d_pat_id:
             doc_counts[d_pat_id] = doc_counts.get(d_pat_id, 0) + 1
 
+    # 6. Batch fetch departments in single query
+    dept_ids = list({s.department_id for s in sessions if s.department_id})
+    departments_map = {
+        d.id: d for d in db.query(Department).filter(Department.id.in_(dept_ids)).all()
+    } if dept_ids else {}
+
     now_utc = datetime.now(timezone.utc)
     queue_items: list[DoctorQueueItem] = []
 
@@ -276,6 +309,19 @@ def get_reviewed_patients(
 
         red_flags = state_dict.get("red_flags", [])
         has_red_flags = len(red_flags) > 0
+
+        # Resolve department details
+        dept_obj = departments_map.get(s.department_id) if s.department_id else None
+        if dept_obj:
+            d_code = normalize_department_code(dept_obj.code)
+            d_meta = DEPARTMENT_METADATA.get(d_code)
+            d_name = d_meta["name_en"] if d_meta else dept_obj.name
+            d_ayush = d_meta["ayush_name"] if d_meta else None
+        else:
+            d_code = "DEPT_GEN_MED"
+            d_meta = DEPARTMENT_METADATA.get("DEPT_GEN_MED")
+            d_name = d_meta["name_en"] if d_meta else "General Medicine"
+            d_ayush = d_meta["ayush_name"] if d_meta else "Kayachikitsa"
 
         # Reviewer display name
         reviewer_name = None
@@ -322,6 +368,10 @@ def get_reviewed_patients(
                 review_status="REVIEWED",
                 reviewed_by=reviewer_name,
                 reviewed_at=s.reviewed_at,
+                department_id=s.department_id,
+                department_code=d_code,
+                department_name=d_name,
+                ayush_opd_tag=d_ayush,
             )
         )
 
@@ -550,6 +600,17 @@ def get_patient_clinical_detail(
         except Exception:
             db.rollback()
 
+    dept_obj = db.query(Department).filter(Department.id == session.department_id).first() if session.department_id else None
+    if dept_obj:
+        d_code = normalize_department_code(dept_obj.code)
+        d_meta = DEPARTMENT_METADATA.get(d_code)
+        d_name = d_meta["name_en"] if d_meta else dept_obj.name
+        d_ayush = d_meta["ayush_name"] if d_meta else None
+    else:
+        d_code = "DEPT_GEN_MED"
+        d_meta = DEPARTMENT_METADATA.get("DEPT_GEN_MED")
+        d_name = d_meta["name_en"] if d_meta else "General Medicine"
+        d_ayush = d_meta["ayush_name"] if d_meta else "Kayachikitsa"
 
     detail = DoctorPatientDetail(
         intake_session_id=session.id,
@@ -580,6 +641,10 @@ def get_patient_clinical_detail(
         medical_records=all_medical_records,
         clinician_notes=review.notes if review else None,
         submitted_at=session.submitted_at or session.started_at or datetime.now(timezone.utc),
+        department_id=session.department_id,
+        department_code=d_code,
+        department_name=d_name,
+        ayush_opd_tag=d_ayush,
     )
     
     t_elapsed = (datetime.now(timezone.utc) - t_start).total_seconds() * 1000

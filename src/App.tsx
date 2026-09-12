@@ -1,7 +1,8 @@
-import { Route, Switch } from 'wouter';
+import { Route, Switch, useLocation } from 'wouter';
 import { HomePage } from './pages/HomePage';
 import { PatientLanguageSelection } from './pages/PatientLanguageSelection';
 import { PatientDetails } from './pages/PatientDetails';
+import { PatientDepartmentSelection } from './pages/PatientDepartmentSelection';
 import { PatientModeSelection } from './pages/PatientModeSelection';
 import { PatientIntake } from './pages/PatientIntake';
 import { PatientReviewSummary } from './pages/PatientReviewSummary';
@@ -18,6 +19,46 @@ import { HospitalOperations } from './pages/HospitalOperations';
 import { AdminRouteGuard } from './components/admin/AdminRouteGuard';
 import NotFound from './pages/not-found';
 import { Toaster } from './components/ui/toaster';
+import { useKioskIdleTimer } from './hooks/useKioskIdleTimer';
+import { KioskInactivityModal } from './components/patient/KioskInactivityModal';
+import { getStoredLanguage } from './lib/kioskState';
+
+function KioskInactivityWatcher() {
+  const [location, setLocation] = useLocation();
+
+  // Active kiosk intake routes where patient personal data is being entered
+  const isKioskIntakeActive =
+    location.startsWith('/patient') &&
+    location !== '/patient' &&
+    location !== '/patient/language' &&
+    location !== '/patient/complete';
+
+  const handleTimeout = () => {
+    setLocation('/patient/language');
+  };
+
+  const { isIdleWarning, countdownSeconds, resetTimer, cancelAndPurge } = useKioskIdleTimer({
+    idleTimeoutMs: 60000,
+    countdownDurationSec: 15,
+    enabled: isKioskIntakeActive,
+    onTimeout: handleTimeout,
+  });
+
+  const language = getStoredLanguage() || 'English';
+
+  return (
+    <KioskInactivityModal
+      isOpen={isIdleWarning && isKioskIntakeActive}
+      countdownSeconds={countdownSeconds}
+      onContinue={resetTimer}
+      onCancel={() => {
+        cancelAndPurge('USER_CANCELLED');
+        setLocation('/patient/language');
+      }}
+      language={language}
+    />
+  );
+}
 
 function ProtectedAdmin() {
   return (
@@ -62,6 +103,7 @@ function Router() {
       <Route path="/patient/language" component={PatientLanguageSelection} />
       <Route path="/patient/details" component={PatientDetails} />
       <Route path="/patient/details-form" component={PatientDetails} />
+      <Route path="/patient/department" component={PatientDepartmentSelection} />
       <Route path="/patient/mode" component={PatientModeSelection} />
       <Route path="/patient/intake" component={PatientIntake} />
       <Route path="/patient/review" component={PatientReviewSummary} />
@@ -80,6 +122,7 @@ function App() {
   return (
     <>
       <Router />
+      <KioskInactivityWatcher />
       <Toaster />
     </>
   );

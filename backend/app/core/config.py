@@ -81,5 +81,13 @@ class Settings(BaseSettings):
     MAX_QUESTIONS_DEFAULT: int = 10
     MAX_CONSECUTIVE_LOW_PROGRESS: int = 2
 
+    # ABDM Gateway Configuration (Dual-Mode Architecture: Sandbox vs Simulation)
+    ABDM_GATEWAY_MODE: str = "simulation"  # Options: "sandbox", "simulation"
+    ABDM_GATEWAY_BASE_URL: str = "https://dev.abdm.gov.in"
+    ABDM_CLIENT_ID: str | None = None
+    ABDM_CLIENT_SECRET: str | None = None
+    ABDM_FACILITY_ID: str = "IN-MH-100234"  # Registered National Health Facility ID
+    ABDM_HIP_ID: str = "SWASTHYA_VAANI_HIP_01"
+
 
 settings = Settings()

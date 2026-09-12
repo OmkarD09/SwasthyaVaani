@@ -17,6 +17,7 @@ class IntakeSession(Base):
     patient_id = Column(String, ForeignKey("patients.id"), nullable=False, index=True)
     hospital_id = Column(String, ForeignKey("hospitals.id"), nullable=False, index=True)
     doctor_id = Column(String, ForeignKey("doctors.id"), nullable=False, index=True)
+    department_id = Column(String, ForeignKey("departments.id"), nullable=True, index=True)
     workflow_type = Column(String, default="GENERAL_CLINICAL")
     interaction_mode = Column(String, default="VOICE")
     language_code = Column(String, default="en")
@@ -36,6 +37,7 @@ class IntakeSession(Base):
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
+    department = relationship("Department")
     questions = relationship("QuestionEvent", back_populates="intake_session", cascade="all, delete-orphan")
     answers = relationship("Answer", back_populates="intake_session", cascade="all, delete-orphan")
     clinical_states = relationship("ClinicalStateModel", back_populates="intake_session", cascade="all, delete-orphan")

@@ -248,6 +248,8 @@ export function HospitalOperations() {
             {activeTab === 'overview' && stats && (
               <DashboardOverviewTab
                 stats={stats}
+                aiSummary={aiSummary}
+                emergencyCases={emergencyCases}
                 loading={loading}
                 onRefresh={loadAllData}
                 onNavigateTab={handleTabChange}

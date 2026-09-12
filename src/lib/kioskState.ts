@@ -3,6 +3,15 @@ import { patientApi } from '../services/patientApi.ts';
 export const PATIENT_LANG_KEY = 'sv_selected_language';
 export const PATIENT_LANG_CODE_KEY = 'sv_selected_lang_code';
 export const PATIENT_MODE_KEY = 'sv_selected_mode';
+export const PATIENT_DEPARTMENT_KEY = 'sv_selected_department_code';
+
+export function getStoredDepartment(): string {
+  return localStorage.getItem(PATIENT_DEPARTMENT_KEY) || 'AUTO';
+}
+
+export function setStoredDepartment(code: string) {
+  localStorage.setItem(PATIENT_DEPARTMENT_KEY, code);
+}
 
 export function getStoredLanguage(): string {
   return localStorage.getItem(PATIENT_LANG_KEY) || '';

@@ -106,7 +106,7 @@ export const AuditLogsTab: React.FC<AuditLogsTabProps> = ({
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
             <ShieldCheck size={14} className="text-teal-600" />
-            Compliance & System Audit Trail (GET /api/v1/admin/audit)
+            Compliance, Security & Clinical Governance Audit Trail
           </div>
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
             Security & Clinical Audit Logs

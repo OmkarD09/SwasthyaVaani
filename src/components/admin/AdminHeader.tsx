@@ -41,7 +41,17 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
       .slice(0, 2)
       .toUpperCase() || 'AD';
 
-  const isHealthy = serviceStatus?.overall_status === 'HEALTHY' || true;
+  const onlineAdaptersCount = serviceStatus
+    ? [
+        serviceStatus.database?.status === 'HEALTHY' || serviceStatus.database?.status === 'ONLINE',
+        serviceStatus.llm_service?.status === 'HEALTHY' || serviceStatus.llm_service?.status === 'ONLINE',
+        serviceStatus.speech_service?.status === 'HEALTHY' || serviceStatus.speech_service?.status === 'ONLINE',
+        serviceStatus.ocr_service?.status === 'HEALTHY' || serviceStatus.ocr_service?.status === 'ONLINE',
+        serviceStatus.abdm_gateway?.status === 'HEALTHY' || serviceStatus.abdm_gateway?.status === 'ONLINE',
+      ].filter(Boolean).length
+    : 5;
+
+  const isHealthy = !serviceStatus || serviceStatus.overall_status === 'HEALTHY' || onlineAdaptersCount >= 4;
 
   const handleLogout = () => {
     clearClinicianSession();
@@ -100,7 +110,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
           <ShieldCheck size={14} className={isHealthy ? 'text-emerald-600' : 'text-amber-500'} />
           <span className="text-slate-600 font-medium">Core Adapters</span>
-          <span className="text-emerald-700 font-bold">5/5 Online</span>
+          <span className={isHealthy ? 'text-emerald-700 font-bold' : 'text-amber-700 font-bold'}>
+            {onlineAdaptersCount}/5 Online
+          </span>
         </div>
 
         {/* Notifications Bell */}
@@ -114,12 +126,12 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
         {/* User Identity Pill */}
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-teal-700 to-emerald-500 flex items-center justify-center text-white text-[11px] font-extrabold shadow-xs shrink-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-[#1f5b4e] to-[#2e7d6b] flex items-center justify-center text-white text-[11px] font-extrabold shadow-xs shrink-0 border border-[#eaba61]/30">
             {initials}
           </div>
           <div className="hidden md:block text-left leading-tight">
             <div className="text-xs font-bold text-slate-800 flex items-center gap-1">
-              {displayName} <Sparkles size={11} className="text-amber-500" />
+              {displayName} <Sparkles size={11} className="text-[#eaba61]" />
             </div>
             <div className="text-[10px] text-slate-400 font-medium">
               {session?.role || 'HOSPITAL_ADMIN'}
@@ -140,3 +152,5 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     </header>
   );
 };
+
+export default AdminHeader;

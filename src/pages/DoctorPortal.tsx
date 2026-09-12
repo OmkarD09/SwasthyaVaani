@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Building2,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -533,6 +534,10 @@ function formatQueueItems(data: any[]): any[] {
       review_status: item.review_status,
       reviewed_by: item.reviewed_by,
       reviewed_at: item.reviewed_at,
+      department_id: item.department_id || null,
+      department_code: item.department_code || null,
+      department_name: item.department_name || null,
+      ayush_opd_tag: item.ayush_opd_tag || null,
     };
   });
 }
@@ -587,6 +592,7 @@ export function DoctorPortal() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statFilter, setStatFilter] = useState<StatFilterType>('all');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [now, setNow] = useState<number>(Date.now());
@@ -816,6 +822,22 @@ export function DoctorPortal() {
         if (getPriorityWeight(item.priority, item.has_red_flags) !== 3) return false;
       }
     }
+    if (departmentFilter !== 'ALL') {
+      if (departmentFilter === 'EMERGENCY_ONLY') {
+        const isEmergency =
+          item.department_code === 'DEPT_EMERGENCY' ||
+          Boolean(item.has_red_flags) ||
+          item.review_status === 'PRIORITY_REVIEW' ||
+          item.status === 'PRIORITY_REVIEW' ||
+          getPriorityWeight(item.priority, item.has_red_flags) === 3;
+        if (!isEmergency) return false;
+      } else {
+        const matchesDept =
+          item.department_code === departmentFilter ||
+          item.department_id === departmentFilter;
+        if (!matchesDept) return false;
+      }
+    }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     const nameMatch = (item.name || '').toLowerCase().includes(q);
@@ -825,7 +847,19 @@ export function DoctorPortal() {
     const sessionMatch = (item.intake_session_id || '').toLowerCase().includes(q);
     const reasonMatch = (item.reason || '').toLowerCase().includes(q);
     const reviewerMatch = (item.reviewed_by || '').toLowerCase().includes(q);
-    return nameMatch || idMatch || tokenMatch || displayIdMatch || sessionMatch || reasonMatch || reviewerMatch;
+    const deptMatch =
+      (item.department_name || '').toLowerCase().includes(q) ||
+      (item.ayush_opd_tag || '').toLowerCase().includes(q);
+    return (
+      nameMatch ||
+      idMatch ||
+      tokenMatch ||
+      displayIdMatch ||
+      sessionMatch ||
+      reasonMatch ||
+      reviewerMatch ||
+      deptMatch
+    );
   });
 
   const waitingCount = activeLiveQueue.length;
@@ -1106,6 +1140,30 @@ export function DoctorPortal() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* Department Filter Dropdown */}
+                  <div className="relative flex items-center">
+                    <select
+                      id="doctor-queue-department-filter"
+                      value={departmentFilter}
+                      onChange={(e) => {
+                        setDepartmentFilter(e.target.value);
+                        setSelected(0);
+                      }}
+                      className="h-9 px-3 text-xs font-semibold rounded-lg border border-[#dbe5e8] bg-[#fbfdfd] text-[#1e394c] focus:border-[#1f5b4e] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1f5b4e] transition cursor-pointer"
+                      aria-label="Filter queue by department"
+                    >
+                      <option value="ALL">🏥 All Departments (Hospital-Wide)</option>
+                      <option value="EMERGENCY_ONLY">🚨 Emergency Triage Only</option>
+                      <option value="DEPT_GEN_MED">🩺 General Medicine (Kayachikitsa)</option>
+                      <option value="DEPT_ORTHO_SHALYA">🦴 Orthopedics (Shalya Tantra)</option>
+                      <option value="DEPT_ENT_EYE">👁️ Eye & ENT (Shalakya Tantra)</option>
+                      <option value="DEPT_PEDS">👶 Child Health (Kaumarbhritya)</option>
+                      <option value="DEPT_GYNEC">🌸 Women's Health (Prasuti Tantra)</option>
+                      <option value="DEPT_DERM">✨ Skin & Derm (Twak Roga)</option>
+                      <option value="DEPT_PANCHAKARMA">🌿 Panchakarma & Detox</option>
+                    </select>
+                  </div>
+
                   <div className="relative flex items-center">
                     <Search size={15} className="absolute left-3 text-[#7b909a] pointer-events-none" />
                     <input
@@ -1150,27 +1208,70 @@ export function DoctorPortal() {
               </div>
 
               <div className="queue-list">
-                {viewMode === 'live' && statFilter !== 'all' && (
-                  <div className="flex items-center justify-between gap-2 px-3 py-2 mb-2 rounded-xl bg-[#eef7f4] border border-[#cbe4dc] text-xs text-[#1e4d41] transition-all">
-                    <div className="flex items-center gap-2 font-medium">
-                      <Filter size={13} className="text-[#1f5b4e] shrink-0" />
-                      <span>
-                        Active filter: <b>High Priority Patients</b> ({filteredQueue.length}{' '}
-                        {filteredQueue.length === 1 ? 'patient' : 'patients'})
-                      </span>
+                {/* Active filter banners */}
+                <div className="flex flex-col gap-1.5 mb-2">
+                  {viewMode === 'live' && statFilter !== 'all' && (
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#eef7f4] border border-[#cbe4dc] text-xs text-[#1e4d41] transition-all">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Filter size={13} className="text-[#1f5b4e] shrink-0" />
+                        <span>
+                          Active filter: <b>High Priority Patients</b> ({filteredQueue.length}{' '}
+                          {filteredQueue.length === 1 ? 'patient' : 'patients'})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatFilter('all');
+                          setSelected(0);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-[#1f5b4e] hover:text-[#12382f] underline cursor-pointer"
+                      >
+                        <X size={12} /> Clear filter
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStatFilter('all');
-                        setSelected(0);
-                      }}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-[#1f5b4e] hover:text-[#12382f] underline cursor-pointer"
-                    >
-                      <X size={12} /> Clear filter
-                    </button>
-                  </div>
-                )}
+                  )}
+                  {departmentFilter !== 'ALL' && (
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#f0f7f5] border border-[#bcdad0] text-xs text-[#173e35] transition-all">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Building2 size={13} className="text-[#1f5b4e] shrink-0" />
+                        <span>
+                          Department filter:{' '}
+                          <b>
+                            {departmentFilter === 'EMERGENCY_ONLY'
+                              ? '🚨 Emergency Triage Only'
+                              : departmentFilter === 'DEPT_GEN_MED'
+                              ? 'General Medicine (Kayachikitsa)'
+                              : departmentFilter === 'DEPT_ORTHO_SHALYA'
+                              ? 'Orthopedics & Joint Care (Shalya)'
+                              : departmentFilter === 'DEPT_ENT_EYE'
+                              ? 'Eye & ENT (Shalakya Tantra)'
+                              : departmentFilter === 'DEPT_PEDS'
+                              ? 'Child Health (Kaumarbhritya)'
+                              : departmentFilter === 'DEPT_GYNEC'
+                              ? "Women's Health (Prasuti Tantra)"
+                              : departmentFilter === 'DEPT_DERM'
+                              ? 'Skin & Derm (Twak Roga)'
+                              : departmentFilter === 'DEPT_PANCHAKARMA'
+                              ? 'Panchakarma & Detox'
+                              : departmentFilter}
+                          </b>{' '}
+                          ({filteredQueue.length} {filteredQueue.length === 1 ? 'patient' : 'patients'})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDepartmentFilter('ALL');
+                          setSelected(0);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-[#1f5b4e] hover:text-[#12382f] underline cursor-pointer"
+                      >
+                        <X size={12} /> Clear filter
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {(viewMode === 'live' ? liveQueue : reviewedQueue) === null ? (
                   /* Initial loading state */
                   <div className="py-12 px-4 text-center rounded-xl border border-dashed border-[#dce6e9] bg-[#fbfdfd] my-3">
@@ -1219,6 +1320,24 @@ export function DoctorPortal() {
                             {item.display_id || item.id}
                             {item.token ? ` · Token ${item.token}` : ''} · {item.age}
                           </span>
+                          {/* Department Badge & AYUSH OPD tag */}
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                item.department_code === 'DEPT_EMERGENCY' || item.has_red_flags
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  : 'bg-[#eef5f3] text-[#1e4d41] border border-[#d2e3dc]'
+                              }`}
+                            >
+                              <Building2 size={10} />
+                              {item.department_name || 'General Medicine'}
+                            </span>
+                            {item.ayush_opd_tag && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#fcf8ee] text-[#855711] border border-[#f0e2bf]">
+                                🌿 {item.ayush_opd_tag}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="queue-reason">
                           <b>{item.reason}</b>
@@ -1368,6 +1487,23 @@ export function DoctorPortal() {
                         {patient.display_id || patient.id}
                         {patient.token ? ` · Token ${patient.token}` : ''} · {patient.age} · {patient.lang}
                       </span>
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${
+                            patient.department_code === 'DEPT_EMERGENCY' || patient.has_red_flags
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                              : 'bg-[#eef5f3] text-[#1e4d41] border border-[#d2e3dc]'
+                          }`}
+                        >
+                          <Building2 size={11} />
+                          {patient.department_name || 'General Medicine'}
+                        </span>
+                        {patient.ayush_opd_tag && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#fcf8ee] text-[#855711] border border-[#f0e2bf]">
+                            🌿 {patient.ayush_opd_tag}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {viewMode === 'reviewed' ? (
                       <span className="profile-status bg-[#dcfce7] text-[#14532d] border border-[#86efac] px-2.5 py-0.5 rounded-full font-bold text-xs">

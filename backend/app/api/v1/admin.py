@@ -132,6 +132,9 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         ComplaintFrequency(complaint="Abdominal Discomfort & Gastritis", count=19, category="Gastroenterology"),
     ]
 
+    modern_clinical_count = db.query(IntakeSession).filter(IntakeSession.workflow_type != "AYUSH").count()
+    ayush_count = db.query(IntakeSession).filter(IntakeSession.workflow_type == "AYUSH").count()
+
     return AdminDashboardStats(
         total_patients=total_patients,
         active_patients=active_patients,
@@ -146,7 +149,9 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         reports_pending_review=reports_pending,
         intake_volume_trend=volume_trends,
         critical_cases_trend=critical_trends,
-        common_complaints=common_complaints
+        common_complaints=common_complaints,
+        modern_clinical_count=modern_clinical_count,
+        ayush_count=ayush_count
     )
 
 
@@ -160,7 +165,7 @@ def get_ai_monitoring_oversight(db: Session = Depends(get_db)):
     and physician verification/override telemetry.
     Affirms that SwasthyaVaani AI assists rather than replaces clinical judgment.
     """
-    sessions = db.query(IntakeSession).all()
+    sessions = db.query(IntakeSession).order_by(IntakeSession.started_at.desc()).all()
     total_assessments = len(sessions)
     active = sum(1 for s in sessions if s.status in ["ACTIVE", "IN_REVIEW", "READY_TO_SUBMIT"])
     completed = sum(1 for s in sessions if s.status == "SUBMITTED")
@@ -272,7 +277,7 @@ def get_emergency_cases(
     Live priority list of red-flag-escalated intake cases.
     Read-only oversight — clinical actioning is performed by the physician in Doctor Workstation.
     """
-    red_flags = db.query(RedFlagModel).filter(RedFlagModel.status == "OPEN").all()
+    red_flags = db.query(RedFlagModel).filter(RedFlagModel.status == "OPEN").order_by(RedFlagModel.created_at.desc()).all()
     results: List[EmergencyCaseItem] = []
 
     now = datetime.now(timezone.utc)

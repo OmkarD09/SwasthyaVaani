@@ -37,6 +37,7 @@ import {
   getStoredMode,
   setStoredMode,
   getStoredWorkflow,
+  getStoredDepartment,
 } from '../lib/kioskState';
 import {
   buildClinicalSummary,
@@ -578,6 +579,7 @@ export function PatientIntake() {
                                 abha_address: abhaAddressToSend,
                                 language_code: langCode,
                                 workflow_type: getStoredWorkflow(),
+                                department_code: getStoredDepartment(),
                                 interaction_mode: mode.toUpperCase(),
                                 consent_given: true,
                                 consent_language: audioConsent?.consent_language || (langCode === 'hi' ? 'हिन्दी' : langCode === 'mr' ? 'मराठी' : 'English'),

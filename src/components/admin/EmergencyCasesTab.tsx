@@ -10,6 +10,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { EmergencyCaseItem } from '../../services/adminApi';
+import { StatusBadge } from '../ui/StatusBadge';
 
 interface EmergencyCasesTabProps {
   cases: EmergencyCaseItem[];
@@ -142,7 +143,7 @@ export const EmergencyCasesTab: React.FC<EmergencyCasesTabProps> = ({
                     </span>
 
                     {/* Wait Time */}
-                    <span className="flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100">
+                    <span className="flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100 tabular-nums">
                       <Clock size={13} className="text-slate-400" />
                       Wait: {item.wait_time_minutes}m
                     </span>
@@ -192,9 +193,13 @@ export const EmergencyCasesTab: React.FC<EmergencyCasesTabProps> = ({
                     </div>
 
                     <div className="pt-2">
-                      <span className="inline-flex items-center gap-1 text-[11px] text-teal-700 font-semibold bg-teal-50 px-2 py-1 rounded border border-teal-100">
-                        Physician review required in workstation <ArrowRight size={10} />
-                      </span>
+                      <a
+                        href={`/doctor/patient/${item.patient_id}`}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-md transition-colors border border-teal-200"
+                        title="Review case in doctor workstation"
+                      >
+                        Review in Workstation <ArrowRight size={11} />
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -206,3 +211,5 @@ export const EmergencyCasesTab: React.FC<EmergencyCasesTabProps> = ({
     </div>
   );
 };
+
+export default EmergencyCasesTab;

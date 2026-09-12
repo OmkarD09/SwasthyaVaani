@@ -12,12 +12,14 @@ export interface PatientProfileData {
   isAbhaFromQr?: boolean;
 }
 
-const DEFAULT_PATIENT_PROFILE: PatientProfileData = {
-  name: 'Ananya Sharma',
-  age: '34',
-  gender: 'Female',
-  abhaNumber: '91-4521-8890-1234',
-  phone: '9876543210',
+export const BLANK_PATIENT_PROFILE: PatientProfileData = {
+  name: '',
+  age: '',
+  gender: '',
+  abhaNumber: '',
+  abhaAddress: '',
+  dateOfBirth: '',
+  phone: '',
   preferredLanguage: 'en',
   isAbhaFromQr: false,
 };
@@ -28,7 +30,10 @@ export function getStoredPatientProfile(): PatientProfileData | null {
   try {
     const stored = localStorage.getItem(PATIENT_STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
     }
   } catch {
     // ignore storage errors
@@ -36,17 +41,29 @@ export function getStoredPatientProfile(): PatientProfileData | null {
   return null;
 }
 
+export function clearStoredPatientProfile(): void {
+  try {
+    localStorage.removeItem(PATIENT_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export const patientApi = {
   getProfile: async (): Promise<PatientProfileData> => {
     try {
       const stored = localStorage.getItem(PATIENT_STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') {
+          return parsed;
+        }
       }
     } catch {
-      // ignore storage errors and return default
+      // ignore storage errors and return pristine blank
     }
-    return DEFAULT_PATIENT_PROFILE;
+    // Pristine blank profile as mandated by DPDP Act (no hardcoded fallback data)
+    return { ...BLANK_PATIENT_PROFILE };
   },
 
   updateProfile: async (profile: PatientProfileData): Promise<PatientProfileData> => {

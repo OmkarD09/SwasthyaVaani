@@ -6423,3 +6423,15 @@ a:active {
 .ns-stagger-4 {
   animation: ns-stagger-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
 }
+
+/* Admin sidebar hidden scrollbar (mouse/trackpad/touch scrollable without visible track/thumb) */
+.admin-sidebar-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE / Edge */
+}
+
+.admin-sidebar-scroll::-webkit-scrollbar {
+  display: none; /* WebKit / Chromium / Safari */
+  width: 0;
+  height: 0;
+}

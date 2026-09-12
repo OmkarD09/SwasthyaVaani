@@ -24,6 +24,7 @@ class IntakeCreateRequest(BaseModel):
     consent_version: str | None = "v1.0"
     hospital_id: str = "hosp_district_01"
     doctor_id: str = "doc_001"
+    department_code: str | None = "AUTO"
     workflow_type: Literal["GENERAL_CLINICAL", "AYUSH"] = "GENERAL_CLINICAL"
     language_code: str = "en"
     interaction_mode: Literal["VOICE", "TEXT", "TOUCH", "MIXED"] = "VOICE"
@@ -73,6 +74,18 @@ class IntakeReviewUpdateRequest(BaseModel):
     patient_notes: str | None = None
 
 
+class IntakeAbortRequest(BaseModel):
+    reason: Literal["IDLE_TIMEOUT", "USER_CANCELLED", "PRIVACY_PURGE", "OTHER"] | str = "IDLE_TIMEOUT"
+
+
+class IntakeAbortResponse(BaseModel):
+    status: str = "SESSION_PURGED"
+    intake_session_id: str
+    previous_status: str | None = None
+    reason: str
+    purged_at: str
+
+
 class IntakeSubmissionResponse(BaseModel):
     intake_session_id: str
     token: str
@@ -81,6 +94,8 @@ class IntakeSubmissionResponse(BaseModel):
     display_id: str | None = None
     status: str
     doctor_id: str
+    department_id: str | None = None
+    department_code: str | None = None
     submitted_at: datetime
     message: str
 
@@ -107,6 +122,8 @@ class IntakeSessionDetail(BaseModel):
     consent_recorded: bool = False
     hospital_id: str
     doctor_id: str
+    department_id: str | None = None
+    department_code: str | None = None
     workflow_type: str
     language_code: str
     interaction_mode: str

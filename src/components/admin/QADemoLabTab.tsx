@@ -216,8 +216,8 @@ export const QADemoLabTab: React.FC<QADemoLabTabProps> = ({
                 <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-mono font-bold text-xs">
                   Token #A-027
                 </span>
-                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                  CRITICAL
+                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                  Emergency Priority
                 </span>
               </div>
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
@@ -261,7 +261,7 @@ export const QADemoLabTab: React.FC<QADemoLabTabProps> = ({
                   Token #A-021
                 </span>
                 <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                  AYUSH STREAM
+                  AYUSH Stream
                 </span>
               </div>
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
@@ -305,7 +305,7 @@ export const QADemoLabTab: React.FC<QADemoLabTabProps> = ({
                   Token #SV-2048
                 </span>
                 <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
-                  OPD & OCR
+                  Modern Clinical & OCR
                 </span>
               </div>
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">

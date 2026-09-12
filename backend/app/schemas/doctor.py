@@ -31,6 +31,10 @@ class DoctorQueueItem(BaseModel):
     review_status: Optional[str] = "PENDING_REVIEW"
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
+    department_id: Optional[str] = None
+    department_code: Optional[str] = None
+    department_name: Optional[str] = None
+    ayush_opd_tag: Optional[str] = None
 
     @field_validator("submitted_at", "reviewed_at", mode="before")
     @classmethod
@@ -55,6 +59,10 @@ class DoctorPatientDetail(BaseModel):
     consent_recorded: bool = False
     hospital_name: Optional[str] = "Hospital not recorded"
     doctor_name: Optional[str] = "Clinician not recorded"
+    department_id: Optional[str] = None
+    department_code: Optional[str] = None
+    department_name: Optional[str] = None
+    ayush_opd_tag: Optional[str] = None
     workflow_type: Optional[str] = "GENERAL"
     language_code: Optional[str] = "en"
     status: Optional[str] = "WAITING"

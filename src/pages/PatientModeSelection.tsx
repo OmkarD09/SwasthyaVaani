@@ -137,7 +137,7 @@ export function PatientModeSelection() {
               <div className="kiosk-form-actions mt-auto pt-4 border-t border-[#edf3f1]">
                 <button
                   type="button"
-                  onClick={() => setLocation('/patient/details')}
+                  onClick={() => setLocation('/patient/department')}
                   className="kiosk-back-btn"
                 >
                   <ArrowLeft size={16} />

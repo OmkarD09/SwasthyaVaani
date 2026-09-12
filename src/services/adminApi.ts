@@ -30,6 +30,8 @@ export interface AdminDashboardStats {
   intake_volume_trend: StatTrend[];
   critical_cases_trend: StatTrend[];
   common_complaints: ComplaintFrequency[];
+  modern_clinical_count?: number;
+  ayush_count?: number;
 }
 
 export interface AICaseOversightItem {
