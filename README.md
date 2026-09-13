@@ -6,29 +6,82 @@
 
 **Your story, structured before the consultation.**
 
+![SIH 2026](https://img.shields.io/badge/SIH%202026-PS%2026047-orange)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-backend-009485)
+![React](https://img.shields.io/badge/React-19-61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-frontend-3178C6)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF)
+![ABDM](https://img.shields.io/badge/ABDM-sandbox%20%2F%20simulation-2E8B57)
+![FHIR R4](https://img.shields.io/badge/FHIR-R4%20NRCES-2E8B57)
+![License](https://img.shields.io/badge/license-unspecified-lightgrey)
+
 </div>
 
 SwasthyaVaani is an AI-assisted pre-consultation clinical intake platform designed for healthcare workflows in India. It collects a patient's symptoms and medical context through voice or text, adapts its questions based on the evolving clinical story, structures the information into a **ClinicalState**, and presents a concise, physician-reviewable summary before the consultation.
 
 **Patient explains naturally → AI structures the story → Doctor reviews and decides.**
 
+> Runs fully offline out of the box: SQLite database, mock LLM/speech/OCR providers, zero API keys required. See [Quickstart](#quickstart-under-2-minutes).
+
+---
+
+## At a Glance
+
+| | |
+|---|---|
+| **Problem** | Clinical consultations lose time to repetitive, generic history-taking that isn't adapted to the patient or accessible in their language. |
+| **Solution** | An adaptive AI intake that asks only the questions that matter, structures the answer into a doctor-reviewable `ClinicalState`, and hands off a concise summary before the consultation starts. |
+| **Built for** | Smart India Hackathon 2026, Problem Statement 26047 |
+| **Maturity** | Not a mockup — ABDM (Sandbox/Simulation) integration, FHIR R4 (NRCES) export, full AYUSH Dashavidha Pariksha, deterministic safety rules, and realtime doctor dashboards are implemented and runnable locally today. |
+| **Try it in** | Under 2 minutes, no API keys — see [Quickstart](#quickstart-under-2-minutes) |
+
+<!-- TODO: Replace with your actual PS 26047 title/theme/organization and a one-row-per-requirement mapping, e.g.:
+| PS Requirement | What We Built | Where |
+|---|---|---|
+| ... | ... | ... |
+-->
+
+## Demo
+
+[![Watch the SwasthyaVaani demo](https://img.youtube.com/vi/SzdWJoTa6Is/maxresdefault.jpg)](https://youtu.be/SzdWJoTa6Is)
+
+**[▶ Watch the full demo on YouTube](https://youtu.be/SzdWJoTa6Is)**
+
+**Screens at a glance:**
+
+<table>
+<tr>
+<td align="center"><img src="./docs/screenshots/home%20page.png" width="200"/><br/><sub>Kiosk home page</sub></td>
+<td align="center"><img src="./docs/screenshots/login.png" width="200"/><br/><sub>Doctor / Admin login</sub></td>
+<td align="center"><img src="./docs/screenshots/doctor%20dashboard.png" width="200"/><br/><sub>Doctor dashboard</sub></td>
+<td align="center"><img src="./docs/screenshots/Ayush%20assessment.png" width="200"/><br/><sub>AYUSH assessment</sub></td>
+</tr>
+</table>
+
+More screenshots are included throughout the [Core Capabilities](#core-capabilities) section below.
+
 ---
 
 ## Table of Contents
 
+- [At a Glance](#at-a-glance)
+- [Demo](#demo)
 - [The Problem](#the-problem)
 - [Our Approach](#our-approach)
-- [Key Features](#key-features)
+- [Quickstart (Under 2 Minutes)](#quickstart-under-2-minutes)
+- [Repository Structure](#repository-structure)
+- [Core Capabilities](#core-capabilities)
   - [Multilingual Voice and Text Intake](#multilingual-voice-and-text-intake)
   - [Adaptive Clinical Interview](#adaptive-clinical-interview)
   - [Structured ClinicalState](#structured-clinicalstate)
-- [Safety and Red-Flag Awareness](#safety-and-red-flag-awareness)
-- [Medical Document Intelligence](#medical-document-intelligence)
-- [Modern Medicine and AYUSH](#modern-medicine-and-ayush)
-- [Doctor Dashboard](#doctor-dashboard)
-- [Multilingual Clinical Handoff](#multilingual-clinical-handoff)
-- [Security and Privacy Direction](#security-and-privacy-direction)
-- [Healthcare Interoperability](#healthcare-interoperability)
+  - [Safety and Red-Flag Awareness](#safety-and-red-flag-awareness)
+  - [Medical Document Intelligence](#medical-document-intelligence)
+  - [Modern Medicine and AYUSH](#modern-medicine-and-ayush)
+  - [Doctor Dashboard and Realtime Queue](#doctor-dashboard-and-realtime-queue)
+  - [Healthcare Interoperability — ABDM and FHIR R4](#healthcare-interoperability--abdm-and-fhir-r4)
+  - [Kiosk Privacy Safeguards](#kiosk-privacy-safeguards)
+  - [LLM Provider Benchmarking](#llm-provider-benchmarking)
 - [System Architecture](#system-architecture)
 - [Tech Stack](#tech-stack)
 - [Core Data Flow](#core-data-flow)
@@ -36,14 +89,16 @@ SwasthyaVaani is an AI-assisted pre-consultation clinical intake platform design
 - [AI Design Philosophy](#ai-design-philosophy)
 - [Reliability Principles](#reliability-principles)
 - [Product Modules](#product-modules)
-- [Getting Started](#getting-started)
 - [Environment Configuration](#environment-configuration)
+- [Verification, Testing and Benchmarking](#verification-testing-and-benchmarking)
+- [Documentation](#documentation)
+- [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
 - [What Makes SwasthyaVaani Different](#what-makes-swasthyavaani-different)
 - [Clinical Safety Philosophy](#clinical-safety-philosophy)
 - [Project Status](#project-status)
 - [Team](#team)
-- [Documentation](#documentation)
+- [License](#license)
 - [Disclaimer](#disclaimer)
 - [Vision](#vision)
 
@@ -91,11 +146,125 @@ The system aims for **Minimum Sufficient History**: ask enough relevant question
 
 ---
 
-## Key Features
+## Quickstart (Under 2 Minutes)
+
+The backend runs on a zero-config **SQLite** database and defaults every AI/speech/OCR provider to **mock mode** — you can run the entire platform locally with no external services and no API keys.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/OmkarD09/SwasthyaVaani.git
+cd SwasthyaVaani
+```
+
+### 2. Backend (FastAPI, port 8000)
+
+```bash
+cd backend
+python -m venv .venv
+```
+
+**Windows**
+```bash
+.venv\Scripts\activate
+```
+
+**macOS / Linux**
+```bash
+source .venv/bin/activate
+```
+
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Environment variables are optional for local evaluation — copy `backend/.env.example` to `backend/.env` if you want to override defaults (e.g. to plug in a real Groq/Gemini key or a Postgres URL instead of SQLite). See [Environment Configuration](#environment-configuration).
+
+On first run, the backend seeds default accounts automatically (see below).
+
+### 3. Frontend (React + Vite, port 5173)
+
+Run this from the **repository root** — the frontend is not in a separate `frontend/` folder, its `package.json` and `vite.config.ts` live at the project root:
+
+```bash
+npm install
+npm run dev
+```
+
+Vite proxies `/api` requests and WebSocket connections through to the backend on `http://127.0.0.1:8000`, so start the backend first.
+
+### 4. Access the app
+
+| Portal | URL |
+|---|---|
+| Patient Kiosk | http://localhost:5173 |
+| Doctor / Admin login | http://localhost:5173 (login with credentials below) |
+| Backend API (Swagger docs) | http://127.0.0.1:8000/docs |
+
+### 5. Seed test credentials
+
+The backend automatically provisions these accounts on startup:
+
+| Role | Email | Password |
+|---|---|---|
+| Doctor | `ananya.rao@district-hospital.in` | `Doctor@123` |
+| Admin | `admin.rohan@district-hospital.in` | `Admin@123` |
+
+> Change or rotate these before any deployment beyond local development — they are seed/demo credentials only.
+
+---
+
+## Repository Structure
+
+```text
+SwasthyaVaani/
+├── package.json                  # Frontend package manifest (root, not frontend/)
+├── vite.config.ts                # Vite config incl. /api and WS proxy to :8000
+├── src/                          # Frontend source
+│   ├── components/                 # e.g. AbhaQrScanner.tsx
+│   ├── pages/                       # e.g. DoctorPatientAyush.tsx
+│   ├── lib/                         # e.g. kioskState.ts, parseAbhaQr.ts, useKioskIdleTimer.ts
+│   └── App.tsx
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── core/                    # config.py, database.py, events.py (WS manager)
+│   │   ├── models/                  # SQLAlchemy models, e.g. knowledge.py
+│   │   ├── schemas/                 # Pydantic schemas, e.g. ayush.py, clinical_state.py
+│   │   ├── services/
+│   │   │   ├── rag/                    # rag_service.py — in-memory cosine similarity RAG
+│   │   │   ├── safety/                 # red_flags.py — deterministic red-flag rules
+│   │   │   └── fhir/                   # mapper.py, FHIR R4 NRCES generation
+│   │   ├── api/v1/                  # doctor.py, abdm.py, fhir.py, ...
+│   │   └── seed/                    # seed_data.py — default accounts
+│   ├── tests/                       # pytest suite
+│   ├── alembic/                     # DB migrations
+│   ├── requirements.txt
+│   ├── requirements-dev.txt
+│   ├── .env.example                 # Real location of the env template
+│   └── benchmark.py                 # LLM provider benchmarking CLI
+├── docs/
+│   ├── SwasthyaVaani_PRD.md
+│   ├── SwasthyaVaani_TRD.md
+│   ├── SwasthyaVaani_architecture.md
+│   ├── SwasthyaVaani_backend_schema.md
+│   ├── SwasthyaVaani_rules.md
+│   ├── SwasthyaVaani_appflow.md
+│   ├── SwasthyaVaani_AYUSH_Specification.md
+│   ├── SwasthyaVaani_Current_Project_State.md
+│   └── TEAM_CONTRACTS.md
+├── CURRENT_OCR_FLOW.md
+└── BENCHMARK_RESULTS.md
+```
+
+---
+
+## Core Capabilities
 
 ### Multilingual Voice and Text Intake
 
-Patients can communicate through voice or text in supported languages, including Indian languages.
+Patients can communicate through voice or text. The kiosk UI supports **13 Indic languages**, with deeper support — full audio consent flows and i18n bundles — for English, Hindi, and Marathi.
 
 ```mermaid
 flowchart TD
@@ -107,6 +276,15 @@ flowchart TD
 ```
 
 Voice and text use the same underlying clinical reasoning and state-management system.
+
+<table>
+<tr>
+<td align="center"><img src="./docs/screenshots/Language%20page.png" width="180"/><br/><sub>Language selection</sub></td>
+<td align="center"><img src="./docs/screenshots/Choose%20format.png" width="180"/><br/><sub>Choose voice or text</sub></td>
+<td align="center"><img src="./docs/screenshots/Voice.png" width="180"/><br/><sub>Voice intake</sub></td>
+<td align="center"><img src="./docs/screenshots/Text.png" width="180"/><br/><sub>Text intake</sub></td>
+</tr>
+</table>
 
 ### Adaptive Clinical Interview
 
@@ -133,6 +311,13 @@ flowchart TD
     E --> F[Minimum sufficient history]
     F --> G[Intake complete]
 ```
+
+<table>
+<tr>
+<td align="center"><img src="./docs/screenshots/patient%20conversation.png" width="200"/><br/><sub>Adaptive conversation</sub></td>
+<td align="center"><img src="./docs/screenshots/final%20submission.png" width="200"/><br/><sub>Intake complete</sub></td>
+</tr>
+</table>
 
 ### Structured ClinicalState
 
@@ -163,11 +348,16 @@ Each dimension is tracked as one of the following states:
 
 This prevents missing or ambiguous information from being treated as confirmed fact.
 
----
+<table>
+<tr>
+<td align="center"><img src="./docs/screenshots/Patient%20Details.png" width="200"/><br/><sub>Patient details</sub></td>
+<td align="center"><img src="./docs/screenshots/patient%20history.png" width="200"/><br/><sub>Patient history</sub></td>
+</tr>
+</table>
 
-## Safety and Red-Flag Awareness
+### Safety and Red-Flag Awareness
 
-Safety evaluation runs throughout the intake.
+Safety evaluation runs throughout the intake, using a deterministic, configurable rule engine rather than relying solely on an LLM.
 
 ```mermaid
 flowchart TD
@@ -176,26 +366,27 @@ flowchart TD
     B -->|Red flag detected| D[Physician Attention]
 ```
 
-The safety layer is designed to be deterministic and configurable, rather than relying solely on an LLM. Relevant safety areas include:
+**Currently active rules:**
 
-- Acute visual threats
-- Severe respiratory distress
-- Cardiac emergency indicators
-- Neurological red flags
-- Gastrointestinal bleeding indicators
+| Rule ID | Trigger |
+|---|---|
+| `RF-CP-001` | Cardiac warning signs, including Hindi vernacular symptom terms |
+| `RF-SEV-001` | Reported pain severity ≥ 8 |
+| `RF-SO-001` | Febrile respiratory distress |
+| `RF-GI-001` | GI bleeding / melena indicators |
+
+Acute visual-threat and neurological red-flag rules are **planned but not yet implemented** in the active engine (see [Roadmap](#roadmap)).
 
 A red flag is an attention signal — **not an autonomous diagnosis**.
 
----
-
-## Medical Document Intelligence
+### Medical Document Intelligence
 
 Patients can attach relevant previous records such as prescriptions and diagnostic reports.
 
 ```mermaid
 flowchart TD
     A[Upload] --> B[Validation]
-    B --> C[Secure Storage]
+    B --> C[Secure Local Storage]
     C --> D[OCR]
     D --> E[Fact Extraction]
     E --> F["Confidence & Provenance"]
@@ -203,13 +394,13 @@ flowchart TD
     G --> H[Doctor Review]
 ```
 
-OCR-derived information remains reviewable evidence rather than unquestionable truth.
+Uploaded files are written to a secure local directory (`./private_uploads/`) rather than a cloud object store. OCR-derived information remains reviewable evidence rather than unquestionable truth — see `CURRENT_OCR_FLOW.md` for the full pipeline.
 
----
+<p align="center"><img src="./docs/screenshots/Doc%20upload.png" width="240"/><br/><sub>Document upload</sub></p>
 
-## Modern Medicine and AYUSH
+### Modern Medicine and AYUSH
 
-SwasthyaVaani is designed to support modern clinical history-taking and AYUSH-oriented assessment within one platform.
+SwasthyaVaani supports modern clinical history-taking and AYUSH-oriented assessment within one platform.
 
 ```mermaid
 flowchart TD
@@ -222,13 +413,13 @@ flowchart TD
 
 Baseline AYUSH concepts include **Prakriti**, **Vikriti**, **Agni**, and **Koshtha**.
 
-The expanded design considers **Dashavidha Pariksha**, including Sara, Samhanana, Pramana, Satmya, Sattva, Ahara Shakti, Vyayama Shakti, and Vaya, with relevant Ahara-Vihara context.
+The **full Dashavidha Pariksha** is implemented — all eight dimensions (Sara, Samhanana, Pramana, Satmya, Sattva, Ahara Shakti, Vyayama Shakti, and Vaya) are evaluated through adaptive question scoring and rendered directly in the doctor portal's AYUSH view, alongside Ahara-Vihara context.
 
 AYUSH information supports physician review and is not intended for autonomous diagnosis or treatment.
 
----
+<p align="center"><img src="./docs/screenshots/Ayush%20assessment.png" width="240"/><br/><sub>AYUSH assessment (Dashavidha Pariksha)</sub></p>
 
-## Doctor Dashboard
+### Doctor Dashboard and Realtime Queue
 
 The patient-side intake becomes a structured clinical handoff. Doctors can view:
 
@@ -245,65 +436,58 @@ The patient-side intake becomes a structured clinical handoff. Doctors can view:
 - AYUSH assessment, where applicable
 - Intake status and priority
 
+New submissions, triage priority changes, and confirmations are pushed to connected doctor dashboards **live** over a WebSocket connection (an async connection manager mounted at `/api/v1/doctor/ws`) — dashboards do not need to be manually refreshed.
+
 The doctor remains the final clinical authority.
 
 ```mermaid
 flowchart TD
     A[Patient Story] --> B[AI Structuring]
-    B --> C[Doctor Review]
+    B --> C["Doctor Review (Realtime WS)"]
     C --> D["Correction / Confirmation"]
     D --> E[Clinical Consultation]
 ```
 
----
+Patient interaction language and doctor-facing structured language can differ — for example, a Hindi voice conversation is understood by the AI and rendered as a standardized English clinical summary, while the original transcript remains available as evidence.
 
-## Multilingual Clinical Handoff
+<table>
+<tr>
+<td align="center"><img src="./docs/screenshots/doctor%20dashboard.png" width="200"/><br/><sub>Doctor dashboard</sub></td>
+<td align="center"><img src="./docs/screenshots/Consultation.png" width="200"/><br/><sub>Consultation view</sub></td>
+<td align="center"><img src="./docs/screenshots/patient%20report.png" width="200"/><br/><sub>Structured patient report</sub></td>
+</tr>
+</table>
 
-Patient interaction language and doctor-facing structured language can be different. For example:
+### Healthcare Interoperability — ABDM and FHIR R4
 
-```mermaid
-flowchart TD
-    A[Hindi Voice Conversation] --> B[AI Understanding]
-    B --> C[English Clinical Summary]
-    C --> D[Doctor Dashboard]
-```
+Both ABDM and FHIR R4 support are implemented, not just planned:
 
-The original patient transcript remains available as evidence, while the doctor receives a standardized English summary.
-
----
-
-## Security and Privacy Direction
-
-The platform is designed with healthcare data protection in mind. The broader product direction includes:
-
-- Authentication
-- Role-based authorization
-- Patient / doctor verification
-- Session isolation
-- Consent-aware workflows
-- Auditability
-- Secure document handling
-- Provider secret protection
-- Privacy-preserving processing
-- TEE-based secure processing, where implemented
-
-Planned capabilities are not represented as production-ready features until implemented and tested.
-
----
-
-## Healthcare Interoperability
-
-SwasthyaVaani is designed toward structured healthcare interoperability.
+- **ABDM Gateway** — a dual-mode gateway (Sandbox and Simulation) handles ABHA authentication, including camera/file-based ABHA QR scanning and demographic parsing, OTP login, and pushing clinical records to a Health Information Provider (HIP) endpoint (`/api/v1/abdm/hip/push`).
+- **FHIR R4** — confirmed clinical records are transformed into NRCES India Core–compliant `OPConsultRecord` Document Bundles (Composition, Patient, Condition, Observation, MedicationStatement, AllergyIntolerance, plus AYUSH/NAMASTE extensions), with a dedicated validator.
 
 ```mermaid
 flowchart TD
     A[ClinicalState] --> B[Physician Review]
     B --> C[Validated Clinical Data]
-    C --> D["FHIR-Compatible Representation"]
-    D --> E["ABDM / HIS Integration Boundary"]
+    C --> D["FHIR R4 NRCES Bundle"]
+    D --> E["ABDM Gateway (Sandbox / Simulation)"]
 ```
 
-Live ABDM/HIS connectivity should only be claimed when an actual integration is implemented and tested.
+The gateway currently operates in sandbox/simulation mode; production ABDM registration is a deployment-time configuration step, not a code change.
+
+### Kiosk Privacy Safeguards
+
+Because the patient kiosk is often used in a shared or public waiting-room setting, an inactivity watcher monitors the session, shows an audio warning modal before timeout, and automatically purges session data to reduce PHI exposure risk between patients.
+
+<p align="center"><img src="./docs/screenshots/consent%20before%20submision.png" width="240"/><br/><sub>Consent, shown before submission</sub></p>
+
+### LLM Provider Benchmarking
+
+A benchmarking CLI (`backend/benchmark.py`) evaluates Groq, Gemini, and the Mock LLM provider against a set of standard patient scenarios, tracking latency, information gain, stop accuracy, and hallucination rate. Results are recorded in `BENCHMARK_RESULTS.md`.
+
+<!-- TODO: Pull 2–3 headline numbers from BENCHMARK_RESULTS.md here, e.g.:
+> Groq averaged **X.Xs** median response time and **XX%** stop accuracy across N scenarios, vs. XX% for Gemini — see BENCHMARK_RESULTS.md for the full breakdown.
+Concrete numbers here do more to convince a judge than the paragraph above. -->
 
 ---
 
@@ -313,6 +497,7 @@ Live ABDM/HIS connectivity should only be claimed when an actual integration is 
 flowchart TD
     P["Patient<br/>Voice / Text / OCR"] --> API[FastAPI API]
     API --> ACE
+    API --> WS["WebSocket Manager<br/>/api/v1/doctor/ws"]
 
     subgraph ACE["Adaptive Clinical Engine"]
         direction TB
@@ -327,13 +512,16 @@ flowchart TD
 
     ACE --> CS[ClinicalState]
     CS --> OCRN[OCR]
-    CS --> RAGN[RAG]
-    CS --> LLMN["AI / LLM"]
-    OCRN --> DB[("PostgreSQL / Supabase")]
+    CS --> RAGN["RAG (in-memory cosine similarity)"]
+    CS --> LLMN["AI / LLM (Groq, Gemini, or Mock)"]
+    OCRN --> DB[("SQLite (default) / PostgreSQL")]
     RAGN --> DB
     LLMN --> DB
     DB --> DASH[Doctor Dashboard]
+    WS --> DASH
     DASH --> PREV[Physician Review]
+    PREV --> FHIR["FHIR R4 Bundle"]
+    FHIR --> ABDM["ABDM Gateway<br/>(Sandbox / Simulation)"]
 ```
 
 ---
@@ -344,40 +532,43 @@ flowchart TD
 
 | Component | Technology |
 |---|---|
-| Framework | React + TypeScript |
-| Build Tool | Vite |
-| Styling | Tailwind CSS |
+| Framework | React 19.1 + TypeScript |
+| Build Tool | Vite 7 |
+| Styling | Tailwind CSS v4 |
 | UI Components | Radix UI / shadcn-style components |
-| Data Fetching | React Query |
+| Data Fetching | TanStack (React) Query |
+| Routing | Wouter |
 
 **Backend**
 
 | Component | Technology |
 |---|---|
-| Framework | Python + FastAPI |
-| API Style | REST-style HTTP APIs |
+| Framework | Python 3.12 + FastAPI |
+| API Style | REST-style HTTP APIs + WebSockets |
 | Server | Uvicorn |
 | Validation | Pydantic |
-| ORM | SQLAlchemy |
+| ORM | SQLAlchemy 2.0 |
 | Migrations | Alembic |
 
 **Data, AI and Speech**
 
 | Component | Technology |
 |---|---|
-| Database | PostgreSQL / Supabase |
-| Vector Search | pgvector |
-| LLM Providers | Groq, Gemini |
-| Speech (STT / TTS) | Sarvam AI |
-| OCR | PaddleOCR |
-| Knowledge Retrieval | RAG (pgvector-backed) |
+| Database | SQLite (zero-config default) / PostgreSQL (optional) |
+| Vector Storage & Search | JSON column + in-memory cosine similarity (no pgvector dependency; works on both SQLite and Postgres) |
+| Knowledge Retrieval | RAG, backed by the above in-memory similarity search |
+| LLM Providers | Groq, Gemini, Mock (default) |
+| Speech (STT / TTS) | Sarvam AI, Bhashini, Mock (default) |
+| OCR | PaddleOCR, Mock (default) |
+| Document Storage | Local filesystem (`./private_uploads/`) |
+| Realtime Transport | WebSockets (FastAPI native) |
 
 **Interoperability**
 
-| Component | Direction |
+| Component | Status |
 |---|---|
-| Health Data Standard | FHIR |
-| National Registry | ABDM |
+| FHIR R4 (NRCES India Core) | Implemented — OPConsultRecord bundle generation & validation |
+| ABDM (ABHA, HIP push) | Implemented — Sandbox / Simulation gateway modes |
 
 ---
 
@@ -397,9 +588,10 @@ flowchart TD
     J -.repeats until sufficient.-> D
     J --> K[Minimum sufficient history]
     K --> L[Intake submitted]
-    L --> M[Doctor queue]
+    L --> M["Doctor queue (realtime WS push)"]
     M --> N[Structured clinical summary]
     N --> O[Physician review]
+    O --> P["FHIR R4 export / ABDM push"]
 ```
 
 ---
@@ -421,6 +613,7 @@ flowchart TD
     IS --> AY["AYUSH Assessment"]
     IS --> DOC[Documents]
     IS --> PR["Physician Review"]
+    PR --> FHIRB["FHIR Bundle"]
 ```
 
 The intake session connects the conversation, structured clinical state, evidence, and physician review.
@@ -478,9 +671,10 @@ flowchart TD
     PP --> PP4[Adaptive Questions]
     PP --> PP5[Patient Profile]
     PP --> PP6[Records]
+    PP --> PP7["ABHA QR Login"]
 
     ROOT --> DP[Doctor Portal]
-    DP --> DP1[Dashboard]
+    DP --> DP1["Dashboard (Realtime)"]
     DP --> DP2[Patient Queue]
     DP --> DP3[Clinical Summary]
     DP --> DP4[Conversation]
@@ -498,113 +692,88 @@ flowchart TD
 
 ---
 
-## Getting Started
+## Environment Configuration
 
-### Prerequisites
+Never commit API keys or secrets. The real template lives at **`backend/.env.example`** (there is no root-level `.env.example`).
 
-Typical development requirements:
+| Category | Key Variables |
+|---|---|
+| Security & Auth | `SECRET_KEY`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `SEED_USER_DOC_01_PASSWORD`, `SEED_USER_ADMIN_01_PASSWORD` |
+| AI Provider Selection | `PROVIDER_LLM`, `PROVIDER_SPEECH`, `PROVIDER_OCR`, `EMBEDDING_PROVIDER`, `LLM_PROVIDER`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY` |
+| Speech & Audio | `SARVAM_API_KEY`, `BHASHINI_API_KEY`, `BHASHINI_USER_ID` |
+| Document Intelligence | `DOCUMENT_STORAGE_DIR`, `DOCUMENT_MAX_FILE_SIZE_BYTES`, `DOCUMENT_MAX_PAGE_COUNT`, `DOCUMENT_AUTO_PROCESS`, `KUNAL_DOCUMENT_EXTRACTOR_PROVIDER`, `KUNAL_GROQ_API_KEY`, `KUNAL_GROQ_DOCUMENT_MODEL`, `KUNAL_GEMINI_API_KEY`, `KUNAL_GEMINI_DOCUMENT_MODEL` |
+| ABDM Gateway | `ABDM_GATEWAY_MODE`, `ABDM_GATEWAY_BASE_URL`, `ABDM_CLIENT_ID`, `ABDM_CLIENT_SECRET`, `ABDM_FACILITY_ID`, `ABDM_HIP_ID` |
+| Guardrails | `MAX_QUESTIONS_DEFAULT`, `MAX_CONSECUTIVE_LOW_PROGRESS` |
 
-- Node.js
-- npm
-- Python
-- PostgreSQL / Supabase
-- Required AI provider API keys
-- Required speech/OCR configuration
-
-### Clone the Repository
-
-```bash
-git clone <your-repository-url>
-cd SwasthyaVaani
-```
-
-### Backend Setup
-
-```bash
-cd backend
-python -m venv .venv
-```
-
-**Windows**
-```bash
-.venv\Scripts\activate
-```
-
-**macOS / Linux**
-```bash
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Configure environment variables using the project's `.env.example`, then run:
-
-```bash
-uvicorn app.main:app --reload
-```
-
-### Frontend Setup
-
-From the frontend/project directory:
-
-```bash
-npm install
-npm run dev
-```
-
-> Exact commands may vary with the current repository structure. Treat repository configuration and `.env.example` files as the source of truth.
+By default, `PROVIDER_LLM`, `PROVIDER_SPEECH`, `PROVIDER_OCR`, and `EMBEDDING_PROVIDER` are all set to `mock`, and the database URL defaults to a local SQLite file (`sqlite:///./swasthyavaani.db`) — no keys or external database are required to run the project locally.
 
 ---
 
-## Environment Configuration
+## Verification, Testing and Benchmarking
 
-Never commit API keys or secrets.
+| Command | Purpose |
+|---|---|
+| `pytest` (run from `backend/`) | Backend test suite (50+ test files, 180+ tests) |
+| `npm test` | Frontend unit tests (QR parser, intake components) |
+| `npm run typecheck` | Static TypeScript validation (`tsc --noEmit`) |
+| `npm run build` | Production Vite build |
+| `python benchmark.py` (from `backend/`) | LLM provider benchmarking — see `BENCHMARK_RESULTS.md` |
+| `alembic upgrade head` (from `backend/`) | Apply database migrations |
+| `ruff check .` (from `backend/`) | Python linting |
 
-Typical configuration categories include:
+---
 
-```env
-DATABASE_URL=
-GROQ_API_KEY=
-GEMINI_API_KEY=
-SARVAM_API_KEY=
-```
+## Documentation
 
-Use the actual variable names present in the repository.
+| Document | Purpose |
+|---|---|
+| [`README.md`](./README.md) | Project overview, setup & positioning |
+| [`docs/SwasthyaVaani_PRD.md`](./docs/SwasthyaVaani_PRD.md) | What the product must do |
+| [`docs/SwasthyaVaani_architecture.md`](./docs/SwasthyaVaani_architecture.md) | How the system is structured |
+| [`docs/SwasthyaVaani_TRD.md`](./docs/SwasthyaVaani_TRD.md) | Technical implementation details |
+| [`docs/SwasthyaVaani_backend_schema.md`](./docs/SwasthyaVaani_backend_schema.md) | Data models & API contracts |
+| [`docs/SwasthyaVaani_rules.md`](./docs/SwasthyaVaani_rules.md) | Adaptive engine & safety rules |
+| [`docs/SwasthyaVaani_appflow.md`](./docs/SwasthyaVaani_appflow.md) | UX / application flow |
+| [`docs/SwasthyaVaani_AYUSH_Specification.md`](./docs/SwasthyaVaani_AYUSH_Specification.md) | AYUSH / Dashavidha Pariksha spec |
+| [`docs/SwasthyaVaani_Current_Project_State.md`](./docs/SwasthyaVaani_Current_Project_State.md) | Snapshot of current build status |
+| [`docs/TEAM_CONTRACTS.md`](./docs/TEAM_CONTRACTS.md) | Team roles & domain ownership |
+| [`CURRENT_OCR_FLOW.md`](./CURRENT_OCR_FLOW.md) | Document upload & OCR pipeline |
+| [`BENCHMARK_RESULTS.md`](./BENCHMARK_RESULTS.md) | LLM provider benchmark results |
+
+---
+
+## Troubleshooting
+
+- **Frontend can't reach the API** — confirm the backend is running on port 8000 before starting the frontend; Vite's dev server proxies `/api` and WebSocket traffic to it.
+- **`pip install` fails on PaddleOCR** — make sure you're installing a build compatible with your Python version and platform; if you don't need real OCR locally, leave `PROVIDER_OCR=mock` (the default) and skip it.
+- **venv activation fails on Windows** — use `.venv\Scripts\activate` in PowerShell/cmd, not the macOS/Linux `source` form.
+- **Can't log in as Doctor/Admin** — use the [seed credentials](#5-seed-test-credentials) above; they're created automatically the first time the backend starts against a fresh database.
+- **Wrong database in use** — check `DATABASE_URL` in `backend/.env`; if unset, SQLite is used automatically.
 
 ---
 
 ## Roadmap
 
-### Core
+### Implemented
 
-- Patient intake
-- Voice/text interaction
-- Adaptive clinical questioning
-- ClinicalState
-- Modern clinical history
-- Doctor dashboard
-- Structured summaries
-- Baseline safety/red-flag handling
-- OCR/document pipeline
-- Baseline AYUSH concepts
+- Patient intake (voice/text), adaptive clinical questioning, ClinicalState
+- Modern clinical history + baseline and full AYUSH assessment (Dashavidha Pariksha)
+- Doctor dashboard with realtime WebSocket updates
+- Deterministic safety/red-flag rules (cardiac, pain severity, febrile respiratory, GI bleed)
+- OCR/document pipeline with local secure storage
+- ABDM gateway (Sandbox/Simulation) and FHIR R4 (NRCES) export
+- Kiosk privacy safeguards (inactivity purge)
+- LLM provider benchmarking suite
 
-### Expanded
+### In Development / Proposed
 
-- Expanded Dashavidha Pariksha
-- Deeper authentication and verification
-- TEE-based secure processing, where appropriate
-- FHIR mapping
-- ABDM/HIS integration
+- Acute visual-threat and neurological red-flag rules
+- Deeper authentication and verification, TEE-based secure processing
+- Production ABDM registration (beyond sandbox/simulation)
 - Expanded audit capabilities
-- Additional Indian languages
+- Additional Indian languages beyond the current 13
 - Advanced document intelligence
 - Additional hospital administration capabilities
-
-Features are described according to their actual implementation status: **implemented**, **in development**, or **proposed**.
 
 ---
 
@@ -655,9 +824,9 @@ The physician remains responsible for diagnosis, treatment, and clinical decisio
 
 ## Project Status
 
-**SwasthyaVaani is an evolving prototype built for Smart India Hackathon 2026.**
+**SwasthyaVaani is an evolving prototype built for Smart India Hackathon 2026, Problem Statement 26047.**
 
-Some capabilities are implemented, while others are in development or proposed. The project prioritizes:
+Core intake, safety, AYUSH, ABDM, and FHIR functionality is implemented and testable locally today (see [Quickstart](#quickstart-under-2-minutes)); some capabilities remain in development (see [Roadmap](#roadmap)). The project prioritizes:
 
 1. Patient usability
 2. Clinical usefulness
@@ -672,7 +841,7 @@ Some capabilities are implemented, while others are in development or proposed. 
 
 ## Team
 
-Developed as a collaborative project for **Smart India Hackathon 2026**.
+Developed as a collaborative project for **Smart India Hackathon 2026 (Problem Statement 26047)**.
 
 | Name | Role |
 |---|---|
@@ -685,32 +854,9 @@ Developed as a collaborative project for **Smart India Hackathon 2026**.
 
 ---
 
-## Documentation
+## License
 
-Recommended project documentation:
-
-```text
-README.md
-PRD.md
-architecture.md
-TRD.md
-API / DB documentation
-AI / Clinical Engine documentation
-Security documentation
-UX / Application Flow documentation
-```
-
-Keep each document focused:
-
-| Document | Purpose |
-|---|---|
-| `README.md` | Project overview, setup & positioning |
-| `PRD.md` | What the product must do |
-| `architecture.md` | How the system is structured |
-| `TRD.md` | Technical implementation details |
-| AI / Clinical spec | Adaptive reasoning & clinical-state behavior |
-| API / DB spec | Data models & API contracts |
-| Security spec | Authentication, authorization & privacy |
+No license file is currently included in this repository. Until one is added, all rights are reserved by the authors — add a `LICENSE` file (e.g. MIT or Apache 2.0) before any public or production distribution.
 
 ---
 
