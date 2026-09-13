@@ -15,13 +15,21 @@ import {
   Save,
 } from 'lucide-react';
 import { DoshaArcGauge } from '../clinician/ClinicianShared';
-import { type AyushData } from './AyushAssessment';
 import {
   type AyushAssessmentData,
   type AyushDimensionData,
   type AyushProvenanceSource,
   type AyushAssessmentStatus,
 } from '../../lib/clinicianData';
+
+export interface AyushData {
+  prakriti?: string;
+  vikriti?: string;
+  agni?: string;
+  koshtha?: string;
+  ahara_vihara?: string;
+  doshas?: [number, number, number] | number[];
+}
 
 export interface AyushAssessmentSectionProps {
   ayushAssessment?: AyushAssessmentData;

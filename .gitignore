@@ -25,9 +25,12 @@ private_uploads/
 backend/private_uploads/
 backend/tests/generated/
 
-# Build artifacts
+# Build artifacts & caches
 dist/
 build/
+*.tsbuildinfo
+*.log
+.replit-artifact/
 
 # Database files
 *.db

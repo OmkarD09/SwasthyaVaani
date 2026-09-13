@@ -8,7 +8,6 @@ import { PatientReviewSummary } from './pages/PatientReviewSummary';
 import { PatientComplete } from './pages/PatientComplete';
 import { PatientProfile } from './pages/PatientProfile';
 import { ClinicianLogin } from './pages/ClinicianLogin';
-import { DoctorPatientReview } from './pages/DoctorPatientReview';
 import { DoctorPatientSummary } from './pages/DoctorPatientSummary';
 import { DoctorPatientConversation } from './pages/DoctorPatientConversation';
 import { DoctorPatientAyush } from './pages/DoctorPatientAyush';
@@ -43,7 +42,7 @@ function Router() {
       <Route path="/doctor/patient/:id/conversation" component={DoctorPatientConversation} />
       <Route path="/doctor/patient/:id/summary" component={DoctorPatientSummary} />
       <Route path="/doctor/patient/:id/ayush" component={DoctorPatientAyush} />
-      <Route path="/doctor/patient/:id" component={DoctorPatientReview} />
+      <Route path="/doctor/patient/:id" component={DoctorPatientSummary} />
 
       {/* Protected Admin Routes */}
       <Route path="/admin" component={ProtectedAdmin} />
