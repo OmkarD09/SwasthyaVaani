@@ -554,11 +554,11 @@ flowchart TD
 
 | Component | Technology |
 |---|---|
-| Database | SQLite (zero-config default) / PostgreSQL (optional) |
+| Database | PostgreSQL (Supabase) |
 | Vector Storage & Search | JSON column + in-memory cosine similarity (no pgvector dependency; works on both SQLite and Postgres) |
 | Knowledge Retrieval | RAG, backed by the above in-memory similarity search |
 | LLM Providers | Groq, Gemini, Mock (default) |
-| Speech (STT / TTS) | Sarvam AI, Bhashini, Mock (default) |
+| Speech (STT / TTS) | Sarvam AI + browser speech/voice layer + Mock |
 | OCR | PaddleOCR, Mock (default) |
 | Document Storage | Local filesystem (`./private_uploads/`) |
 | Realtime Transport | WebSockets (FastAPI native) |
